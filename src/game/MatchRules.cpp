@@ -1,0 +1,118 @@
+#include "game/MatchRules.h"
+
+#include <QStringList>
+
+#include <algorithm>
+#include <cmath>
+
+namespace toupie {
+
+namespace {
+double clampMultiplier(double value)
+{
+    return std::clamp(value, MatchRules::kMinMultiplier, MatchRules::kMaxMultiplier);
+}
+
+bool same(double a, double b)
+{
+    return std::abs(a - b) < 1e-6;
+}
+} // namespace
+
+BattleConfig MatchRules::apply(const BattleConfig &base) const
+{
+    BattleConfig c = base;
+    const double v = std::max(0.1, speed);
+    c.launchSpeed *= v;
+    c.orbitBase *= v;
+    c.orbitPerAttack *= v;
+    c.dashSpeed *= v;
+    c.steerAcceleration *= v * steering;
+
+    c.knockbackBase *= knockback;
+    c.knockbackPerAttack *= knockback;
+    c.knockbackPerAttackerDefense *= knockback;
+    c.knockbackApproach *= knockback;
+    c.specialKnockbackScale *= knockback;
+
+    c.passiveBase *= wear;
+    c.damageBase *= damage;
+    c.specialDamageScale *= damage;
+    c.dashAttackMultiplier = 1.0 + (base.dashAttackMultiplier - 1.0) * dashPower;
+
+    c.maxSpin = std::max(10.0, maxEndurance);
+    c.maxDuration = std::max(0.0, timeLimit);
+
+    c.specialChargeRate *= specialCharge;
+    c.specialHitCharge *= specialCharge;
+    c.specialsEnabled = base.specialsEnabled && specialCharge > 0.0;
+    return c;
+}
+
+bool MatchRules::isDefault() const
+{
+    return *this == MatchRules{};
+}
+
+QString MatchRules::summary() const
+{
+    QStringList parts;
+    auto percent = [&](const QString &label, double value) {
+        if (!same(value, 1.0))
+            parts << QStringLiteral("%1 %2 %").arg(label).arg(qRound(value * 100));
+    };
+    percent(QStringLiteral("Vitesse"), speed);
+    percent(QStringLiteral("Rebonds"), knockback);
+    percent(QStringLiteral("Usure"), wear);
+    percent(QStringLiteral("Dégâts"), damage);
+    percent(QStringLiteral("Dash"), dashPower);
+    if (!same(maxEndurance, 100.0))
+        parts << QStringLiteral("Endurance %1").arg(qRound(maxEndurance));
+    if (timeLimit > 0.0)
+        parts << QStringLiteral("Limite %1 s").arg(qRound(timeLimit));
+    if (steering <= 0.0)
+        parts << QStringLiteral("Sans pilotage");
+    else
+        percent(QStringLiteral("Pilotage"), steering);
+    if (specialCharge <= 0.0)
+        parts << QStringLiteral("Sans coups spéciaux");
+    else
+        percent(QStringLiteral("Charge spéciale"), specialCharge);
+    return parts.isEmpty() ? QStringLiteral("Règles normales") : parts.join(QStringLiteral(" · "));
+}
+
+QJsonObject MatchRules::toJson() const
+{
+    return {
+        {"speed", speed},           {"knockback", knockback},
+        {"wear", wear},             {"damage", damage},
+        {"maxEndurance", maxEndurance}, {"timeLimit", timeLimit},
+        {"steering", steering},     {"specialCharge", specialCharge},
+        {"dashPower", dashPower},
+    };
+}
+
+MatchRules MatchRules::fromJson(const QJsonObject &json)
+{
+    MatchRules r;
+    r.speed = clampMultiplier(json.value("speed").toDouble(1.0));
+    r.knockback = clampMultiplier(json.value("knockback").toDouble(1.0));
+    r.wear = clampMultiplier(json.value("wear").toDouble(1.0));
+    r.damage = clampMultiplier(json.value("damage").toDouble(1.0));
+    r.maxEndurance = std::clamp(json.value("maxEndurance").toDouble(100.0), 10.0, 1000.0);
+    r.timeLimit = std::clamp(json.value("timeLimit").toDouble(0.0), 0.0, 3600.0);
+    r.steering = clampMultiplier(json.value("steering").toDouble(1.0));
+    r.specialCharge = clampMultiplier(json.value("specialCharge").toDouble(1.0));
+    r.dashPower = clampMultiplier(json.value("dashPower").toDouble(1.0));
+    return r;
+}
+
+bool MatchRules::operator==(const MatchRules &o) const
+{
+    return same(speed, o.speed) && same(knockback, o.knockback) && same(wear, o.wear)
+        && same(damage, o.damage) && same(maxEndurance, o.maxEndurance)
+        && same(timeLimit, o.timeLimit) && same(steering, o.steering)
+        && same(specialCharge, o.specialCharge) && same(dashPower, o.dashPower);
+}
+
+} // namespace toupie

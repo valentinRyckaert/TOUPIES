@@ -29,8 +29,16 @@ struct BattleConfig
     double friction = 0.7;
     /// Propulsion tangentielle due à la rotation (la toupie se déplace dans
     /// le sens inverse de sa rotation) : base + parAttaque * attaque.
-    double orbitBase = 0.22;
-    double orbitPerAttack = 0.04;
+    double orbitBase = 0.15;
+    double orbitPerAttack = 0.015;
+    /// Attraction constante vers le centre : sans action contraire (pilotage,
+    /// chocs), les toupies finissent par se rapprocher du centre.
+    double centerPull = 0.12;
+    /// Pilotage aux flèches : légère accélération dans la direction voulue.
+    double steerAcceleration = 0.45;
+    /// Force de lancer : multiplicateur de launchSpeed choisi par le joueur.
+    double launchPowerMin = 0.5;
+    double launchPowerMax = 1.5;
     /// En dessous de ce ratio de rotation, la toupie vacille.
     double wobbleThreshold = 0.25;
     double wobbleStrength = 1.2;
@@ -86,6 +94,15 @@ struct BattleConfig
     double dashBoostDuration = 0.35; ///< Durée du bonus d'attaque.
     double postDashSpeed = 0.45;
 
+    // --- Coups spéciaux ------------------------------------------------------
+    /// La jauge (0 à 100) se remplit avec le temps et à chaque choc ; pleine,
+    /// elle permet de lancer le coup spécial du boulon.
+    double specialChargeRate = 7.0;  ///< Points par seconde.
+    double specialHitCharge = 6.0;   ///< Points par choc reçu ou donné.
+    double specialDamageScale = 1.0; ///< Multiplicateur des dégâts des coups spéciaux.
+    double specialKnockbackScale = 1.0;
+    bool specialsEnabled = true;
+
     // --- Mêlée (3-4 toupies) ---------------------------------------------------
     /// Endurance rendue à la toupie qui provoque une élimination (dernier choc
     /// reçu par la victime il y a moins de knockoutWindow secondes).
@@ -93,7 +110,8 @@ struct BattleConfig
     double knockoutWindow = 4.0;
 
     // --- Partie -------------------------------------------------------------------
-    double maxDuration = 90.0;      ///< Au-delà : victoire à l'endurance restante.
+    /// Durée maximale (0 = aucune) ; au-delà, victoire à l'endurance restante.
+    double maxDuration = 0.0;
     double fixedStep = 1.0 / 240.0;
 
     double dashDistance() const { return dashSpeed * dashDuration; }

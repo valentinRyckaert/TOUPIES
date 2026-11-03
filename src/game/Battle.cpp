@@ -47,7 +47,7 @@ Vec2 Battle::startPosition(int index) const
     return Vec2::fromAngle(angle) * (m_config.startOffset * m_geometry.innerRadius());
 }
 
-void Battle::launch(const QList<double> &angles)
+void Battle::launch(const QList<double> &angles, const QList<double> &powers)
 {
     if (m_phase != Phase::Ready)
         return;
@@ -56,8 +56,10 @@ void Battle::launch(const QList<double> &angles)
         Spinner &s = m_spinners[i];
         if (s.status == Spinner::Status::Forfeit)
             continue;
+        const double power = std::clamp(powers.value(i, 1.0), m_config.launchPowerMin,
+                                        m_config.launchPowerMax);
         s.position = startPosition(i);
-        s.velocity = Vec2::fromAngle(angles.value(i, 0.0)) * m_config.launchSpeed;
+        s.velocity = Vec2::fromAngle(angles.value(i, 0.0)) * (m_config.launchSpeed * power);
         s.status = Spinner::Status::Spinning;
     }
     m_phase = Phase::Running;
@@ -91,8 +93,52 @@ bool Battle::canDash(int index) const
         return false;
     const Spinner &self = m_spinners[index];
     return m_phase == Phase::Running && self.isActive() && !self.isDashing()
-        && self.dashCooldown <= 0.0 && self.spin > m_config.dashCost
+        && !self.isDisarmed() && self.dashCooldown <= 0.0 && self.spin > m_config.dashCost
         && nearestOpponent(index) >= 0;
+}
+
+void Battle::setSteering(int index, Vec2 direction)
+{
+    if (index < 0 || index >= playerCount())
+        return;
+    const double length = direction.length();
+    m_spinners[index].steer = length > 1.0 ? direction / length : direction;
+}
+
+bool Battle::canSpecial(int index) const
+{
+    if (index < 0 || index >= playerCount() || !m_config.specialsEnabled)
+        return false;
+    const Spinner &self = m_spinners[index];
+    return m_phase == Phase::Running && self.isActive() && !self.isDisarmed()
+        && self.special >= 100.0 && SpecialMove::find(self.top.special()).has_value()
+        && nearestOpponent(index) >= 0;
+}
+
+bool Battle::requestSpecial(int index)
+{
+    if (!canSpecial(index))
+        return false;
+    Spinner &self = m_spinners[index];
+    const SpecialMove move = *SpecialMove::find(self.top.special());
+    const Spinner &target = m_spinners[nearestOpponent(index)];
+
+    Projectile p;
+    p.id = m_nextProjectileId++;
+    p.move = move.id;
+    p.owner = index;
+    p.ring = move.shape == SpecialMove::Shape::Ring;
+    p.origin = self.position;
+    p.direction = (target.position - self.position).normalized();
+    p.position = self.position + p.direction * m_config.topRadius;
+    p.radius = m_config.topRadius;
+    p.speed = move.speed;
+    p.range = move.range;
+    p.width = move.width;
+    p.color = move.color;
+    m_projectiles.push_back(p);
+    self.special = 0.0;
+    return true;
 }
 
 bool Battle::requestDash(int index, int targetIndex)
@@ -233,6 +279,7 @@ void Battle::step(double h)
         for (int j = i + 1; j < playerCount(); ++j)
             resolveCollision(i, j);
     }
+    updateProjectiles(h);
 
     // Éliminations de ce pas, les plus faibles d'abord (départage du classement).
     QList<int> order;
@@ -312,6 +359,9 @@ void Battle::integrate(Spinner &s, double h)
             s.velocity = s.dashDirection * m_config.postDashSpeed;
         }
     } else {
+        // Ralentie (givre) : moins de propulsion, plus de frottement, pas de pilotage.
+        const double control = s.isSlowed() ? 1.0 - s.slowStrength : 1.0;
+
         // Pente de la cuvette : ramène la toupie vers le centre.
         Vec2 acceleration = s.position * -m_config.slopeStrength;
 
@@ -324,10 +374,17 @@ void Battle::integrate(Spinner &s, double h)
             const double nearCenter = std::min(1.0, r / 0.15);
             const double orbit = (m_config.orbitBase + m_config.orbitPerAttack * s.stats.attack)
                                * (0.4 + 0.6 * ratio) * nearCenter;
-            acceleration += clockwiseTangent * (-s.spinSign * orbit);
+            acceleration += clockwiseTangent * (-s.spinSign * orbit * control);
+            // Attraction vers le centre : sans action contraire, la toupie s'en rapproche.
+            acceleration -= s.position / r * (m_config.centerPull * nearCenter);
         }
 
-        acceleration -= s.velocity * m_config.friction;
+        // Pilotage aux flèches : légère correction de trajectoire.
+        if (!s.isSlowed() && s.steer.lengthSquared() > 1e-9)
+            acceleration += s.steer * m_config.steerAcceleration;
+
+        const double friction = m_config.friction * (s.isSlowed() ? 1.0 + 2.0 * s.slowStrength : 1.0);
+        acceleration -= s.velocity * friction;
 
         // Une toupie à bout de souffle vacille.
         if (ratio < m_config.wobbleThreshold) {
@@ -346,6 +403,10 @@ void Battle::integrate(Spinner &s, double h)
 
     s.dashCooldown = std::max(0.0, s.dashCooldown - h);
     s.boostTimer = std::max(0.0, s.boostTimer - h);
+    s.slowTimer = std::max(0.0, s.slowTimer - h);
+    s.disarmTimer = std::max(0.0, s.disarmTimer - h);
+    if (m_config.specialsEnabled)
+        s.special = std::min(100.0, s.special + m_config.specialChargeRate * h);
 }
 
 void Battle::resolveCollision(int i, int j)
@@ -411,6 +472,10 @@ void Battle::resolveCollision(int i, int j)
     a.lastHitBy = j;
     b.lastHitBy = i;
     a.lastHitTime = b.lastHitTime = m_elapsed;
+    if (m_config.specialsEnabled) {
+        a.special = std::min(100.0, a.special + m_config.specialHitCharge);
+        b.special = std::min(100.0, b.special + m_config.specialHitCharge);
+    }
 
     // Un dash s'arrête au premier contact (le bonus d'attaque reste actif).
     a.dashTimer = 0.0;
@@ -423,6 +488,137 @@ void Battle::resolveCollision(int i, int j)
     event.intensity = std::min(1.0, (damageToA + damageToB) / 20.0);
     event.first = i;
     event.second = j;
+    m_impacts.append(event);
+}
+
+// ---------------------------------------------------------------------------
+// Coups spéciaux
+// ---------------------------------------------------------------------------
+
+namespace {
+double distanceToSegment(Vec2 p, Vec2 a, Vec2 b)
+{
+    const Vec2 ab = b - a;
+    const double len2 = ab.lengthSquared();
+    const double t = len2 > 1e-12 ? std::clamp((p - a).dot(ab) / len2, 0.0, 1.0) : 0.0;
+    return (p - (a + ab * t)).length();
+}
+} // namespace
+
+void Battle::updateProjectiles(double h)
+{
+    for (Projectile &p : m_projectiles) {
+        const auto move = SpecialMove::find(p.move);
+        if (!move) {
+            p.traveled = p.range + 1.0;
+            continue;
+        }
+        if (p.ring) {
+            // Anneau : touche chaque adversaire au passage du front.
+            const double previous = p.radius;
+            p.radius += p.speed * h;
+            p.traveled = p.radius;
+            for (int j = 0; j < playerCount(); ++j) {
+                const Spinner &t = m_spinners[j];
+                if (j == p.owner || !t.isActive() || p.hit.contains(j))
+                    continue;
+                const double d = (t.position - p.origin).length();
+                if (d + m_config.topRadius >= previous - p.width
+                    && d - m_config.topRadius <= p.radius + p.width && d <= p.range + m_config.topRadius) {
+                    p.hit.append(j);
+                    applySpecialHit(p, *move, j);
+                }
+            }
+        } else {
+            // Vague : avance en ligne droite et s'arrête sur le premier adversaire.
+            const Vec2 previous = p.position;
+            p.position += p.direction * (p.speed * h);
+            p.traveled += p.speed * h;
+            for (int j = 0; j < playerCount(); ++j) {
+                const Spinner &t = m_spinners[j];
+                if (j == p.owner || !t.isActive())
+                    continue;
+                if (distanceToSegment(t.position, previous, p.position)
+                    <= m_config.topRadius + p.width) {
+                    p.hit.append(j);
+                    applySpecialHit(p, *move, j);
+                    p.traveled = p.range + 1.0; // Absorbée.
+                    break;
+                }
+            }
+            if (m_geometry.level(p.position) > 1.2)
+                p.traveled = p.range + 1.0;
+        }
+    }
+    m_projectiles.erase(std::remove_if(m_projectiles.begin(), m_projectiles.end(),
+                                       [](const Projectile &p) { return p.traveled > p.range; }),
+                        m_projectiles.end());
+}
+
+void Battle::applySpecialHit(const Projectile &projectile, const SpecialMove &move, int target)
+{
+    Spinner &t = m_spinners[target];
+    Spinner &owner = m_spinners[projectile.owner];
+
+    // Les stats comptent aussi face aux coups spéciaux : la défense réduit
+    // les dégâts et le recul.
+    const double mitigation = std::max(
+        m_config.minReduction, 1.0 - m_config.damagePerDefense * t.stats.defense);
+    const double damage = move.damage * m_config.specialDamageScale * mitigation * stability(t);
+    t.spin -= damage;
+
+    const Vec2 direction = projectile.ring ? (t.position - projectile.origin).normalized()
+                                           : projectile.direction;
+    const double resistance = std::max(
+        m_config.minReduction, 1.0 - m_config.knockbackPerDefense * t.stats.defense);
+    t.velocity += direction * (move.knockback * m_config.specialKnockbackScale * resistance
+                               * stability(t));
+
+    switch (move.effect) {
+    case SpecialMove::Effect::None:
+        break;
+    case SpecialMove::Effect::PullToCenter: {
+        const Vec2 toCenter = (-t.position).normalized();
+        t.velocity = toCenter * move.effectStrength;
+        t.dashTimer = 0.0;
+        break;
+    }
+    case SpecialMove::Effect::Slow:
+        t.slowTimer = move.effectDuration;
+        t.slowStrength = move.effectStrength;
+        t.dashTimer = 0.0;
+        break;
+    case SpecialMove::Effect::Teleport: {
+        // Point aléatoire au niveau voulu (toutes les formes sont homogènes).
+        std::uniform_real_distribution<double> angle(0.0, 2.0 * kPi);
+        const Vec2 dir = Vec2::fromAngle(angle(m_rng));
+        const double level = std::max(1e-6, m_geometry.level(dir));
+        t.position = dir * (move.effectStrength / level);
+        t.velocity = dir * 0.25;
+        t.dashTimer = 0.0;
+        t.escaping = false;
+        break;
+    }
+    case SpecialMove::Effect::Drain:
+        if (owner.isActive())
+            owner.spin = std::min(owner.maxSpin, owner.spin + damage * move.effectStrength);
+        break;
+    case SpecialMove::Effect::Disarm:
+        t.disarmTimer = move.effectDuration;
+        t.dashTimer = 0.0;
+        break;
+    }
+
+    t.lastHitBy = projectile.owner;
+    t.lastHitTime = m_elapsed;
+
+    ImpactEvent event;
+    event.point = t.position;
+    event.intensity = std::min(1.0, 0.4 + damage / 20.0);
+    event.first = projectile.owner;
+    event.second = target;
+    event.special = true;
+    event.color = move.color;
     m_impacts.append(event);
 }
 
@@ -460,7 +656,7 @@ void Battle::checkEnd()
         const bool tie = previous >= 0
                       && std::abs(m_spinners[last].spin - m_spinners[previous].spin) < 1e-9;
         finish(tie ? -1 : last, reasonFor(m_spinners[last]));
-    } else if (m_elapsed >= m_config.maxDuration) {
+    } else if (m_config.maxDuration > 0.0 && m_elapsed >= m_config.maxDuration) {
         std::sort(active.begin(), active.end(),
                   [this](int a, int b) { return m_spinners[a].spin > m_spinners[b].spin; });
         const bool tie = std::abs(m_spinners[active[0]].spin - m_spinners[active[1]].spin) < 0.5;

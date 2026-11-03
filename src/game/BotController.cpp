@@ -1,6 +1,7 @@
 #include "game/BotController.h"
 
 #include "game/Battle.h"
+#include "game/SpecialMove.h"
 
 #include <algorithm>
 #include <cmath>
@@ -86,10 +87,52 @@ double BotController::chooseLaunchAngle(const Battle &battle)
     return direction.angle() + variation(m_rng) + error(m_rng);
 }
 
+double BotController::chooseLaunchPower(const Battle &battle)
+{
+    const Spinner &self = battle.spinner(m_index);
+    double power = 1.0;
+    switch (classify(self.stats)) {
+    case TopType::Attack:
+        power = 1.3; // Arriver vite au contact.
+        break;
+    case TopType::Defense:
+        power = 0.85; // Se poser au centre.
+        break;
+    case TopType::Endurance:
+        power = 0.75; // Économiser sa rotation.
+        break;
+    case TopType::Balance:
+        break;
+    }
+    std::normal_distribution<double> error(0.0, aimError() * 0.5);
+    const BattleConfig &cfg = battle.config();
+    return std::clamp(power + error(m_rng), cfg.launchPowerMin, cfg.launchPowerMax);
+}
+
+double BotController::dodgeSkill() const
+{
+    switch (m_difficulty) {
+    case Difficulty::Easy:
+        return 0.2;
+    case Difficulty::Normal:
+        return 0.6;
+    case Difficulty::Hard:
+        break;
+    }
+    return 0.9;
+}
+
 void BotController::update(Battle &battle, double dt)
 {
     if (battle.phase() != Battle::Phase::Running)
         return;
+
+    // Pilotage : réévalué fréquemment (esquive comprise).
+    m_steerTimer -= dt;
+    if (m_steerTimer <= 0.0) {
+        m_steerTimer = std::min(0.1, reactionTime() * 0.5);
+        battle.setSteering(m_index, chooseSteering(battle));
+    }
 
     m_decisionTimer -= dt;
     if (m_decisionTimer > 0.0)
@@ -98,11 +141,132 @@ void BotController::update(Battle &battle, double dt)
     std::uniform_real_distribution<double> jitter(0.7, 1.3);
     m_decisionTimer = reactionTime() * jitter(m_rng);
 
+    if (battle.canSpecial(m_index) && wantsSpecial(battle)) {
+        battle.requestSpecial(m_index);
+        return;
+    }
     if (!battle.canDash(m_index))
         return;
     const int target = chooseDashTarget(battle);
     if (target >= 0)
         battle.requestDash(m_index, target);
+}
+
+bool BotController::wantsSpecial(const Battle &battle)
+{
+    const Spinner &self = battle.spinner(m_index);
+    const auto move = SpecialMove::find(self.top.special());
+    const int target = battle.nearestOpponent(m_index);
+    if (!move || target < 0)
+        return false;
+    const Spinner &other = battle.spinner(target);
+    const StadiumGeometry &geometry = battle.geometry();
+    const double distance = (other.position - self.position).length();
+    const double reach = move->range * (m_difficulty == Difficulty::Easy ? 1.2 : 0.8);
+    if (distance > reach)
+        return false;
+
+    switch (move->effect) {
+    case SpecialMove::Effect::Teleport:
+        // Inutile si la cible est déjà au bord.
+        return geometry.level(other.position) < 0.5;
+    case SpecialMove::Effect::PullToCenter:
+        // Pour forcer le contact quand l'adversaire fuit loin.
+        return distance > 0.45;
+    case SpecialMove::Effect::Drain:
+        return self.spinRatio() < 0.9;
+    default:
+        break;
+    }
+    if (move->shape == SpecialMove::Shape::Ring && move->knockback > 0.5)
+        return geometry.level(other.position) > 0.35; // Onde : pousser vers le bord.
+    return true;
+}
+
+Vec2 BotController::dodgeDirection(const Battle &battle)
+{
+    const BattleConfig &cfg = battle.config();
+    const Spinner &self = battle.spinner(m_index);
+    for (const Projectile &p : battle.projectiles()) {
+        if (p.owner == m_index || p.hit.contains(m_index))
+            continue;
+        const int key = p.id;
+        if (!m_seenThreats.contains(key)) {
+            // Selon son niveau, le bot remarque ou non chaque vague.
+            m_seenThreats.append(key);
+            std::bernoulli_distribution notice(dodgeSkill());
+            if (!notice(m_rng))
+                m_ignoredThreats.append(key);
+        }
+        if (m_ignoredThreats.contains(key))
+            continue;
+
+        if (p.ring) {
+            const Vec2 away = self.position - p.origin;
+            const double d = away.length();
+            // Fuir seulement si on peut sortir de la portée à temps.
+            if (d > p.radius && d > p.range - 0.25 && d < p.range + cfg.topRadius)
+                return away.normalized();
+            continue;
+        }
+        const Vec2 toSelf = self.position - p.position;
+        const double along = toSelf.dot(p.direction);
+        if (along < 0.0 || along / p.speed > 1.2)
+            continue; // Déjà passée, ou encore loin.
+        const Vec2 lateral = toSelf - p.direction * along;
+        if (lateral.length() > cfg.topRadius + p.width + 0.08)
+            continue; // Ne passera pas sur nous.
+        // S'écarter perpendiculairement à la trajectoire, du côté où l'on est déjà.
+        Vec2 side = lateral.lengthSquared() > 1e-8 ? lateral.normalized() : p.direction.perpendicular();
+        // Mais pas vers le bord.
+        if (battle.geometry().level(self.position + side * 0.2) > 0.85)
+            side = -side;
+        return side;
+    }
+    if (battle.projectiles().empty()) {
+        m_seenThreats.clear();
+        m_ignoredThreats.clear();
+    }
+    return {};
+}
+
+Vec2 BotController::chooseSteering(const Battle &battle)
+{
+    const Spinner &self = battle.spinner(m_index);
+    const StadiumGeometry &geometry = battle.geometry();
+    const double level = geometry.level(self.position);
+    const Vec2 toCenter = (-self.position).normalized();
+
+    // Sécurité d'abord : ne pas sortir du stadium.
+    if (level > (battle.stadium().hasRim ? 0.8 : 0.7))
+        return toCenter;
+
+    const Vec2 dodge = dodgeDirection(battle);
+    if (dodge.lengthSquared() > 0.0)
+        return dodge;
+
+    const int target = battle.nearestOpponent(m_index);
+    if (target < 0)
+        return {};
+    const Spinner &other = battle.spinner(target);
+    const Vec2 toTarget = other.position - self.position;
+    const double distance = toTarget.length();
+
+    switch (classify(self.stats)) {
+    case TopType::Attack:
+        return toTarget.normalized(); // Chercher le contact.
+    case TopType::Defense:
+        return level > 0.25 ? toCenter * 0.7 : Vec2{}; // Tenir le centre.
+    case TopType::Endurance:
+        if (distance < 0.4)
+            return (-toTarget).normalized() * 0.8; // Éviter les chocs.
+        return level > 0.5 ? toCenter * 0.5 : Vec2{};
+    case TopType::Balance:
+        if (self.spinRatio() > other.spinRatio())
+            return toTarget.normalized() * 0.6;
+        return level > 0.45 ? toCenter * 0.6 : Vec2{};
+    }
+    return {};
 }
 
 int BotController::chooseDashTarget(const Battle &battle)

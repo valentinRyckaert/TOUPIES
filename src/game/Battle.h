@@ -2,6 +2,7 @@
 
 #include "core/Top.h"
 #include "game/BattleConfig.h"
+#include "game/SpecialMove.h"
 #include "game/Stadium.h"
 #include "game/Vec2.h"
 
@@ -36,12 +37,39 @@ struct Spinner
     int lastHitBy = -1;        ///< Dernière toupie à l'avoir frappée.
     double lastHitTime = -1e9;
 
+    Vec2 steer;                ///< Pilotage demandé (longueur <= 1).
+    double special = 0.0;      ///< Jauge du coup spécial (0 à 100).
+    double slowTimer = 0.0;    ///< > 0 : ralentie (coup spécial « givre »).
+    double slowStrength = 0.0;
+    double disarmTimer = 0.0;  ///< > 0 : ni dash ni coup spécial.
+
     Status status = Status::Waiting;
 
     double spinRatio() const { return maxSpin > 0.0 ? spin / maxSpin : 0.0; }
     bool isActive() const { return status == Status::Spinning; }
     bool isDashing() const { return dashTimer > 0.0; }
     bool isBoosted() const { return boostTimer > 0.0; }
+    bool isSlowed() const { return slowTimer > 0.0; }
+    bool isDisarmed() const { return disarmTimer > 0.0; }
+};
+
+/// Vague d'un coup spécial en cours de propagation.
+struct Projectile
+{
+    int id = 0;            ///< Identifiant unique dans le combat.
+    QString move;          ///< Identifiant du SpecialMove.
+    int owner = 0;
+    bool ring = false;     ///< Anneau (s'élargit) ou vague (avance en ligne droite).
+    Vec2 origin;
+    Vec2 position;         ///< Vague : position du front.
+    Vec2 direction;        ///< Vague : direction de propagation.
+    double radius = 0.0;   ///< Anneau : rayon courant.
+    double traveled = 0.0;
+    double speed = 1.0;
+    double range = 1.0;
+    double width = 0.08;
+    unsigned color = 0xffffff;
+    QList<int> hit;        ///< Toupies déjà touchées.
 };
 
 /// Un choc entre deux toupies (utilisé pour les effets visuels).
@@ -51,6 +79,8 @@ struct ImpactEvent
     double intensity = 0.0;
     int first = 0;
     int second = 1;
+    bool special = false;  ///< Touché par un coup spécial.
+    unsigned color = 0;    ///< Couleur du coup spécial.
 };
 
 /// Simulation d'un combat entre 2 et 4 toupies dans un stadium.
@@ -83,8 +113,9 @@ public:
     const std::vector<Spinner> &spinners() const { return m_spinners; }
     Vec2 startPosition(int index) const;
 
-    /// Lance toutes les toupies simultanément (angles en radians, repère écran).
-    void launch(const QList<double> &angles);
+    /// Lance toutes les toupies simultanément (angles en radians, repère
+    /// écran ; forces entre launchPowerMin et launchPowerMax, 1 par défaut).
+    void launch(const QList<double> &angles, const QList<double> &powers = {});
     void launch(double firstAngle, double secondAngle);
 
     bool canDash(int index) const;
@@ -93,6 +124,14 @@ public:
     bool requestDash(int index, int target = -1);
     /// Adversaire en jeu le plus proche (-1 s'il n'y en a pas).
     int nearestOpponent(int index) const;
+
+    /// Pilotage aux flèches : direction souhaitée (longueur <= 1, nulle = aucun).
+    void setSteering(int index, Vec2 direction);
+
+    bool canSpecial(int index) const;
+    /// Lance le coup spécial du boulon vers l'adversaire le plus proche.
+    bool requestSpecial(int index);
+    const std::vector<Projectile> &projectiles() const { return m_projectiles; }
 
     /// Abandon (joueur déconnecté) : la toupie est éliminée.
     void forfeit(int index);
@@ -123,6 +162,8 @@ private:
     void integrate(Spinner &s, double h);
     void applyRim(Spinner &s);
     void resolveCollision(int i, int j);
+    void updateProjectiles(double h);
+    void applySpecialHit(const Projectile &projectile, const SpecialMove &move, int target);
     void eliminate(int index, Spinner::Status status);
     void checkEnd();
     void finish(int winner, EndReason reason);
@@ -144,6 +185,8 @@ private:
     QList<int> m_eliminated;   ///< Ordre d'élimination.
     QList<int> m_ranking;
     QList<ImpactEvent> m_impacts;
+    std::vector<Projectile> m_projectiles;
+    int m_nextProjectileId = 1;
 };
 
 } // namespace toupie

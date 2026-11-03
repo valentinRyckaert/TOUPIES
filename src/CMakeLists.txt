@@ -13,6 +13,10 @@ add_library(toupie_core STATIC
     game/BattleConfig.h
     game/Stadium.h
     game/Stadium.cpp
+    game/SpecialMove.h
+    game/SpecialMove.cpp
+    game/MatchRules.h
+    game/MatchRules.cpp
     game/Battle.h
     game/Battle.cpp
     game/BotController.h
