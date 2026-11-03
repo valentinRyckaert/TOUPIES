@@ -41,14 +41,16 @@ void MatchSession::initFromBattle(const Battle &battle, const QStringList &names
     m_impacts.clear();
 }
 
-void MatchSession::syncFromBattle(Battle &battle)
+QList<ImpactEvent> MatchSession::syncFromBattle(Battle &battle)
 {
     m_state.spinners = battle.spinners();
     m_state.elapsed = battle.elapsed();
     m_state.winner = battle.winner();
     m_state.endReason = battle.endReason();
     m_state.ranking = battle.ranking();
-    m_impacts.append(battle.takeImpacts());
+    const QList<ImpactEvent> impacts = battle.takeImpacts();
+    m_impacts.append(impacts);
+    return impacts;
 }
 
 } // namespace toupie

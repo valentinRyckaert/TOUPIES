@@ -66,8 +66,9 @@ protected:
     void setPhase(MatchPhase phase);
     /// Initialise l'état à partir d'un combat qui n'a pas encore commencé.
     void initFromBattle(const Battle &battle, const QStringList &names);
-    /// Copie l'état dynamique du combat (positions, endurance, résultat).
-    void syncFromBattle(Battle &battle);
+    /// Copie l'état dynamique du combat (positions, endurance, résultat) et
+    /// retourne les nouveaux chocs (également mis à disposition de l'arène).
+    QList<ImpactEvent> syncFromBattle(Battle &battle);
 
     MatchState m_state;
     int m_localPlayer = 0;
