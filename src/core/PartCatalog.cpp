@@ -1,5 +1,6 @@
 #include "core/PartCatalog.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace toupie {
@@ -36,6 +37,12 @@ QList<Part> defaultParts()
         wheel("RM6", "Tonnerre", {5, 3, 2}, SD::CounterClockwise, 25),
         wheel("RM7", "Ouragan", {2, 3, 5}, SD::Clockwise, 190),
         wheel("RM8", "Orbite", {4, 2, 4}, SD::CounterClockwise, 320),
+        wheel("RM9", "Météore", {7, 2, 1}, SD::Clockwise, 15),
+        wheel("RM10", "Titan", {1, 7, 2}, SD::CounterClockwise, 100),
+        wheel("RM11", "Nébuleuse", {1, 2, 7}, SD::Clockwise, 250),
+        wheel("RM12", "Faucon", {5, 2, 3}, SD::Clockwise, 340),
+        wheel("RM13", "Zéphyr", {3, 2, 5}, SD::CounterClockwise, 170),
+        wheel("RM14", "Golem", {3, 6, 1}, SD::Clockwise, 80),
 
         // Parties intermédiaires (budget 6).
         middle("PI1", "Noyau", {2, 3, 1}, 200),
@@ -44,6 +51,10 @@ QList<Part> defaultParts()
         middle("PI4", "Anneau", {1, 1, 4}, 280),
         middle("PI5", "Axe", {2, 2, 2}, 50),
         middle("PI6", "Turbine", {3, 1, 2}, 30),
+        middle("PI7", "Lame", {3, 2, 1}, 0),
+        middle("PI8", "Bouclier", {1, 3, 2}, 140),
+        middle("PI9", "Spirale", {2, 1, 3}, 300),
+        middle("PI10", "Contrepoids", {1, 2, 3}, 230),
 
         // Pointes (budget 7).
         tip("P1", "Pivot", {1, 4, 2}, 220),
@@ -52,6 +63,10 @@ QList<Part> defaultParts()
         tip("P4", "Bille", {2, 3, 2}, 160),
         tip("P5", "Plateau", {3, 2, 2}, 40),
         tip("P6", "Pointe Fine", {1, 2, 4}, 260),
+        tip("P7", "Crampon", {5, 1, 1}, 20),
+        tip("P8", "Dôme", {1, 5, 1}, 210),
+        tip("P9", "Rotule", {2, 2, 3}, 180),
+        tip("P10", "Sabot", {3, 3, 1}, 60),
     };
 }
 
@@ -102,6 +117,9 @@ QList<Top> PartCatalog::presets() const
         {"Éternelle", "RM4", "PI4", "P3"},         //  4 / 4 / 15  -> Endurance
         {"Juste Milieu", "RM5", "PI5", "P4"},      //  8 / 8 / 7   -> Équilibre
         {"Gardienne", "RM1", "PI1", "P1"},         //  6 / 12 / 5  -> Défense
+        {"Comète", "RM9", "PI7", "P7"},            // 15 / 5 / 3   -> Attaque
+        {"Colosse", "RM10", "PI8", "P8"},          //  3 / 15 / 5  -> Défense
+        {"Brise Éternelle", "RM13", "PI9", "P9"},  //  7 / 5 / 11  -> Endurance
     };
 
     QList<Top> result;
@@ -113,6 +131,22 @@ QList<Top> PartCatalog::presets() const
             result.append(Top(QString::fromUtf8(recipe.name), *w, *m, *t));
     }
     return result;
+}
+
+int PartCatalog::maxStatValue() const
+{
+    int best = 0;
+    auto bestOf = [this](PartKind kind, int Stats::*field) {
+        int value = 0;
+        for (const Part &part : parts(kind))
+            value = std::max(value, part.stats.*field);
+        return value;
+    };
+    for (int Stats::*field : {&Stats::attack, &Stats::defense, &Stats::endurance}) {
+        best = std::max(best, bestOf(PartKind::Wheel, field) + bestOf(PartKind::Middle, field)
+                                  + bestOf(PartKind::Tip, field));
+    }
+    return best;
 }
 
 int PartCatalog::budget(PartKind kind)

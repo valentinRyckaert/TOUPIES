@@ -36,6 +36,9 @@ public:
     /// Toupies pré-assemblées (une par type).
     QList<Top> presets() const;
 
+    /// Valeur maximale atteignable par une stat avec ce catalogue.
+    int maxStatValue() const;
+
     static int budget(PartKind kind);
 
 private:

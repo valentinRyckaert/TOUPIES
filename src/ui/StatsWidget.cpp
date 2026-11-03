@@ -1,5 +1,6 @@
 #include "ui/StatsWidget.h"
 
+#include "core/PartCatalog.h"
 #include "ui/TopPainter.h"
 
 #include <QPainter>
@@ -8,7 +9,11 @@
 namespace toupie {
 
 namespace {
-constexpr int kMaxStat = 15; // Plus haute valeur atteignable avec le catalogue.
+int maxStat()
+{
+    static const int value = PartCatalog::instance().maxStatValue();
+    return value;
+}
 
 void drawBar(QPainter &p, const QRectF &rect, const QString &label, int value, const QColor &color,
              const QColor &textColor)
@@ -24,7 +29,7 @@ void drawBar(QPainter &p, const QRectF &rect, const QString &label, int value, c
     p.setBrush(QColor(127, 127, 127, 60));
     p.drawRoundedRect(track, 4, 4);
     QRectF fill = track;
-    fill.setWidth(track.width() * qBound(0, value, kMaxStat) / kMaxStat);
+    fill.setWidth(track.width() * qBound(0, value, maxStat()) / maxStat());
     p.setBrush(color);
     p.drawRoundedRect(fill, 4, 4);
 
