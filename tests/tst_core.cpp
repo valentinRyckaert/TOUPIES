@@ -80,6 +80,11 @@ void TestCore::catalogPartsRespectBudgets()
 {
     for (const Part &part : PartCatalog::instance().parts()) {
         QVERIFY2(part.stats.total() == PartCatalog::budget(part.kind), qPrintable(part.name));
+        if (part.kind == PartKind::Bolt) {
+            // Le boulon ne donne aucune statistique, seulement un coup spécial.
+            QVERIFY(!part.special.isEmpty());
+            continue;
+        }
         QVERIFY(part.stats.attack >= 1 && part.stats.defense >= 1 && part.stats.endurance >= 1);
     }
 }
@@ -91,7 +96,7 @@ void TestCore::catalogIdsAreUnique()
         QVERIFY2(!ids.contains(part.id), qPrintable(part.id));
         ids.insert(part.id);
     }
-    for (PartKind kind : {PartKind::Wheel, PartKind::Middle, PartKind::Tip})
+    for (PartKind kind : {PartKind::Wheel, PartKind::Middle, PartKind::Tip, PartKind::Bolt})
         QVERIFY(PartCatalog::instance().parts(kind).size() >= 2);
 }
 

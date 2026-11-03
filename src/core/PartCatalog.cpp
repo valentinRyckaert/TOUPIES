@@ -9,19 +9,27 @@ namespace {
 
 Part wheel(const char *id, const char *name, Stats stats, SpinDirection spin, int hue)
 {
-    return {QString::fromLatin1(id), QString::fromUtf8(name), PartKind::Wheel, stats, spin, hue};
+    return {QString::fromLatin1(id), QString::fromUtf8(name), PartKind::Wheel, stats, spin, hue, {}};
 }
 
 Part middle(const char *id, const char *name, Stats stats, int hue)
 {
     return {QString::fromLatin1(id), QString::fromUtf8(name), PartKind::Middle, stats,
-            SpinDirection::Clockwise, hue};
+            SpinDirection::Clockwise, hue, {}};
+}
+
+Part bolt(const char *id, const char *name, const char *special, int hue)
+{
+    Part p{QString::fromLatin1(id), QString::fromUtf8(name), PartKind::Bolt, Stats{},
+           SpinDirection::Clockwise, hue, {}};
+    p.special = QString::fromLatin1(special);
+    return p;
 }
 
 Part tip(const char *id, const char *name, Stats stats, int hue)
 {
     return {QString::fromLatin1(id), QString::fromUtf8(name), PartKind::Tip, stats,
-            SpinDirection::Clockwise, hue};
+            SpinDirection::Clockwise, hue, {}};
 }
 
 QList<Part> defaultParts()
@@ -67,6 +75,15 @@ QList<Part> defaultParts()
         tip("P8", "Dôme", {1, 5, 1}, 210),
         tip("P9", "Rotule", {2, 2, 3}, 180),
         tip("P10", "Sabot", {3, 3, 1}, 60),
+
+        // Boulons (aucune statistique) : chacun débloque un coup spécial.
+        bolt("B1", "Boulon Tempête", "onde", 200),
+        bolt("B2", "Boulon Perçant", "lance", 0),
+        bolt("B3", "Boulon Polaire", "givre", 190),
+        bolt("B4", "Boulon Abysse", "vortex", 270),
+        bolt("B5", "Boulon Spectral", "distorsion", 315),
+        bolt("B6", "Boulon Vampire", "siphon", 350),
+        bolt("B7", "Boulon Tellurique", "seisme", 30),
     };
 }
 
@@ -110,16 +127,17 @@ QList<Top> PartCatalog::presets() const
         const char *wheel;
         const char *middle;
         const char *tip;
+        const char *bolt;
     };
     static constexpr Recipe recipes[] = {
-        {"Cyclone Furieux", "RM2", "PI2", "P2"},   // 14 / 4 / 5   -> Attaque
-        {"Forteresse", "RM3", "PI3", "P1"},        //  4 / 14 / 5  -> Défense
-        {"Éternelle", "RM4", "PI4", "P3"},         //  4 / 4 / 15  -> Endurance
-        {"Juste Milieu", "RM5", "PI5", "P4"},      //  8 / 8 / 7   -> Équilibre
-        {"Gardienne", "RM1", "PI1", "P1"},         //  6 / 12 / 5  -> Défense
-        {"Comète", "RM9", "PI7", "P7"},            // 15 / 5 / 3   -> Attaque
-        {"Colosse", "RM10", "PI8", "P8"},          //  3 / 15 / 5  -> Défense
-        {"Brise Éternelle", "RM13", "PI9", "P9"},  //  7 / 5 / 11  -> Endurance
+        {"Cyclone Furieux", "RM2", "PI2", "P2", "B2"},   // 14 / 4 / 5   -> Attaque
+        {"Forteresse", "RM3", "PI3", "P1", "B1"},        //  4 / 14 / 5  -> Défense
+        {"Éternelle", "RM4", "PI4", "P3", "B6"},         //  4 / 4 / 15  -> Endurance
+        {"Juste Milieu", "RM5", "PI5", "P4", "B3"},      //  8 / 8 / 7   -> Équilibre
+        {"Gardienne", "RM1", "PI1", "P1", "B7"},         //  6 / 12 / 5  -> Défense
+        {"Comète", "RM9", "PI7", "P7", "B5"},            // 15 / 5 / 3   -> Attaque
+        {"Colosse", "RM10", "PI8", "P8", "B4"},          //  3 / 15 / 5  -> Défense
+        {"Brise Éternelle", "RM13", "PI9", "P9", "B3"},  //  7 / 5 / 11  -> Endurance
     };
 
     QList<Top> result;
@@ -127,8 +145,9 @@ QList<Top> PartCatalog::presets() const
         const auto w = find(QString::fromLatin1(recipe.wheel));
         const auto m = find(QString::fromLatin1(recipe.middle));
         const auto t = find(QString::fromLatin1(recipe.tip));
-        if (w && m && t)
-            result.append(Top(QString::fromUtf8(recipe.name), *w, *m, *t));
+        const auto b = find(QString::fromLatin1(recipe.bolt));
+        if (w && m && t && b)
+            result.append(Top(QString::fromUtf8(recipe.name), *w, *m, *t, *b));
     }
     return result;
 }
@@ -156,6 +175,8 @@ int PartCatalog::budget(PartKind kind)
         return kWheelBudget;
     case PartKind::Middle:
         return kMiddleBudget;
+    case PartKind::Bolt:
+        return 0;
     case PartKind::Tip:
         break;
     }

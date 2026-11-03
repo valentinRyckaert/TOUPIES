@@ -13,7 +13,8 @@ namespace toupie {
 /// Catalogue des pièces disponibles et des toupies pré-assemblées.
 ///
 /// Règle d'équilibrage : toutes les pièces d'un même emplacement disposent
-/// du même « budget » de points (roue : 10, intermédiaire : 6, pointe : 7).
+/// du même « budget » de points (roue : 10, intermédiaire : 6, pointe : 7,
+/// boulon : 0 — le boulon ne donne qu'un coup spécial).
 /// Toutes les toupies totalisent donc 23 points : assembler une toupie
 /// consiste à répartir ces points, jamais à en gagner.
 class PartCatalog

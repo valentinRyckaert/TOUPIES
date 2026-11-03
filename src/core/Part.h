@@ -6,10 +6,10 @@
 
 namespace toupie {
 
-/// Les trois emplacements d'une toupie.
-enum class PartKind { Wheel, Middle, Tip };
+/// Les quatre emplacements d'une toupie, de haut en bas.
+enum class PartKind { Wheel, Middle, Tip, Bolt };
 
-/// Une pièce de toupie (roue métallique, partie intermédiaire ou pointe).
+/// Une pièce de toupie (boulon, roue métallique, partie intermédiaire ou pointe).
 struct Part
 {
     QString id;          ///< Identifiant stable, utilisé pour la sauvegarde.
@@ -20,6 +20,8 @@ struct Part
     SpinDirection spin = SpinDirection::Clockwise;
     /// Teinte (0-359) utilisée pour dessiner la pièce.
     int hue = 0;
+    /// Boulon uniquement : identifiant du coup spécial débloqué (voir SpecialMove).
+    QString special;
 
     bool isValid() const { return !id.isEmpty(); }
 };
@@ -33,6 +35,8 @@ inline QString toString(PartKind kind)
         return QStringLiteral("Partie intermédiaire");
     case PartKind::Tip:
         return QStringLiteral("Pointe");
+    case PartKind::Bolt:
+        return QStringLiteral("Boulon");
     }
     return {};
 }
