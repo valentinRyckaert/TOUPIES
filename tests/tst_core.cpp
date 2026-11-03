@@ -24,6 +24,7 @@ private slots:
     void catalogPartsRespectBudgets();
     void catalogIdsAreUnique();
     void presetsCoverEveryType();
+    void maxStatValueMatchesCatalog();
     void jsonRoundTrip();
     void jsonWithUnknownPartIsRejected();
     void repositorySaveAndLoad();
@@ -103,6 +104,12 @@ void TestCore::presetsCoverEveryType()
         types.insert(top.type());
     }
     QCOMPARE(types.size(), 4);
+}
+
+void TestCore::maxStatValueMatchesCatalog()
+{
+    // Nébuleuse (7) + Anneau (4) + Aiguille (5) en endurance.
+    QCOMPARE(PartCatalog::instance().maxStatValue(), 16);
 }
 
 void TestCore::jsonRoundTrip()
