@@ -19,3 +19,8 @@ else()
 endif()
 
 add_subdirectory(src)
+
+option(TOUPIE_BUILD_TOOLS "Construire les outils (simulateur d'équilibrage)" ON)
+if(TOUPIE_BUILD_TOOLS)
+    add_subdirectory(tools)
+endif()

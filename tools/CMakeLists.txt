@@ -1,0 +1,2 @@
+add_executable(toupie_balance_sim balance_sim.cpp)
+target_link_libraries(toupie_balance_sim PRIVATE toupie_core)
