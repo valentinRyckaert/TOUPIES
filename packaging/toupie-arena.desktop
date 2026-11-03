@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Toupie Arena
+Comment=Combats de toupies en 2D, en solo ou en réseau local
+Exec=toupie_arena
+Icon=toupie-arena
+Categories=Game;ArcadeGame;
+Terminal=false

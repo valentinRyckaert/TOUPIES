@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QT_QPA_PLATFORM: offscreen   # Tests d'interface sans affichage.
+  CTEST_OUTPUT_ON_FAILURE: "1"
+
+jobs:
+  # Version minimale supportée (Qt 6.4 des dépôts Ubuntu), avertissements = erreurs.
+  linux-system-qt:
+    name: Linux · Qt système · ${{ matrix.build_type }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dépendances
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev libxkbcommon-dev
+
+      - name: Configuration
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DTOUPIE_WERROR=ON
+
+      - name: Compilation
+        run: cmake --build build --parallel
+
+      - name: Tests unitaires et d'intégration
+        run: ctest --test-dir build --timeout 300
+
+      - name: Test de démarrage de l'application
+        run: ./build/src/toupie_arena --smoke-test
+
+      - name: Simulateur d'équilibrage (fumée)
+        run: ./build/tools/toupie_balance_sim -n 5 -r 300 -s all
+
+  # Analyse dynamique : AddressSanitizer + UndefinedBehaviorSanitizer.
+  sanitizers:
+    name: Linux · ASan + UBSan
+    runs-on: ubuntu-24.04
+    env:
+      ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dépendances
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev libxkbcommon-dev
+
+      - name: Configuration
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTOUPIE_BUILD_TOOLS=OFF
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined"
+
+      - name: Compilation
+        run: cmake --build build --parallel
+
+      - name: Tests
+        run: ctest --test-dir build --timeout 600
+
+  # Qt récent (LTS) sur les trois systèmes.
+  qt-lts:
+    name: ${{ matrix.os }} · Qt 6.8
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installation de Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          cache: true
+
+      - name: Environnement MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Dépendances Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build libgl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-0
+
+      - name: Ninja (Windows / macOS)
+        if: runner.os != 'Linux'
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Configuration
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Compilation
+        run: cmake --build build --parallel
+
+      - name: Tests unitaires et d'intégration
+        run: ctest --test-dir build --timeout 300
+
+      - name: Archive du binaire
+        uses: actions/upload-artifact@v4
+        with:
+          name: toupie-arena-${{ matrix.os }}
+          path: |
+            build/src/toupie_arena
+            build/src/toupie_arena.exe
+            build/src/toupie_arena.app
+          if-no-files-found: ignore
+          retention-days: 7
