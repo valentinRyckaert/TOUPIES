@@ -141,6 +141,13 @@ bool BotController::wantsToDash(const Battle &battle)
     const double theirRatio = other.spinRatio();
     const double spinAfterDash = self.spin - cfg.dashCost;
 
+    // Si l'adversaire va tenir plus longtemps à la seule endurance, attendre
+    // ne sert à rien : on passe à l'offensive quel que soit le style.
+    const double myTimeLeft = self.spin / battle.passiveLossPerSecond(self);
+    const double theirTimeLeft = other.spin / battle.passiveLossPerSecond(other);
+    if (myTimeLeft < 0.9 * theirTimeLeft)
+        return spinAfterDash > 10.0;
+
     switch (classify(self.stats)) {
     case TopType::Attack:
         return spinAfterDash > 10.0;
