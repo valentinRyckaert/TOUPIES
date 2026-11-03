@@ -21,12 +21,12 @@ BattlePage::BattlePage(QWidget *parent)
 
     auto *bar = new QHBoxLayout;
     bar->setContentsMargins(10, 0, 10, 0);
-    auto *menuButton = new QPushButton(tr("Menu (Échap)"), this);
-    auto *setupButton = new QPushButton(tr("Changer de toupies"), this);
-    m_rematchButton = new QPushButton(tr("Revanche (R)"), this);
+    m_leaveButton = new QPushButton(this);
+    m_setupButton = new QPushButton(tr("Changer de toupies"), this);
+    m_rematchButton = new QPushButton(this);
     m_score = new QLabel(this);
-    bar->addWidget(menuButton);
-    bar->addWidget(setupButton);
+    bar->addWidget(m_leaveButton);
+    bar->addWidget(m_setupButton);
     bar->addStretch();
     bar->addWidget(m_score);
     bar->addStretch();
@@ -34,44 +34,89 @@ BattlePage::BattlePage(QWidget *parent)
     root->addLayout(bar);
 
     // Les boutons ne doivent pas voler le focus clavier à l'arène.
-    for (QPushButton *b : {menuButton, setupButton, m_rematchButton})
+    for (QPushButton *b : {m_leaveButton, m_setupButton, m_rematchButton})
         b->setFocusPolicy(Qt::NoFocus);
 
-    connect(menuButton, &QPushButton::clicked, this, &BattlePage::menuRequested);
-    connect(setupButton, &QPushButton::clicked, this, &BattlePage::setupRequested);
-    connect(m_rematchButton, &QPushButton::clicked, m_arena, &ArenaWidget::restart);
+    connect(m_leaveButton, &QPushButton::clicked, this, &BattlePage::leaveRequested);
+    connect(m_setupButton, &QPushButton::clicked, this, &BattlePage::setupRequested);
+    connect(m_rematchButton, &QPushButton::clicked, this, &BattlePage::rematchRequested);
     connect(new QShortcut(QKeySequence(Qt::Key_Escape), this), &QShortcut::activated, this,
-            &BattlePage::menuRequested);
-    connect(m_arena, &ArenaWidget::matchFinished, this, &BattlePage::updateScore);
-    connect(m_arena, &ArenaWidget::phaseChanged, this, [this](ArenaWidget::Phase phase) {
-        m_rematchButton->setEnabled(phase == ArenaWidget::Phase::Finished);
+            &BattlePage::leaveRequested);
+    connect(m_arena, &ArenaWidget::matchFinished, this, &BattlePage::onFinished);
+    connect(m_arena, &ArenaWidget::rematchRequested, this, [this] {
+        if (m_mode != Mode::LanClient)
+            emit rematchRequested();
     });
 }
 
-void BattlePage::startMatch(const Top &player, const Top &opponent, Difficulty difficulty)
+BattlePage::~BattlePage()
 {
+    m_arena->setSession(nullptr);
+}
+
+void BattlePage::start(std::unique_ptr<MatchSession> session, Mode mode)
+{
+    m_arena->setSession(nullptr);
+    m_session = std::move(session);
+    m_mode = mode;
     m_wins = m_losses = m_draws = 0;
-    updateScore(-2);
-    m_arena->startMatch(player, opponent, difficulty);
+
+    if (m_session)
+        connect(m_session.get(), &MatchSession::phaseChanged, this, &BattlePage::updateButtons);
+    m_arena->setSession(m_session.get());
+    updateButtons();
 }
 
 void BattlePage::stop()
 {
-    m_arena->stop();
+    m_arena->setSession(nullptr);
+    m_session.reset();
 }
 
-void BattlePage::updateScore(int winner)
+void BattlePage::onFinished(int winner)
 {
-    if (winner == 0)
+    if (!m_session)
+        return;
+    const int local = m_session->localPlayer();
+    if (winner == local)
         ++m_wins;
-    else if (winner == 1)
-        ++m_losses;
-    else if (winner == -1)
+    else if (winner < 0)
         ++m_draws;
-    m_score->setText(tr("Victoires %1  ·  Défaites %2  ·  Nuls %3")
-                         .arg(m_wins)
-                         .arg(m_losses)
-                         .arg(m_draws));
+    else
+        ++m_losses;
+    updateButtons();
+}
+
+void BattlePage::updateButtons()
+{
+    const bool finished = m_session && m_session->state().phase == MatchPhase::Finished;
+    m_setupButton->setVisible(m_mode == Mode::Solo);
+
+    switch (m_mode) {
+    case Mode::Solo:
+        m_leaveButton->setText(tr("Menu (Échap)"));
+        m_rematchButton->setText(tr("Revanche (R)"));
+        m_rematchButton->setVisible(true);
+        m_rematchButton->setEnabled(finished);
+        m_score->setText(tr("Victoires %1  ·  Défaites %2  ·  Nuls %3")
+                             .arg(m_wins)
+                             .arg(m_losses)
+                             .arg(m_draws));
+        break;
+    case Mode::LanHost:
+        m_leaveButton->setText(tr("Fermer le lobby"));
+        m_rematchButton->setText(tr("Retour au lobby (R)"));
+        m_rematchButton->setVisible(true);
+        m_rematchButton->setEnabled(finished);
+        m_score->setText(finished ? tr("Combat terminé") : tr("Partie en réseau local (hôte)"));
+        break;
+    case Mode::LanClient:
+        m_leaveButton->setText(tr("Quitter le lobby"));
+        m_rematchButton->setVisible(false);
+        m_score->setText(finished ? tr("En attente de l'hôte pour revenir au lobby…")
+                                  : tr("Partie en réseau local"));
+        break;
+    }
 }
 
 } // namespace toupie

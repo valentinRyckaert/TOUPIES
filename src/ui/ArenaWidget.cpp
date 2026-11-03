@@ -1,13 +1,11 @@
 #include "ui/ArenaWidget.h"
 
+#include "ui/StadiumPainter.h"
 #include "ui/TopPainter.h"
 
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QPainterPath>
-#include <QRadialGradient>
-#include <QRandomGenerator>
 #include <QtMath>
 
 #include <algorithm>
@@ -17,36 +15,57 @@ namespace toupie {
 
 namespace {
 constexpr double kHudHeight = 78.0;
-constexpr double kCountdownSeconds = 3.0;
 constexpr int kTrailLength = 36;
 constexpr double kSparkLifetime = 0.4;
 constexpr double kAimStep = qDegreesToRadians(3.0);
 
-const QColor kPlayerColor(80, 190, 255);
-const QColor kBotColor(255, 120, 90);
-
-QString endReasonText(Battle::EndReason reason)
+QString endReasonText(Battle::EndReason reason, int players)
 {
     switch (reason) {
     case Battle::EndReason::RingOut:
-        return QObject::tr("Éjection hors du stadium");
+        return players > 2 ? QObject::tr("Dernière élimination : éjection hors du stadium")
+                           : QObject::tr("Éjection hors du stadium");
     case Battle::EndReason::SpinOut:
-        return QObject::tr("Plus d'endurance");
+        return players > 2 ? QObject::tr("Dernière élimination : plus d'endurance")
+                           : QObject::tr("Plus d'endurance");
     case Battle::EndReason::Timeout:
         return QObject::tr("Temps écoulé : victoire à l'endurance restante");
+    case Battle::EndReason::Forfeit:
+        return QObject::tr("Abandon (joueur déconnecté)");
     case Battle::EndReason::None:
         break;
     }
     return {};
 }
+
+QString statusText(Spinner::Status status)
+{
+    switch (status) {
+    case Spinner::Status::RingOut:
+        return QObject::tr("Éjectée");
+    case Spinner::Status::Stopped:
+        return QObject::tr("À l'arrêt");
+    case Spinner::Status::Forfeit:
+        return QObject::tr("Déconnectée");
+    default:
+        return {};
+    }
+}
 } // namespace
+
+QColor ArenaWidget::slotColor(int slot)
+{
+    static const QColor colors[] = {QColor(80, 190, 255), QColor(255, 120, 90),
+                                    QColor(120, 220, 120), QColor(205, 140, 255)};
+    return colors[qBound(0, slot, 3)];
+}
 
 ArenaWidget::ArenaWidget(QWidget *parent)
     : QWidget(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
-    setMinimumSize(480, 520);
+    setMinimumSize(520, 560);
     setAttribute(Qt::WA_OpaquePaintEvent);
 
     m_timer.setTimerType(Qt::PreciseTimer);
@@ -56,46 +75,41 @@ ArenaWidget::ArenaWidget(QWidget *parent)
 
 ArenaWidget::~ArenaWidget() = default;
 
-void ArenaWidget::startMatch(const Top &player, const Top &opponent, Difficulty difficulty)
+void ArenaWidget::setSession(MatchSession *session)
 {
-    m_player = player;
-    m_opponent = opponent;
-    m_difficulty = difficulty;
-    restart();
-}
-
-void ArenaWidget::restart()
-{
-    auto *rng = QRandomGenerator::global();
-    m_battle = std::make_unique<Battle>(m_player, m_opponent, BattleConfig{}, rng->generate());
-    m_bot = std::make_unique<BotController>(1, m_difficulty, rng->generate());
-    m_botAngle = m_bot->chooseLaunchAngle(*m_battle);
-    m_aimAngle = 0.0; // Vers le centre du stadium.
-    m_countdown = 0.0;
-    m_flash = 0.0;
-    for (auto &trail : m_trails)
-        trail.clear();
-    m_sparks.clear();
-
-    setPhase(Phase::Aiming);
+    if (m_session)
+        disconnect(m_session, nullptr, this, nullptr);
+    m_session = session;
+    resetVisuals();
+    if (!m_session) {
+        m_timer.stop();
+        update();
+        return;
+    }
+    connect(m_session, &MatchSession::phaseChanged, this, [this] {
+        if (m_session && m_session->state().phase == MatchPhase::Aiming)
+            resetVisuals();
+    });
     m_clock.restart();
     m_timer.start();
     setFocus();
     update();
 }
 
-void ArenaWidget::stop()
+void ArenaWidget::resetVisuals()
 {
-    m_timer.stop();
-    setPhase(Phase::Idle);
-}
-
-void ArenaWidget::setPhase(Phase phase)
-{
-    if (m_phase == phase)
-        return;
-    m_phase = phase;
-    emit phaseChanged(phase);
+    m_trails.clear();
+    m_sparks.clear();
+    m_flash = 0.0;
+    m_lastPhase = MatchPhase::Aiming;
+    if (m_session) {
+        const MatchState &s = m_session->state();
+        m_trails.resize(s.spinners.size());
+        m_lastPhase = s.phase;
+        // Visée par défaut : vers le centre du stadium.
+        const Vec2 start = s.startPositions.value(m_session->localPlayer());
+        m_aimAngle = (-start).angle();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -104,33 +118,33 @@ void ArenaWidget::setPhase(Phase phase)
 
 void ArenaWidget::tick()
 {
+    if (!m_session)
+        return;
+
     const double dt = std::min(0.05, m_clock.restart() / 1000.0);
+    m_session->update(dt);
+    const MatchState &state = m_session->state();
 
-    if (m_phase == Phase::Countdown) {
-        m_countdown -= dt;
-        if (m_countdown <= 0.0) {
-            m_battle->launch(m_aimAngle, m_botAngle);
+    if (state.phase != m_lastPhase) {
+        if (state.phase == MatchPhase::Fighting)
             m_flash = 0.8;
-            setPhase(Phase::Fighting);
-        }
-    } else if (m_phase == Phase::Fighting && m_battle) {
-        m_bot->update(*m_battle, dt);
-        m_battle->advance(dt);
+        if (state.phase == MatchPhase::Finished)
+            emit matchFinished(state.winner);
+        m_lastPhase = state.phase;
+    }
 
-        const QList<ImpactEvent> impacts = m_battle->takeImpacts();
-        for (const ImpactEvent &impact : impacts)
-            m_sparks.append({QPointF(impact.point.x, impact.point.y), 0.0, impact.intensity});
+    for (const ImpactEvent &impact : m_session->takeImpacts())
+        m_sparks.append({QPointF(impact.point.x, impact.point.y), 0.0, impact.intensity});
 
-        for (int i = 0; i < 2; ++i) {
-            const Vec2 pos = m_battle->spinner(i).position;
-            m_trails[i].append(QPointF(pos.x, pos.y));
+    if (state.phase == MatchPhase::Fighting) {
+        m_trails.resize(state.spinners.size());
+        for (size_t i = 0; i < state.spinners.size(); ++i) {
+            const Spinner &s = state.spinners[i];
+            if (!s.isActive())
+                continue;
+            m_trails[i].append(QPointF(s.position.x, s.position.y));
             while (m_trails[i].size() > kTrailLength)
                 m_trails[i].removeFirst();
-        }
-
-        if (m_battle->isFinished()) {
-            setPhase(Phase::Finished);
-            emit matchFinished(m_battle->winner());
         }
     }
 
@@ -146,16 +160,15 @@ void ArenaWidget::tick()
 
 void ArenaWidget::confirmLaunch()
 {
-    if (m_phase != Phase::Aiming)
-        return;
-    m_countdown = kCountdownSeconds;
-    setPhase(Phase::Countdown);
+    if (m_session && m_session->state().phase == MatchPhase::Aiming
+        && !m_session->localHasAimed())
+        m_session->submitAim(m_aimAngle);
 }
 
 void ArenaWidget::tryDash()
 {
-    if (m_phase == Phase::Fighting && m_battle)
-        m_battle->requestDash(0);
+    if (m_session && m_session->state().phase == MatchPhase::Fighting)
+        m_session->requestDash();
 }
 
 // ---------------------------------------------------------------------------
@@ -164,10 +177,11 @@ void ArenaWidget::tryDash()
 
 void ArenaWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    if (m_phase != Phase::Aiming || !m_battle)
+    if (!m_session || m_session->state().phase != MatchPhase::Aiming
+        || m_session->localHasAimed())
         return;
     const Vec2 target = toWorld(event->position());
-    const Vec2 start = m_battle->startPosition(0);
+    const Vec2 start = m_session->state().startPositions.value(m_session->localPlayer());
     if ((target - start).length() > 0.02)
         m_aimAngle = (target - start).angle();
 }
@@ -175,25 +189,30 @@ void ArenaWidget::mouseMoveEvent(QMouseEvent *event)
 void ArenaWidget::mousePressEvent(QMouseEvent *event)
 {
     setFocus();
-    if (m_phase == Phase::Aiming && event->button() == Qt::LeftButton) {
+    if (!m_session)
+        return;
+    const MatchPhase phase = m_session->state().phase;
+    if (phase == MatchPhase::Aiming && event->button() == Qt::LeftButton) {
         mouseMoveEvent(event);
         confirmLaunch();
-    } else if (m_phase == Phase::Fighting) {
+    } else if (phase == MatchPhase::Fighting) {
         tryDash();
     }
 }
 
 void ArenaWidget::keyPressEvent(QKeyEvent *event)
 {
+    const MatchPhase phase = m_session ? m_session->state().phase : MatchPhase::Finished;
+    const bool aiming = phase == MatchPhase::Aiming && m_session && !m_session->localHasAimed();
     switch (event->key()) {
     case Qt::Key_Left:
     case Qt::Key_Up:
-        if (m_phase == Phase::Aiming)
+        if (aiming)
             m_aimAngle -= kAimStep;
         break;
     case Qt::Key_Right:
     case Qt::Key_Down:
-        if (m_phase == Phase::Aiming)
+        if (aiming)
             m_aimAngle += kAimStep;
         break;
     case Qt::Key_Return:
@@ -201,14 +220,14 @@ void ArenaWidget::keyPressEvent(QKeyEvent *event)
         confirmLaunch();
         break;
     case Qt::Key_Space:
-        if (m_phase == Phase::Aiming)
+        if (phase == MatchPhase::Aiming)
             confirmLaunch();
         else
             tryDash();
         break;
     case Qt::Key_R:
-        if (m_phase == Phase::Finished)
-            restart();
+        if (phase == MatchPhase::Finished)
+            emit rematchRequested();
         break;
     default:
         QWidget::keyPressEvent(event);
@@ -223,27 +242,36 @@ void ArenaWidget::keyPressEvent(QKeyEvent *event)
 
 double ArenaWidget::scale() const
 {
-    const double radius = m_battle ? m_battle->config().stadiumRadius : 1.0;
+    const double radius = m_session ? m_session->state().geometry.radius : 1.0;
     const double available = std::min<double>(width(), height() - kHudHeight);
-    return available / 2.0 * 0.9 / radius;
+    return available / 2.0 * 0.88 / std::max(0.1, radius);
+}
+
+QPointF ArenaWidget::center() const
+{
+    return {width() / 2.0, kHudHeight + (height() - kHudHeight) / 2.0};
 }
 
 QPointF ArenaWidget::toScreen(Vec2 world) const
 {
-    const QPointF center(width() / 2.0, kHudHeight + (height() - kHudHeight) / 2.0);
-    return center + QPointF(world.x, world.y) * scale();
+    return center() + QPointF(world.x, world.y) * scale();
 }
 
 Vec2 ArenaWidget::toWorld(QPointF screen) const
 {
-    const QPointF center(width() / 2.0, kHudHeight + (height() - kHudHeight) / 2.0);
-    const QPointF local = (screen - center) / scale();
+    const QPointF local = (screen - center()) / scale();
     return {local.x(), local.y()};
 }
 
 // ---------------------------------------------------------------------------
 // Rendu
 // ---------------------------------------------------------------------------
+
+void ArenaWidget::resizeEvent(QResizeEvent *event)
+{
+    m_stadiumCacheKey.clear();
+    QWidget::resizeEvent(event);
+}
 
 void ArenaWidget::paintEvent(QPaintEvent *)
 {
@@ -255,11 +283,11 @@ void ArenaWidget::paintEvent(QPaintEvent *)
     background.setColorAt(1.0, QColor(12, 13, 20));
     p.fillRect(rect(), background);
 
-    if (!m_battle)
+    if (!m_session)
         return;
 
     paintStadium(p);
-    if (m_phase == Phase::Aiming)
+    if (m_session->state().phase == MatchPhase::Aiming)
         paintAim(p);
     paintSpinners(p);
     paintHud(p);
@@ -268,72 +296,65 @@ void ArenaWidget::paintEvent(QPaintEvent *)
 
 void ArenaWidget::paintStadium(QPainter &p)
 {
-    const BattleConfig &cfg = m_battle->config();
-    const QPointF center = toScreen({0, 0});
-    const double r = cfg.stadiumRadius * scale();
-
-    // Rebord.
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(70, 74, 92));
-    p.drawEllipse(center, r * 1.05, r * 1.05);
-
-    // Cuvette : plus claire au centre.
-    QRadialGradient bowl(center, r);
-    bowl.setColorAt(0.0, QColor(215, 220, 230));
-    bowl.setColorAt(0.75, QColor(160, 168, 185));
-    bowl.setColorAt(1.0, QColor(105, 112, 132));
-    p.setBrush(bowl);
-    p.drawEllipse(center, r, r);
-
-    // Cercles concentriques.
-    p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(QColor(255, 255, 255, 60), 1.0));
-    for (double f : {0.33, 0.66})
-        p.drawEllipse(center, r * f, r * f);
-    p.setPen(QPen(QColor(40, 44, 60), 2.0));
-    p.drawEllipse(center, r, r);
+    const MatchState &state = m_session->state();
+    const QString key = QStringLiteral("%1/%2x%3").arg(state.stadium.id).arg(width()).arg(height());
+    const qreal dpr = devicePixelRatioF();
+    if (key != m_stadiumCacheKey) {
+        m_stadiumCache = QPixmap(size() * dpr);
+        m_stadiumCache.setDevicePixelRatio(dpr);
+        m_stadiumCache.fill(Qt::transparent);
+        QPainter cache(&m_stadiumCache);
+        StadiumPainter::paint(cache, state.stadium, state.geometry, center(), scale());
+        m_stadiumCacheKey = key;
+    }
+    p.drawPixmap(0, 0, m_stadiumCache);
 
     // Points de départ.
-    if (m_phase == Phase::Aiming || m_phase == Phase::Countdown) {
-        for (int i = 0; i < 2; ++i) {
-            QColor c = i == 0 ? kPlayerColor : kBotColor;
-            c.setAlpha(110);
-            p.setPen(QPen(c, 2.0, Qt::DashLine));
-            p.drawEllipse(toScreen(m_battle->startPosition(i)), cfg.topRadius * scale() * 1.5,
-                          cfg.topRadius * scale() * 1.5);
+    if (state.phase == MatchPhase::Aiming || state.phase == MatchPhase::Countdown) {
+        const double r = state.config.topRadius * scale() * 1.5;
+        for (int i = 0; i < state.startPositions.size(); ++i) {
+            QColor c = slotColor(i);
+            c.setAlpha(state.aimed.value(i) ? 200 : 110);
+            p.setPen(QPen(c, 2.0, state.aimed.value(i) ? Qt::SolidLine : Qt::DashLine));
+            p.setBrush(Qt::NoBrush);
+            p.drawEllipse(toScreen(state.startPositions.at(i)), r, r);
         }
     }
 }
 
 void ArenaWidget::paintAim(QPainter &p)
 {
-    const BattleConfig &cfg = m_battle->config();
-    const Vec2 start = m_battle->startPosition(0);
+    if (m_session->localHasAimed())
+        return;
+    const MatchState &state = m_session->state();
+    const int local = m_session->localPlayer();
+    const Vec2 start = state.startPositions.value(local);
     const Vec2 dir = Vec2::fromAngle(m_aimAngle);
-    const QPointF from = toScreen(start + dir * (cfg.topRadius * 1.3));
+    const QPointF from = toScreen(start + dir * (state.config.topRadius * 1.3));
     const QPointF to = toScreen(start + dir * 0.4);
+    const QColor color = slotColor(local);
 
-    p.setPen(QPen(kPlayerColor, 4.0, Qt::SolidLine, Qt::RoundCap));
+    p.setPen(QPen(color, 4.0, Qt::SolidLine, Qt::RoundCap));
     p.drawLine(from, to);
 
-    const QPointF d = (to - from) / std::hypot((to - from).x(), (to - from).y());
+    const QPointF d = (to - from) / std::max(1e-6, std::hypot((to - from).x(), (to - from).y()));
     const QPointF n(-d.y(), d.x());
     QPolygonF head;
     head << to + d * 14 << to + n * 9 << to - n * 9;
     p.setPen(Qt::NoPen);
-    p.setBrush(kPlayerColor);
+    p.setBrush(color);
     p.drawPolygon(head);
 }
 
 void ArenaWidget::paintSpinners(QPainter &p)
 {
-    const BattleConfig &cfg = m_battle->config();
-    const double radius = cfg.topRadius * scale();
+    const MatchState &state = m_session->state();
+    const double radius = state.config.topRadius * scale();
 
     // Traînées.
-    for (int i = 0; i < 2; ++i) {
+    for (size_t i = 0; i < m_trails.size() && i < state.spinners.size(); ++i) {
         const QList<QPointF> &trail = m_trails[i];
-        const QColor base = TopPainter::typeColor(m_battle->spinner(i).top.type());
+        const QColor base = TopPainter::typeColor(state.spinners[i].top.type());
         for (int k = 1; k < trail.size(); ++k) {
             QColor c = base;
             c.setAlphaF(0.35 * k / trail.size());
@@ -343,31 +364,33 @@ void ArenaWidget::paintSpinners(QPainter &p)
         }
     }
 
-    for (int i = 0; i < 2; ++i) {
-        const Spinner &s = m_battle->spinner(i);
+    for (int i = 0; i < state.playerCount(); ++i) {
+        const Spinner &s = state.spinners[i];
         QPointF pos = toScreen(s.position);
 
         // Vacillement visuel quand la rotation faiblit.
-        if (s.isActive() && s.spinRatio() < cfg.wobbleThreshold) {
-            const double amount = radius * 0.15 * (1.0 - s.spinRatio() / cfg.wobbleThreshold);
+        if (s.isActive() && s.spinRatio() < state.config.wobbleThreshold) {
+            const double amount
+                = radius * 0.15 * (1.0 - s.spinRatio() / state.config.wobbleThreshold);
             pos += QPointF(std::cos(s.angle * 3.0), std::sin(s.angle * 3.0)) * amount;
         }
 
         p.save();
-        if (!s.isActive() && s.status != Spinner::Status::Waiting)
-            p.setOpacity(0.45);
-        const double glow = s.isBoosted() ? s.boostTimer / cfg.dashBoostDuration : 0.0;
+        const bool out = s.status != Spinner::Status::Waiting && !s.isActive();
+        if (out)
+            p.setOpacity(0.4);
+        const double glow = s.isBoosted() ? s.boostTimer / state.config.dashBoostDuration : 0.0;
         TopPainter::paint(p, s.top, pos, radius, s.angle, glow);
         p.restore();
 
         // Étiquette.
-        const QColor label = i == 0 ? kPlayerColor : kBotColor;
         QFont f = font();
         f.setBold(true);
         p.setFont(f);
-        p.setPen(label);
-        p.drawText(QRectF(pos.x() - 40, pos.y() - radius - 22, 80, 18), Qt::AlignCenter,
-                   i == 0 ? tr("VOUS") : tr("BOT"));
+        p.setPen(slotColor(i));
+        const QString label = i == m_session->localPlayer() ? tr("VOUS") : state.names.value(i);
+        p.drawText(QRectF(pos.x() - 70, pos.y() - radius - 22, 140, 18), Qt::AlignCenter,
+                   p.fontMetrics().elidedText(label, Qt::ElideRight, 140));
     }
 
     // Étincelles de choc.
@@ -390,34 +413,55 @@ void ArenaWidget::paintSpinners(QPainter &p)
 
 void ArenaWidget::paintHud(QPainter &p)
 {
-    const double margin = 12.0;
-    const double panelWidth = std::min(330.0, (width() - 3 * margin) / 2.0 - 40);
-    paintSpinnerHud(p, m_battle->spinner(0), QRectF(margin, 8, panelWidth, kHudHeight - 16),
-                    true, false);
-    paintSpinnerHud(p, m_battle->spinner(1),
-                    QRectF(width() - margin - panelWidth, 8, panelWidth, kHudHeight - 16), false,
-                    true);
+    const MatchState &state = m_session->state();
+    const int count = std::max(1, state.playerCount());
+    const double margin = 10.0;
+    if (count <= 2) {
+        const double panelWidth = std::min(330.0, (width() - 3 * margin) / 2.0 - 40);
+        paintSpinnerHud(p, 0, QRectF(margin, 8, panelWidth, kHudHeight - 16));
+        if (count == 2)
+            paintSpinnerHud(p, 1, QRectF(width() - margin - panelWidth, 8, panelWidth,
+                                         kHudHeight - 16));
+    } else {
+        const double panelWidth = (width() - (count + 1) * margin) / count;
+        for (int i = 0; i < count; ++i)
+            paintSpinnerHud(p, i, QRectF(margin + i * (panelWidth + margin), 8, panelWidth,
+                                         kHudHeight - 16));
+    }
 
-    // Chronomètre.
+    // Chronomètre et stadium.
     QFont f = font();
     f.setPointSizeF(f.pointSizeF() * 1.6);
     f.setBold(true);
     p.setFont(f);
     p.setPen(QColor(230, 232, 240));
-    const double remaining
-        = std::max(0.0, m_battle->config().maxDuration - m_battle->elapsed());
-    p.drawText(QRectF(0, 8, width(), kHudHeight - 16), Qt::AlignHCenter | Qt::AlignVCenter,
-               QString::number(static_cast<int>(std::ceil(remaining))));
+    const double remaining = std::max(0.0, state.config.maxDuration - state.elapsed);
+    const QString timer = QString::number(static_cast<int>(std::ceil(remaining)));
+    if (count <= 2) {
+        p.drawText(QRectF(0, 8, width(), kHudHeight - 16), Qt::AlignHCenter | Qt::AlignVCenter,
+                   timer);
+    } else {
+        p.drawText(QRectF(margin, kHudHeight + 4, 120, 30), Qt::AlignLeft | Qt::AlignVCenter,
+                   timer);
+    }
+    f.setPointSizeF(font().pointSizeF());
+    f.setBold(false);
+    p.setFont(f);
+    p.setPen(QColor(170, 175, 190));
+    p.drawText(QRectF(width() - 260 - margin, kHudHeight + 4, 260, 24),
+               Qt::AlignRight | Qt::AlignVCenter, tr("Stadium %1").arg(state.stadium.name));
 }
 
-void ArenaWidget::paintSpinnerHud(QPainter &p, const Spinner &s, const QRectF &rect, bool player,
-                                  bool alignRight)
+void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
 {
-    const BattleConfig &cfg = m_battle->config();
-    const QColor accent = player ? kPlayerColor : kBotColor;
+    const MatchState &state = m_session->state();
+    const Spinner &s = state.spinners[index];
+    const bool local = index == m_session->localPlayer();
+    const bool alignRight = state.playerCount() == 2 && index == 1;
+    const QColor accent = slotColor(index);
     const Qt::Alignment align = (alignRight ? Qt::AlignRight : Qt::AlignLeft) | Qt::AlignVCenter;
 
-    p.setPen(Qt::NoPen);
+    p.setPen(local ? QPen(accent, 1.5) : QPen(Qt::NoPen));
     p.setBrush(QColor(255, 255, 255, 18));
     p.drawRoundedRect(rect, 8, 8);
 
@@ -427,8 +471,8 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, const Spinner &s, const QRectF &r
     p.setFont(f);
     p.setPen(accent);
     const QString title = QStringLiteral("%1 — %2 (%3)")
-                              .arg(player ? tr("Vous") : tr("Bot %1").arg(toString(m_difficulty)),
-                                   s.top.name(), toString(s.top.type()));
+                              .arg(local ? tr("Vous") : state.names.value(index), s.top.name(),
+                                   toString(s.top.type()));
     p.drawText(QRectF(inner.left(), inner.top(), inner.width(), 18), align,
                p.fontMetrics().elidedText(title, Qt::ElideRight, int(inner.width())));
 
@@ -453,29 +497,38 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, const Spinner &s, const QRectF &r
     p.setPen(Qt::white);
     p.drawText(bar, Qt::AlignCenter, tr("Endurance %1").arg(qRound(s.spin)));
 
-    // Indicateur de dash.
+    // Indicateur de dash ou état.
     const QRectF dashRect(inner.left(), bar.bottom() + 4, inner.width(), 14);
-    QString dashText;
-    QColor dashColor;
-    if (s.isBoosted()) {
-        dashText = tr("DASH !");
-        dashColor = QColor(255, 220, 90);
+    QString text;
+    QColor color;
+    const QString status = statusText(s.status);
+    if (!status.isEmpty()) {
+        text = status;
+        color = QColor(230, 110, 100);
+    } else if (state.phase == MatchPhase::Aiming) {
+        text = state.aimed.value(index) ? tr("Prêt à lancer") : tr("Vise…");
+        color = state.aimed.value(index) ? QColor(120, 230, 150) : QColor(170, 170, 180);
+    } else if (s.isBoosted()) {
+        text = tr("DASH !");
+        color = QColor(255, 220, 90);
     } else if (s.dashCooldown > 0.0) {
-        dashText = tr("Dash dans %1 s").arg(s.dashCooldown, 0, 'f', 1);
-        dashColor = QColor(170, 170, 180);
-    } else if (s.spin <= cfg.dashCost) {
-        dashText = tr("Dash impossible");
-        dashColor = QColor(170, 90, 90);
+        text = tr("Dash dans %1 s").arg(s.dashCooldown, 0, 'f', 1);
+        color = QColor(170, 170, 180);
+    } else if (s.spin <= state.config.dashCost) {
+        text = tr("Dash impossible");
+        color = QColor(170, 90, 90);
     } else {
-        dashText = player ? tr("Dash prêt (Espace / clic)") : tr("Dash prêt");
-        dashColor = QColor(120, 230, 150);
+        text = local ? tr("Dash prêt (Espace / clic)") : tr("Dash prêt");
+        color = QColor(120, 230, 150);
     }
-    p.setPen(dashColor);
-    p.drawText(dashRect, align, dashText);
+    p.setPen(color);
+    p.drawText(dashRect, align, p.fontMetrics().elidedText(text, Qt::ElideRight,
+                                                            int(dashRect.width())));
 }
 
 void ArenaWidget::paintOverlay(QPainter &p)
 {
+    const MatchState &state = m_session->state();
     const QRectF area(0, kHudHeight, width(), height() - kHudHeight);
     QFont big = font();
     big.setBold(true);
@@ -484,23 +537,39 @@ void ArenaWidget::paintOverlay(QPainter &p)
         big.setPointSizeF(font().pointSizeF() * sizeFactor);
         p.setFont(big);
         const QRectF r = area.translated(0, dy);
-        p.setPen(QColor(0, 0, 0, 160));
+        p.setPen(QColor(0, 0, 0, 170));
         p.drawText(r.translated(2, 2), Qt::AlignCenter, text);
         p.setPen(color);
         p.drawText(r, Qt::AlignCenter, text);
     };
 
-    switch (m_phase) {
-    case Phase::Aiming:
-        banner(tr("Visez avec la souris ou ← →\nClic ou Entrée pour lancer"), 1.2,
-               QColor(30, 34, 48), -area.height() * 0.2);
+    switch (state.phase) {
+    case MatchPhase::Aiming: {
+        QString hint;
+        if (m_session->localHasAimed()) {
+            const int ready = static_cast<int>(std::count(state.aimed.begin(), state.aimed.end(), true));
+            hint = tr("En attente des autres joueurs (%1/%2)").arg(ready).arg(state.playerCount());
+        } else {
+            hint = tr("Visez : souris ou ← →   ·   Lancer : clic ou Entrée");
+        }
+        QFont f = font();
+        f.setBold(true);
+        f.setPointSizeF(font().pointSizeF() * 1.15);
+        p.setFont(f);
+        const QRectF box(width() / 2.0 - 230, area.top() + 4, 460, 30);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0, 0, 0, 150));
+        p.drawRoundedRect(box, 8, 8);
+        p.setPen(Qt::white);
+        p.drawText(box, Qt::AlignCenter, hint);
         break;
-    case Phase::Countdown: {
-        const int n = static_cast<int>(std::ceil(m_countdown));
+    }
+    case MatchPhase::Countdown: {
+        const int n = std::max(1, static_cast<int>(std::ceil(state.countdown)));
         banner(QString::number(n), 5.0, QColor(255, 255, 255), 0);
         break;
     }
-    case Phase::Fighting:
+    case MatchPhase::Fighting:
         if (m_flash > 0.0) {
             p.save();
             p.setOpacity(std::min(1.0, m_flash * 2.0));
@@ -508,22 +577,35 @@ void ArenaWidget::paintOverlay(QPainter &p)
             p.restore();
         }
         break;
-    case Phase::Finished: {
-        p.fillRect(area, QColor(0, 0, 0, 110));
-        const int winner = m_battle->winner();
-        const QString title = winner == 0 ? tr("Victoire !")
-                            : winner == 1 ? tr("Défaite…")
-                                          : tr("Match nul");
-        const QColor color = winner == 0 ? QColor(120, 230, 150)
-                           : winner == 1 ? QColor(240, 110, 90)
-                                         : QColor(230, 230, 230);
-        banner(title, 3.6, color, -40);
-        banner(endReasonText(m_battle->endReason()), 1.3, QColor(235, 235, 240), 30);
-        banner(tr("R : revanche"), 1.0, QColor(200, 200, 210), 70);
+    case MatchPhase::Finished: {
+        p.fillRect(area, QColor(0, 0, 0, 120));
+        const int winner = state.winner;
+        const int local = m_session->localPlayer();
+        const QString title = winner == local ? tr("Victoire !")
+                            : winner < 0      ? tr("Match nul")
+                                              : tr("Défaite…");
+        const QColor color = winner == local ? QColor(120, 230, 150)
+                           : winner < 0      ? QColor(230, 230, 230)
+                                             : QColor(240, 110, 90);
+        banner(title, 3.6, color, -70);
+        if (winner >= 0 && winner != local)
+            banner(tr("%1 remporte le combat").arg(state.names.value(winner)), 1.3,
+                   slotColor(winner), -20);
+        banner(endReasonText(state.endReason, state.playerCount()), 1.1, QColor(235, 235, 240),
+               14);
+
+        if (state.playerCount() > 2) {
+            QStringList lines;
+            for (int rank = 0; rank < state.ranking.size(); ++rank) {
+                const int idx = state.ranking.at(rank);
+                lines << QStringLiteral("%1. %2 (%3)")
+                             .arg(rank + 1)
+                             .arg(state.names.value(idx), state.spinners[idx].top.name());
+            }
+            banner(lines.join('\n'), 1.0, QColor(220, 222, 230), 40 + 12 * lines.size());
+        }
         break;
     }
-    case Phase::Idle:
-        break;
     }
 }
 

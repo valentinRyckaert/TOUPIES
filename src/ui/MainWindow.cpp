@@ -1,6 +1,7 @@
 #include "ui/MainWindow.h"
 
 #include "core/PartCatalog.h"
+#include "session/LocalSession.h"
 #include "ui/BattlePage.h"
 #include "ui/BuilderPage.h"
 #include "ui/MenuPage.h"
@@ -39,12 +40,22 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_builder, &BuilderPage::topsChanged, m_setup, &SetupPage::refresh);
     connect(m_setup, &SetupPage::backRequested, this, &MainWindow::showMenu);
     connect(m_setup, &SetupPage::fightRequested, this,
-            [this](const Top &player, const Top &opponent, Difficulty difficulty) {
+            [this](const Top &player, const Top &opponent, Difficulty difficulty,
+                   const QString &stadiumId) {
+                const Stadium stadium = Stadium::find(stadiumId).value_or(Stadium::classic());
+                auto session = std::make_unique<LocalSession>(
+                    QList<Top>{player, opponent},
+                    QStringList{tr("Vous"), tr("Bot %1").arg(toString(difficulty))}, stadium,
+                    difficulty);
                 m_stack->setCurrentWidget(m_battle);
-                m_battle->startMatch(player, opponent, difficulty);
+                m_battle->start(std::move(session), BattlePage::Mode::Solo);
             });
-    connect(m_battle, &BattlePage::menuRequested, this, &MainWindow::showMenu);
+    connect(m_battle, &BattlePage::leaveRequested, this, &MainWindow::showMenu);
     connect(m_battle, &BattlePage::setupRequested, this, &MainWindow::showSetup);
+    connect(m_battle, &BattlePage::rematchRequested, this, [this] {
+        if (auto *local = qobject_cast<LocalSession *>(m_battle->session()))
+            local->restart();
+    });
 
     showMenu();
 

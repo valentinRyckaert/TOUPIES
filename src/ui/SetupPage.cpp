@@ -1,6 +1,8 @@
 #include "ui/SetupPage.h"
 
 #include "core/TopRepository.h"
+#include "game/Stadium.h"
+#include "ui/StadiumPainter.h"
 #include "ui/StatsWidget.h"
 
 #include <QComboBox>
@@ -56,7 +58,17 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
         m_difficultyCombo->addItem(toString(d), static_cast<int>(d));
     m_difficultyCombo->setCurrentIndex(1);
     form->addRow(tr("Difficulté du bot"), m_difficultyCombo);
+    m_stadiumCombo = new QComboBox(this);
+    for (const Stadium &stadium : Stadium::all())
+        m_stadiumCombo->addItem(stadium.name, stadium.id);
+    form->addRow(tr("Stadium"), m_stadiumCombo);
     root->addLayout(form);
+    m_stadiumPreview = new StadiumWidget(this);
+    root->addWidget(m_stadiumPreview);
+    connect(m_stadiumCombo, &QComboBox::currentIndexChanged, this, [this] {
+        if (const auto stadium = Stadium::find(m_stadiumCombo->currentData().toString()))
+            m_stadiumPreview->setStadium(*stadium);
+    });
 
     auto *rules = new QLabel(
         tr("<b>Règles</b> — Visez puis lancez votre toupie. Elle parcourt le stadium dans le "
@@ -66,7 +78,8 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
            "d'attaque, au prix d'un peu d'endurance. Une toupie éjectée du stadium ou à court "
            "d'endurance perd la partie.<br><br>"
            "<b>Repères</b> — Attaque bat Endurance, Endurance bat Défense, Défense bat Attaque ; "
-           "le type Équilibre n'a ni point fort ni point faible marqué."),
+           "le type Équilibre n'a ni point fort ni point faible marqué. Chaque stadium "
+           "avantage légèrement certains types."),
         this);
     rules->setWordWrap(true);
     root->addWidget(rules);
@@ -144,7 +157,8 @@ void SetupPage::startFight()
         opponent = QRandomGenerator::global()->bounded(static_cast<int>(m_tops.size()));
 
     const auto difficulty = static_cast<Difficulty>(m_difficultyCombo->currentData().toInt());
-    emit fightRequested(m_tops.at(player), m_tops.at(opponent), difficulty);
+    emit fightRequested(m_tops.at(player), m_tops.at(opponent), difficulty,
+                        m_stadiumCombo->currentData().toString());
 }
 
 } // namespace toupie

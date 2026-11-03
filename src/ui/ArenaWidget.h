@@ -1,50 +1,49 @@
 #pragma once
 
-#include "core/Top.h"
-#include "game/Battle.h"
-#include "game/BotController.h"
+#include "session/MatchSession.h"
 
 #include <QElapsedTimer>
 #include <QList>
+#include <QPixmap>
 #include <QPointF>
+#include <QPointer>
 #include <QTimer>
 #include <QWidget>
 
-#include <array>
-#include <memory>
+#include <vector>
 
 namespace toupie {
 
 /// Vue du stadium : visée, compte à rebours, combat et résultat.
 ///
-/// Le joueur contrôle la toupie 0 (à gauche), le bot la toupie 1.
+/// L'arène affiche l'état d'une MatchSession (solo, hôte ou client réseau)
+/// et lui transmet les actions du joueur local.
 /// Contrôles : souris ou ← → pour viser, clic / Entrée pour lancer,
-/// clic / Espace pour dasher pendant le combat.
+/// clic / Espace pour dasher pendant le combat, R pour demander une revanche.
 class ArenaWidget : public QWidget
 {
     Q_OBJECT
 
 public:
-    enum class Phase { Idle, Aiming, Countdown, Fighting, Finished };
-    Q_ENUM(Phase)
-
     explicit ArenaWidget(QWidget *parent = nullptr);
     ~ArenaWidget() override;
 
-    void startMatch(const Top &player, const Top &opponent, Difficulty difficulty);
-    void restart();
-    void stop();
+    /// Session affichée (non possédée) ; nullptr pour arrêter.
+    void setSession(MatchSession *session);
+    MatchSession *session() const { return m_session; }
 
-    Phase phase() const { return m_phase; }
+    /// Couleur associée à une place (0 à 3).
+    static QColor slotColor(int slot);
 
-    QSize sizeHint() const override { return {720, 720}; }
+    QSize sizeHint() const override { return {760, 760}; }
 
 signals:
     void matchFinished(int winner);
-    void phaseChanged(toupie::ArenaWidget::Phase phase);
+    void rematchRequested();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
@@ -58,11 +57,12 @@ private:
     };
 
     void tick();
-    void setPhase(Phase phase);
+    void resetVisuals();
     void confirmLaunch();
     void tryDash();
 
     double scale() const;
+    QPointF center() const;
     QPointF toScreen(Vec2 world) const;
     Vec2 toWorld(QPointF screen) const;
 
@@ -70,24 +70,18 @@ private:
     void paintAim(QPainter &p);
     void paintSpinners(QPainter &p);
     void paintHud(QPainter &p);
-    void paintSpinnerHud(QPainter &p, const Spinner &s, const QRectF &rect, bool player,
-                         bool alignRight);
+    void paintSpinnerHud(QPainter &p, int index, const QRectF &rect);
     void paintOverlay(QPainter &p);
 
-    Top m_player;
-    Top m_opponent;
-    Difficulty m_difficulty = Difficulty::Normal;
-
-    std::unique_ptr<Battle> m_battle;
-    std::unique_ptr<BotController> m_bot;
-    Phase m_phase = Phase::Idle;
+    QPointer<MatchSession> m_session;
+    MatchPhase m_lastPhase = MatchPhase::Aiming;
     double m_aimAngle = 0.0;
-    double m_botAngle = 0.0;
-    double m_countdown = 0.0;
     double m_flash = 0.0;
 
-    std::array<QList<QPointF>, 2> m_trails;
+    std::vector<QList<QPointF>> m_trails;
     QList<Spark> m_sparks;
+    QPixmap m_stadiumCache;
+    QString m_stadiumCacheKey;
 
     QTimer m_timer;
     QElapsedTimer m_clock;

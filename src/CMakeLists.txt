@@ -17,6 +17,10 @@ add_library(toupie_core STATIC
     game/Battle.cpp
     game/BotController.h
     game/BotController.cpp
+    session/MatchSession.h
+    session/MatchSession.cpp
+    session/LocalSession.h
+    session/LocalSession.cpp
 )
 target_include_directories(toupie_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(toupie_core PUBLIC Qt6::Core)
@@ -26,6 +30,8 @@ qt_add_executable(toupie_arena
     main.cpp
     ui/TopPainter.h
     ui/TopPainter.cpp
+    ui/StadiumPainter.h
+    ui/StadiumPainter.cpp
     ui/StatsWidget.h
     ui/StatsWidget.cpp
     ui/ArenaWidget.h

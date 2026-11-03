@@ -10,6 +10,7 @@ class QComboBox;
 
 namespace toupie {
 
+class StadiumWidget;
 class StatsWidget;
 class TopRepository;
 
@@ -27,7 +28,7 @@ public:
 signals:
     void backRequested();
     void fightRequested(const toupie::Top &player, const toupie::Top &opponent,
-                        toupie::Difficulty difficulty);
+                        toupie::Difficulty difficulty, const QString &stadiumId);
 
 private:
     void updatePreviews();
@@ -38,6 +39,8 @@ private:
     QComboBox *m_playerCombo = nullptr;
     QComboBox *m_opponentCombo = nullptr;
     QComboBox *m_difficultyCombo = nullptr;
+    QComboBox *m_stadiumCombo = nullptr;
+    StadiumWidget *m_stadiumPreview = nullptr;
     StatsWidget *m_playerPreview = nullptr;
     StatsWidget *m_opponentPreview = nullptr;
 };
