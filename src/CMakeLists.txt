@@ -13,6 +13,8 @@ add_library(toupie_core STATIC
     game/BattleConfig.h
     game/Battle.h
     game/Battle.cpp
+    game/BotController.h
+    game/BotController.cpp
 )
 target_include_directories(toupie_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(toupie_core PUBLIC Qt6::Core)
