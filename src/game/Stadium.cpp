@@ -171,8 +171,9 @@ const QList<Stadium> &Stadium::all()
         concrete.id = QStringLiteral("beton");
         concrete.name = QStringLiteral("Béton");
         concrete.description = QStringLiteral(
-            "Octogone au sol dur et lisse, haut rebord. Les toupies filent vite et les chocs "
-            "sont violents, mais la surface râpe la pointe.");
+            "Octogone au sol dur et lisse, entouré d'un très haut rebord. Les toupies vont "
+            "un peu plus vite et les chocs sont plus violents, mais la surface râpe la "
+            "pointe.");
         concrete.shape = Kind::Polygon;
         concrete.sides = 8;
         concrete.rimHeight = 2.0;
@@ -190,8 +191,9 @@ const QList<Stadium> &Stadium::all()
         dirt.id = QStringLiteral("terre");
         dirt.name = QStringLiteral("Terre");
         dirt.description = QStringLiteral(
-            "Arène de terre battue sans rebord. Le sol meuble freine les toupies et les dashs "
-            "et amortit les chocs, mais la pointe s'y enfonce et s'use.");
+            "Arène de terre battue sans rebord. Le sol accroche la pointe : la rotation "
+            "s'use plus vite et les chocs frappent fort ; les dashs sont un peu plus "
+            "courts.");
         dirt.hasRim = false;
         dirt.friction = 1.0;
         dirt.speed = 1.0;
@@ -208,8 +210,8 @@ const QList<Stadium> &Stadium::all()
         ice.id = QStringLiteral("glace");
         ice.name = QStringLiteral("Glace");
         ice.description = QStringLiteral(
-            "Patinoire elliptique au rebord bas. Presque aucun frottement : la rotation dure "
-            "longtemps, mais le moindre choc fait glisser loin.");
+            "Patinoire elliptique au haut rebord. La glace use très peu la rotation et les "
+            "chocs repoussent moins : idéal pour durer.");
         ice.shape = Kind::Ellipse;
         ice.aspect = 0.8;
         ice.rimHeight = 1.7;
@@ -247,8 +249,8 @@ const QList<Stadium> &Stadium::all()
         volcano.id = QStringLiteral("volcan");
         volcano.name = QStringLiteral("Volcan");
         volcano.description = QStringLiteral(
-            "Petit cratère aux pentes raides, sans rebord, entouré de lave. Les chocs et les "
-            "dashs y sont redoutables.");
+            "Petit cratère aux pentes très raides, sans rebord, entouré de lave. Les chocs "
+            "et les dashs y sont plus puissants.");
         volcano.size = 0.9;
         volcano.hasRim = false;
         volcano.slope = 2.0;
