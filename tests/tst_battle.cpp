@@ -1,6 +1,7 @@
 #include "core/PartCatalog.h"
 #include "game/Battle.h"
 #include "game/BotController.h"
+#include "game/MatchRules.h"
 
 #include <QSet>
 #include <QTest>
@@ -51,6 +52,15 @@ private slots:
     void fourPlayerMatchProducesRanking();
     void forfeitEliminatesPlayer();
     void dashTargetsNearestOrChosenOpponent();
+    void rulesModifyConstants();
+    void launchPowerScalesSpeed();
+    void steeringChangesTrajectory();
+    void topsDriftTowardCenter();
+    void specialRequiresFullGauge();
+    void waveHitsTargetAndAppliesEffect_data();
+    void waveHitsTargetAndAppliesEffect();
+    void ringHitsEveryOpponentInRange();
+    void disarmBlocksDash();
 };
 
 void TestBattle::enduranceReducesPassiveLoss()
@@ -343,6 +353,186 @@ void TestBattle::dashTargetsNearestOrChosenOpponent()
     QVERIFY(battle.requestDash(0, 2));
     const Vec2 toRight = (battle.spinner(2).position - battle.spinner(0).position).normalized();
     QVERIFY(battle.spinner(0).dashDirection.dot(toRight) > 0.99);
+}
+
+namespace {
+Top withBolt(Top top, const char *boltId)
+{
+    top.setPart(*PartCatalog::instance().find(QString::fromLatin1(boltId)));
+    return top;
+}
+
+/// Combat figé (aucun mouvement propre) pour tester les coups spéciaux.
+BattleConfig staticConfig()
+{
+    BattleConfig c;
+    c.launchSpeed = 0.0;
+    c.slopeStrength = 0.0;
+    c.centerPull = 0.0;
+    c.orbitBase = c.orbitPerAttack = 0.0;
+    c.specialChargeRate = 1e6; // Jauge pleine dès le premier pas.
+    return c;
+}
+
+/// Fait avancer jusqu'à ce que `done` soit vrai (au plus `seconds`).
+template<typename Predicate>
+void runUntil(Battle &battle, double seconds, Predicate done)
+{
+    for (double t = 0.0; t < seconds && !done() && !battle.isFinished(); t += 1.0 / 240.0)
+        battle.advance(1.0 / 240.0);
+}
+} // namespace
+
+void TestBattle::rulesModifyConstants()
+{
+    const BattleConfig base;
+    MatchRules rules;
+    QVERIFY(rules.isDefault());
+    QCOMPARE(base.maxDuration, 0.0); // Aucune limite de temps par défaut.
+
+    rules.speed = 2.0;
+    rules.wear = 0.5;
+    rules.maxEndurance = 200;
+    rules.timeLimit = 60;
+    rules.steering = 0.0;
+    rules.specialCharge = 0.0;
+    const BattleConfig c = rules.apply(base);
+    QCOMPARE(c.launchSpeed, base.launchSpeed * 2.0);
+    QCOMPARE(c.passiveBase, base.passiveBase * 0.5);
+    QCOMPARE(c.maxSpin, 200.0);
+    QCOMPARE(c.maxDuration, 60.0);
+    QCOMPARE(c.steerAcceleration, 0.0);
+    QVERIFY(!c.specialsEnabled);
+    QVERIFY(MatchRules::fromJson(rules.toJson()) == rules);
+
+    Battle battle({attackTop(), defenseTop()}, Stadium::classic(), c, 1);
+    QCOMPARE(battle.spinner(0).spin, 200.0);
+}
+
+void TestBattle::launchPowerScalesSpeed()
+{
+    Battle battle(attackTop(), defenseTop());
+    battle.launch({0.0, M_PI}, {1.5, 0.1}); // 0.1 est ramené au minimum.
+    const double v0 = battle.spinner(0).velocity.length();
+    const double v1 = battle.spinner(1).velocity.length();
+    QVERIFY(std::abs(v0 - battle.config().launchSpeed * battle.config().launchPowerMax) < 1e-9);
+    QVERIFY(std::abs(v1 - battle.config().launchSpeed * battle.config().launchPowerMin) < 1e-9);
+}
+
+void TestBattle::steeringChangesTrajectory()
+{
+    BattleConfig config = staticConfig();
+    Battle steered({defenseTop(), defenseTop()}, Stadium::classic(), config, 1);
+    Battle free({defenseTop(), defenseTop()}, Stadium::classic(), config, 1);
+    steered.launch({0.0, 0.0});
+    free.launch({0.0, 0.0});
+    steered.setSteering(0, {0.0, -1.0}); // Vers le haut.
+    run(steered, 0.5);
+    run(free, 0.5);
+    QVERIFY(steered.spinner(0).position.y < free.spinner(0).position.y - 0.01);
+    QVERIFY(std::abs(free.spinner(0).position.y) < 1e-9);
+}
+
+void TestBattle::topsDriftTowardCenter()
+{
+    BattleConfig config;
+    config.launchSpeed = 0.0;
+    config.wobbleThreshold = 0.0;
+    Battle battle({defenseTop(), defenseTop()}, Stadium::classic(), config, 1);
+    battle.launch({0.0, 0.0});
+    const double before = battle.spinner(0).position.length();
+    run(battle, 1.0);
+    QVERIFY(battle.spinner(0).position.length() < before);
+}
+
+void TestBattle::specialRequiresFullGauge()
+{
+    Battle battle(attackTop(), defenseTop());
+    battle.launch(0.0, M_PI);
+    QVERIFY(!battle.canSpecial(0)); // Jauge vide au départ.
+    run(battle, 100.0 / battle.config().specialChargeRate + 0.2);
+    if (!battle.isFinished()) {
+        QVERIFY(battle.canSpecial(0));
+        QVERIFY(battle.requestSpecial(0));
+        QCOMPARE(battle.spinner(0).special, 0.0);
+        QCOMPARE(battle.projectiles().size(), size_t(1));
+    }
+}
+
+void TestBattle::waveHitsTargetAndAppliesEffect_data()
+{
+    QTest::addColumn<QString>("bolt");
+    QTest::newRow("lance") << QStringLiteral("B2");
+    QTest::newRow("givre") << QStringLiteral("B3");
+    QTest::newRow("distorsion") << QStringLiteral("B5");
+    QTest::newRow("siphon") << QStringLiteral("B6");
+}
+
+void TestBattle::waveHitsTargetAndAppliesEffect()
+{
+    QFETCH(QString, bolt);
+    const Top shooter = withBolt(attackTop(), bolt.toLatin1().constData());
+    Battle battle({shooter, defenseTop()}, Stadium::classic(), staticConfig(), 1);
+    battle.launch({0.0, 0.0});
+    battle.advance(0.01);
+    const double spinBefore = battle.spinner(1).spin;
+    const double ownerBefore = battle.spinner(0).spin;
+    QVERIFY(battle.requestSpecial(0));
+    const SpecialMove move = *SpecialMove::find(shooter.special());
+    QVERIFY(move.shape == SpecialMove::Shape::Wave);
+
+    runUntil(battle, 3.0, [&] { return battle.projectiles().empty(); });
+    QVERIFY(battle.projectiles().empty()); // La vague a atteint sa cible.
+    const Spinner &target = battle.spinner(1);
+    if (move.damage > 0.0)
+        QVERIFY(target.spin < spinBefore - 0.5);
+
+    switch (move.effect) {
+    case SpecialMove::Effect::Slow:
+        QVERIFY(target.isSlowed());
+        break;
+    case SpecialMove::Effect::Teleport:
+        QVERIFY(std::abs(battle.geometry().level(target.position) - move.effectStrength) < 0.1);
+        break;
+    case SpecialMove::Effect::Drain:
+        // La toupie lanceuse a récupéré de l'endurance malgré l'usure.
+        QVERIFY(battle.spinner(0).spin > ownerBefore - 1.0);
+        break;
+    default:
+        break;
+    }
+}
+
+void TestBattle::ringHitsEveryOpponentInRange()
+{
+    // 4 toupies : celle d'en face (loin) n'est pas touchée par un anneau court.
+    const Top quake = withBolt(defenseTop(), "B7"); // Séisme, portée 0,5.
+    BattleConfig config = staticConfig();
+    config.startOffset = 0.3;
+    Battle battle({quake, attackTop(), attackTop(), attackTop()}, Stadium::classic(), config, 1);
+    battle.launch({0.0, 0.0, 0.0, 0.0});
+    battle.advance(0.01);
+    QVERIFY(battle.requestSpecial(0));
+    runUntil(battle, 2.0, [&] { return battle.projectiles().empty(); });
+    // Voisins à 0,42 (touchés), toupie opposée à 0,6 (hors portée).
+    QVERIFY(battle.spinner(1).isDisarmed());
+    QVERIFY(battle.spinner(3).isDisarmed());
+    QVERIFY(!battle.spinner(2).isDisarmed());
+}
+
+void TestBattle::disarmBlocksDash()
+{
+    const Top quake = withBolt(defenseTop(), "B7");
+    BattleConfig config = staticConfig();
+    config.startOffset = 0.2;
+    Battle battle({quake, attackTop()}, Stadium::classic(), config, 1);
+    battle.launch({0.0, 0.0});
+    battle.advance(0.01);
+    QVERIFY(battle.requestSpecial(0));
+    runUntil(battle, 1.0, [&] { return battle.spinner(1).isDisarmed(); });
+    QVERIFY(battle.spinner(1).isDisarmed());
+    QVERIFY(!battle.canDash(1));
+    QVERIFY(!battle.canSpecial(1));
 }
 
 QTEST_GUILESS_MAIN(TestBattle)
