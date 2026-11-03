@@ -467,8 +467,14 @@ void ArenaWidget::paintAim(QPainter &p)
     f.setBold(true);
     p.setFont(f);
     p.setPen(color);
-    p.drawText(QRectF(to.x() + d.x() * 24 - 50, to.y() + d.y() * 24 - 10, 100, 20), Qt::AlignCenter,
-               tr("Force %1 %").arg(qRound(m_aimPower * 100)));
+    // Libellé au-delà de la pointe, sur un fond pour rester lisible.
+    const QPointF labelCenter = to + d * (size + 34);
+    const QRectF labelRect(labelCenter.x() - 52, labelCenter.y() - 11, 104, 22);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0, 150));
+    p.drawRoundedRect(labelRect, 6, 6);
+    p.setPen(color);
+    p.drawText(labelRect, Qt::AlignCenter, tr("Force %1 %").arg(qRound(m_aimPower * 100)));
 }
 
 void ArenaWidget::paintProjectiles(QPainter &p)
@@ -618,8 +624,15 @@ void ArenaWidget::paintHud(QPainter &p)
     f.setBold(true);
     p.setFont(f);
     p.setPen(QColor(230, 232, 240));
-    const double remaining = std::max(0.0, state.config.maxDuration - state.elapsed);
-    const QString timer = QString::number(static_cast<int>(std::ceil(remaining)));
+    // Avec une limite : compte à rebours ; sans limite : temps écoulé.
+    QString timer;
+    if (state.config.maxDuration > 0.0) {
+        timer = QString::number(static_cast<int>(
+            std::ceil(std::max(0.0, state.config.maxDuration - state.elapsed))));
+    } else {
+        const int seconds = static_cast<int>(state.elapsed);
+        timer = QStringLiteral("%1:%2").arg(seconds / 60).arg(seconds % 60, 2, 10, QLatin1Char('0'));
+    }
     if (count <= 2) {
         p.drawText(QRectF(0, 8, width(), kHudHeight - 16), Qt::AlignHCenter | Qt::AlignVCenter,
                    timer);

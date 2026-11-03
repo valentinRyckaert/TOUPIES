@@ -53,6 +53,11 @@ QPushButton#menu {
     font-size: 13pt; padding: 12px 28px; border-radius: 12px; min-width: 320px;
     background-color: rgba(37, 42, 49, 220);
 }
+QPushButton#menu:default {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 @accentBright, stop:1 @accent);
+    color: #10140d; border: 1px solid @accentDark;
+}
+QPushButton#menu:default:hover { background-color: @accentBright; }
 
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
     background-color: #111417; color: @text; border: 1px solid @border; border-radius: 7px;

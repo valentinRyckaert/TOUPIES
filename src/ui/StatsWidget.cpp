@@ -130,7 +130,7 @@ void StatsWidget::paintEvent(QPaintEvent *)
 
     p.setFont(font());
     const auto move = SpecialMove::find(top.special());
-    const QString info = tr("Type %1  ·  rotation %2  ·  spécial : %3")
+    const QString info = tr("%1  ·  %2  ·  ✦ %3")
                              .arg(toString(top.type()), toString(top.spin()).toLower(),
                                   move ? move->name : tr("aucun"));
     p.setPen(accent);
