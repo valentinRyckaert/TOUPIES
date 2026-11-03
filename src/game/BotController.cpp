@@ -106,7 +106,11 @@ bool BotController::wantsToDash(const Battle &battle)
 {
     const BattleConfig &cfg = battle.config();
     const Spinner &self = battle.spinner(m_index);
-    const Spinner &other = battle.spinner(1 - m_index);
+    const int target = battle.nearestOpponent(m_index);
+    if (target < 0)
+        return false;
+    const Spinner &other = battle.spinner(target);
+    const StadiumGeometry &geometry = battle.geometry();
 
     const Vec2 delta = other.position - self.position;
     const double distance = delta.length();
@@ -124,9 +128,10 @@ bool BotController::wantsToDash(const Battle &battle)
     if (gap > reach * rangeFactor)
         return false;
 
-    // Ne pas se jeter soi-même hors du stadium.
+    // Ne pas se jeter soi-même hors du stadium (plus prudent sans rebord).
     const Vec2 landing = self.position + direction * (std::min(gap, reach) + 0.02);
-    if (landing.length() > 0.88 * cfg.stadiumRadius)
+    const double safeLevel = battle.stadium().hasRim ? 0.88 : 0.8;
+    if (geometry.level(landing) > safeLevel)
         return false;
 
     if (m_difficulty == Difficulty::Easy) {
@@ -135,7 +140,7 @@ bool BotController::wantsToDash(const Battle &battle)
             return false;
     }
 
-    const double opponentEdge = other.position.length() / cfg.stadiumRadius;
+    const double opponentEdge = geometry.level(other.position);
     const double opponentIncoming = other.velocity.dot(-direction);
     const double myRatio = self.spinRatio();
     const double theirRatio = other.spinRatio();
@@ -143,8 +148,14 @@ bool BotController::wantsToDash(const Battle &battle)
 
     // Si l'adversaire va tenir plus longtemps à la seule endurance, attendre
     // ne sert à rien : on passe à l'offensive quel que soit le style.
+    // En mêlée, on se compare à l'adversaire le plus endurant.
     const double myTimeLeft = self.spin / battle.passiveLossPerSecond(self);
-    const double theirTimeLeft = other.spin / battle.passiveLossPerSecond(other);
+    double theirTimeLeft = 0.0;
+    for (int i = 0; i < battle.playerCount(); ++i) {
+        const Spinner &s = battle.spinner(i);
+        if (i != m_index && s.isActive())
+            theirTimeLeft = std::max(theirTimeLeft, s.spin / battle.passiveLossPerSecond(s));
+    }
     if (myTimeLeft < 0.9 * theirTimeLeft)
         return spinAfterDash > 10.0;
 

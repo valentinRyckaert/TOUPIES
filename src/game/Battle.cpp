@@ -20,41 +20,79 @@ Spinner makeSpinner(const Top &top, double maxSpin)
 }
 } // namespace
 
-Battle::Battle(const Top &first, const Top &second, const BattleConfig &config, std::uint32_t seed)
-    : m_config(config)
-    , m_spinners{makeSpinner(first, config.maxSpin), makeSpinner(second, config.maxSpin)}
+Battle::Battle(const QList<Top> &tops, const Stadium &stadium, const BattleConfig &config,
+               std::uint32_t seed)
+    : m_stadium(stadium)
+    , m_config(stadium.apply(config))
+    , m_geometry(stadium.geometry(m_config))
     , m_rng(seed)
 {
-    for (int i = 0; i < 2; ++i)
+    const int count = std::clamp(static_cast<int>(tops.size()), kMinPlayers, kMaxPlayers);
+    for (int i = 0; i < count; ++i)
+        m_spinners.push_back(makeSpinner(tops.value(i, tops.value(0)), m_config.maxSpin));
+    m_pairCooldowns.assign(m_spinners.size() * m_spinners.size(), 0.0);
+    for (int i = 0; i < count; ++i)
         m_spinners[i].position = startPosition(i);
+}
+
+Battle::Battle(const Top &first, const Top &second, const BattleConfig &config, std::uint32_t seed)
+    : Battle(QList<Top>{first, second}, Stadium::classic(), config, seed)
+{
 }
 
 Vec2 Battle::startPosition(int index) const
 {
-    return {index == 0 ? -m_config.startOffset : m_config.startOffset, 0.0};
+    // Joueurs répartis régulièrement autour du centre ; le joueur 0 à gauche.
+    const double angle = kPi + index * 2.0 * kPi / playerCount();
+    return Vec2::fromAngle(angle) * (m_config.startOffset * m_geometry.innerRadius());
 }
 
-void Battle::launch(double firstAngle, double secondAngle)
+void Battle::launch(const QList<double> &angles)
 {
     if (m_phase != Phase::Ready)
         return;
 
-    const double angles[2] = {firstAngle, secondAngle};
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < playerCount(); ++i) {
         Spinner &s = m_spinners[i];
+        if (s.status == Spinner::Status::Forfeit)
+            continue;
         s.position = startPosition(i);
-        s.velocity = Vec2::fromAngle(angles[i]) * m_config.launchSpeed;
+        s.velocity = Vec2::fromAngle(angles.value(i, 0.0)) * m_config.launchSpeed;
         s.status = Spinner::Status::Spinning;
     }
     m_phase = Phase::Running;
+    checkEnd();
+}
+
+void Battle::launch(double firstAngle, double secondAngle)
+{
+    launch(QList<double>{firstAngle, secondAngle});
+}
+
+int Battle::nearestOpponent(int index) const
+{
+    int best = -1;
+    double bestDistance = 1e18;
+    for (int j = 0; j < playerCount(); ++j) {
+        if (j == index || !m_spinners[j].isActive())
+            continue;
+        const double d = (m_spinners[j].position - m_spinners[index].position).lengthSquared();
+        if (d < bestDistance) {
+            bestDistance = d;
+            best = j;
+        }
+    }
+    return best;
 }
 
 bool Battle::canDash(int index) const
 {
-    const Spinner &self = m_spinners.at(index);
-    const Spinner &other = m_spinners.at(1 - index);
-    return m_phase == Phase::Running && self.isActive() && other.isActive() && !self.isDashing()
-        && self.dashCooldown <= 0.0 && self.spin > m_config.dashCost;
+    if (index < 0 || index >= playerCount())
+        return false;
+    const Spinner &self = m_spinners[index];
+    return m_phase == Phase::Running && self.isActive() && !self.isDashing()
+        && self.dashCooldown <= 0.0 && self.spin > m_config.dashCost
+        && nearestOpponent(index) >= 0;
 }
 
 bool Battle::requestDash(int index)
@@ -63,15 +101,30 @@ bool Battle::requestDash(int index)
         return false;
 
     Spinner &self = m_spinners[index];
-    const Spinner &other = m_spinners[1 - index];
+    const Spinner &target = m_spinners[nearestOpponent(index)];
 
-    self.dashDirection = (other.position - self.position).normalized();
+    self.dashDirection = (target.position - self.position).normalized();
     self.velocity = self.dashDirection * m_config.dashSpeed;
     self.dashTimer = m_config.dashDuration;
     self.boostTimer = m_config.dashBoostDuration;
     self.dashCooldown = m_config.dashCooldown;
     self.spin -= m_config.dashCost;
     return true;
+}
+
+void Battle::forfeit(int index)
+{
+    if (index < 0 || index >= playerCount() || m_phase == Phase::Finished)
+        return;
+    Spinner &s = m_spinners[index];
+    if (s.status == Spinner::Status::Waiting) {
+        s.status = Spinner::Status::Forfeit;
+        m_eliminated.append(index);
+    } else if (s.isActive()) {
+        eliminate(index, Spinner::Status::Forfeit);
+    }
+    if (m_phase == Phase::Running)
+        checkEnd();
 }
 
 void Battle::advance(double dt)
@@ -155,6 +208,11 @@ double Battle::mass(const Spinner &s) const
     return 1.0 + m_config.massPerDefense * s.stats.defense;
 }
 
+double &Battle::pairCooldown(int i, int j)
+{
+    return m_pairCooldowns[static_cast<size_t>(i) * m_spinners.size() + static_cast<size_t>(j)];
+}
+
 // ---------------------------------------------------------------------------
 // Simulation
 // ---------------------------------------------------------------------------
@@ -166,18 +224,29 @@ void Battle::step(double h)
             integrate(s, h);
     }
 
-    m_contactCooldown = std::max(0.0, m_contactCooldown - h);
-    resolveCollision();
+    for (double &cooldown : m_pairCooldowns)
+        cooldown = std::max(0.0, cooldown - h);
+    for (int i = 0; i < playerCount(); ++i) {
+        for (int j = i + 1; j < playerCount(); ++j)
+            resolveCollision(i, j);
+    }
 
-    for (Spinner &s : m_spinners) {
-        if (!s.isActive())
-            continue;
+    // Éliminations de ce pas, les plus faibles d'abord (départage du classement).
+    QList<int> order;
+    for (int i = 0; i < playerCount(); ++i) {
+        if (m_spinners[i].isActive())
+            order.append(i);
+    }
+    std::sort(order.begin(), order.end(),
+              [this](int a, int b) { return m_spinners[a].spin < m_spinners[b].spin; });
+    for (int i : order) {
+        Spinner &s = m_spinners[i];
         applyRim(s);
         if (s.spin <= 0.0) {
             s.spin = 0.0;
-            s.status = Spinner::Status::Stopped;
-        } else if (s.position.length() > m_config.stadiumRadius) {
-            s.status = Spinner::Status::RingOut;
+            eliminate(i, Spinner::Status::Stopped);
+        } else if (m_geometry.level(s.position) > 1.0) {
+            eliminate(i, Spinner::Status::RingOut);
         }
     }
 
@@ -185,21 +254,30 @@ void Battle::step(double h)
     checkEnd();
 }
 
-/// Le bord du stadium est un rebord : une toupie qui l'atteint lentement
-/// rebondit, seule une toupie lancée assez vite le franchit (et est éjectée
-/// quand son centre sort du cercle).
+void Battle::eliminate(int index, Spinner::Status status)
+{
+    Spinner &s = m_spinners[index];
+    s.status = status;
+    s.dashTimer = 0.0;
+    m_eliminated.append(index);
+}
+
+/// Avec rebord, une toupie qui atteint le bord lentement rebondit ; seule une
+/// toupie lancée assez vite le franchit (et est éjectée quand son centre sort
+/// du stadium). Sans rebord, rien ne la retient.
 void Battle::applyRim(Spinner &s)
 {
-    const double r = s.position.length();
-    const double rimRadius = m_config.stadiumRadius - m_config.topRadius;
-    if (r <= rimRadius) {
+    if (!m_stadium.hasRim)
+        return;
+
+    if (m_geometry.level(s.position, m_config.topRadius) <= 1.0) {
         s.escaping = false;
         return;
     }
     if (s.escaping)
         return;
 
-    const Vec2 normal = s.position / r;
+    const Vec2 normal = m_geometry.outwardNormal(s.position);
     const double outward = s.velocity.dot(normal);
     if (outward > m_config.rimEscapeSpeed) {
         s.escaping = true;
@@ -207,7 +285,7 @@ void Battle::applyRim(Spinner &s)
     }
     if (outward > 0.0)
         s.velocity -= normal * (outward * (1.0 + m_config.rimRestitution));
-    s.position = normal * rimRadius;
+    s.position = m_geometry.projectInside(s.position, m_config.topRadius);
 }
 
 void Battle::integrate(Spinner &s, double h)
@@ -259,10 +337,10 @@ void Battle::integrate(Spinner &s, double h)
     s.boostTimer = std::max(0.0, s.boostTimer - h);
 }
 
-void Battle::resolveCollision()
+void Battle::resolveCollision(int i, int j)
 {
-    Spinner &a = m_spinners[0];
-    Spinner &b = m_spinners[1];
+    Spinner &a = m_spinners[i];
+    Spinner &b = m_spinners[j];
     if (!a.isActive() || !b.isActive())
         return;
 
@@ -292,7 +370,8 @@ void Battle::resolveCollision()
     if (bTowardA > 0.0)
         b.velocity += n * bTowardA;
 
-    if (m_contactCooldown > 0.0)
+    double &cooldown = pairCooldown(i, j);
+    if (cooldown > 0.0)
         return; // Contact prolongé : un seul choc comptabilisé.
 
     const double approach = std::max(0.0, closing);
@@ -323,12 +402,13 @@ void Battle::resolveCollision()
     a.dashTimer = 0.0;
     b.dashTimer = 0.0;
 
-    m_contactCooldown = m_config.contactCooldown;
+    cooldown = m_config.contactCooldown;
 
     ImpactEvent event;
     event.point = a.position + n * m_config.topRadius;
     event.intensity = std::min(1.0, (damageToA + damageToB) / 20.0);
-    event.damage = {damageToA, damageToB};
+    event.first = i;
+    event.second = j;
     m_impacts.append(event);
 }
 
@@ -337,33 +417,40 @@ void Battle::checkEnd()
     if (m_phase != Phase::Running)
         return;
 
-    const Spinner &a = m_spinners[0];
-    const Spinner &b = m_spinners[1];
-    const bool aLost = !a.isActive();
-    const bool bLost = !b.isActive();
+    QList<int> active;
+    for (int i = 0; i < playerCount(); ++i) {
+        if (m_spinners[i].isActive())
+            active.append(i);
+    }
 
     auto reasonFor = [](const Spinner &loser) {
-        return loser.status == Spinner::Status::RingOut ? EndReason::RingOut : EndReason::SpinOut;
+        switch (loser.status) {
+        case Spinner::Status::RingOut:
+            return EndReason::RingOut;
+        case Spinner::Status::Forfeit:
+            return EndReason::Forfeit;
+        default:
+            return EndReason::SpinOut;
+        }
     };
 
-    if (aLost && bLost) {
-        const EndReason reason = (a.status == Spinner::Status::RingOut
-                                  || b.status == Spinner::Status::RingOut)
-                                   ? EndReason::RingOut
-                                   : EndReason::SpinOut;
-        if (std::abs(a.spin - b.spin) < 1e-9)
-            finish(-1, reason);
-        else
-            finish(a.spin > b.spin ? 0 : 1, reason);
-    } else if (aLost) {
-        finish(1, reasonFor(a));
-    } else if (bLost) {
-        finish(0, reasonFor(b));
+    if (active.size() == 1) {
+        const int last = m_eliminated.isEmpty() ? active.first() : m_eliminated.last();
+        finish(active.first(), reasonFor(m_spinners[last]));
+    } else if (active.isEmpty()) {
+        // Toutes éliminées au même pas : la dernière éliminée (la plus
+        // d'endurance) gagne, sauf égalité parfaite.
+        const int last = m_eliminated.last();
+        const int previous = m_eliminated.size() > 1 ? m_eliminated.at(m_eliminated.size() - 2)
+                                                     : -1;
+        const bool tie = previous >= 0
+                      && std::abs(m_spinners[last].spin - m_spinners[previous].spin) < 1e-9;
+        finish(tie ? -1 : last, reasonFor(m_spinners[last]));
     } else if (m_elapsed >= m_config.maxDuration) {
-        if (std::abs(a.spin - b.spin) < 0.5)
-            finish(-1, EndReason::Timeout);
-        else
-            finish(a.spin > b.spin ? 0 : 1, EndReason::Timeout);
+        std::sort(active.begin(), active.end(),
+                  [this](int a, int b) { return m_spinners[a].spin > m_spinners[b].spin; });
+        const bool tie = std::abs(m_spinners[active[0]].spin - m_spinners[active[1]].spin) < 0.5;
+        finish(tie ? -1 : active.first(), EndReason::Timeout);
     }
 }
 
@@ -374,6 +461,26 @@ void Battle::finish(int winner, EndReason reason)
     m_endReason = reason;
     for (Spinner &s : m_spinners)
         s.dashTimer = 0.0;
+
+    // Classement : toupies encore en jeu (par endurance), puis éliminées de la
+    // plus tardive à la plus précoce.
+    m_ranking.clear();
+    QList<int> active;
+    for (int i = 0; i < playerCount(); ++i) {
+        if (m_spinners[i].isActive())
+            active.append(i);
+    }
+    std::sort(active.begin(), active.end(),
+              [this](int a, int b) { return m_spinners[a].spin > m_spinners[b].spin; });
+    m_ranking = active;
+    for (auto it = m_eliminated.crbegin(); it != m_eliminated.crend(); ++it) {
+        if (!m_ranking.contains(*it))
+            m_ranking.append(*it);
+    }
+    if (winner >= 0 && !m_ranking.isEmpty() && m_ranking.first() != winner) {
+        m_ranking.removeAll(winner);
+        m_ranking.prepend(winner);
+    }
 }
 
 } // namespace toupie
