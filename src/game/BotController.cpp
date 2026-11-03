@@ -98,17 +98,39 @@ void BotController::update(Battle &battle, double dt)
     std::uniform_real_distribution<double> jitter(0.7, 1.3);
     m_decisionTimer = reactionTime() * jitter(m_rng);
 
-    if (battle.canDash(m_index) && wantsToDash(battle))
-        battle.requestDash(m_index);
+    if (!battle.canDash(m_index))
+        return;
+    const int target = chooseDashTarget(battle);
+    if (target >= 0)
+        battle.requestDash(m_index, target);
 }
 
-bool BotController::wantsToDash(const Battle &battle)
+int BotController::chooseDashTarget(const Battle &battle)
+{
+    if (m_difficulty == Difficulty::Easy) {
+        std::bernoulli_distribution hesitate(0.35);
+        if (hesitate(m_rng))
+            return -1;
+    }
+
+    int best = -1;
+    double bestScore = -1e18;
+    for (int i = 0; i < battle.playerCount(); ++i) {
+        if (i == m_index || !battle.spinner(i).isActive())
+            continue;
+        double score = 0.0;
+        if (wantsToDashAt(battle, i, &score) && score > bestScore) {
+            bestScore = score;
+            best = i;
+        }
+    }
+    return best;
+}
+
+bool BotController::wantsToDashAt(const Battle &battle, int target, double *score)
 {
     const BattleConfig &cfg = battle.config();
     const Spinner &self = battle.spinner(m_index);
-    const int target = battle.nearestOpponent(m_index);
-    if (target < 0)
-        return false;
     const Spinner &other = battle.spinner(target);
     const StadiumGeometry &geometry = battle.geometry();
 
@@ -134,12 +156,6 @@ bool BotController::wantsToDash(const Battle &battle)
     if (geometry.level(landing) > safeLevel)
         return false;
 
-    if (m_difficulty == Difficulty::Easy) {
-        std::bernoulli_distribution hesitate(0.35);
-        if (hesitate(m_rng))
-            return false;
-    }
-
     const double opponentEdge = geometry.level(other.position);
     const double opponentIncoming = other.velocity.dot(-direction);
     const double myRatio = self.spinRatio();
@@ -156,10 +172,19 @@ bool BotController::wantsToDash(const Battle &battle)
         if (i != m_index && s.isActive())
             theirTimeLeft = std::max(theirTimeLeft, s.spin / battle.passiveLossPerSecond(s));
     }
+    // Choix de la cible en mêlée : l'attaque vise les proies fragiles (peu de
+    // défense, au bord, à court d'endurance), les autres styles la plus proche.
+    const TopType style = classify(self.stats);
+    if (style == TopType::Attack && m_difficulty != Difficulty::Easy) {
+        *score = opponentEdge + (1.0 - theirRatio) * 0.5 - other.stats.defense / 15.0 - gap;
+    } else {
+        *score = -distance;
+    }
+
     if (myTimeLeft < 0.9 * theirTimeLeft)
         return spinAfterDash > 10.0;
 
-    switch (classify(self.stats)) {
+    switch (style) {
     case TopType::Attack:
         return spinAfterDash > 10.0;
     case TopType::Defense:

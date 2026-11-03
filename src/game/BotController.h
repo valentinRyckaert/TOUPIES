@@ -38,7 +38,9 @@ public:
     void update(Battle &battle, double dt);
 
 private:
-    bool wantsToDash(const Battle &battle);
+    /// Cible du prochain dash, -1 pour ne pas dasher.
+    int chooseDashTarget(const Battle &battle);
+    bool wantsToDashAt(const Battle &battle, int target, double *score);
     double reactionTime() const;
     double aimError() const;
 

@@ -95,13 +95,16 @@ bool Battle::canDash(int index) const
         && nearestOpponent(index) >= 0;
 }
 
-bool Battle::requestDash(int index)
+bool Battle::requestDash(int index, int targetIndex)
 {
     if (!canDash(index))
         return false;
+    if (targetIndex < 0 || targetIndex >= playerCount() || targetIndex == index
+        || !m_spinners[targetIndex].isActive())
+        targetIndex = nearestOpponent(index);
 
     Spinner &self = m_spinners[index];
-    const Spinner &target = m_spinners[nearestOpponent(index)];
+    const Spinner &target = m_spinners[targetIndex];
 
     self.dashDirection = (target.position - self.position).normalized();
     self.velocity = self.dashDirection * m_config.dashSpeed;
@@ -260,6 +263,14 @@ void Battle::eliminate(int index, Spinner::Status status)
     s.status = status;
     s.dashTimer = 0.0;
     m_eliminated.append(index);
+
+    // Mêlée : la toupie qui a provoqué l'élimination récupère de l'endurance.
+    if (status != Spinner::Status::Forfeit && s.lastHitBy >= 0
+        && m_elapsed - s.lastHitTime <= m_config.knockoutWindow) {
+        Spinner &striker = m_spinners[s.lastHitBy];
+        if (striker.isActive())
+            striker.spin = std::min(striker.maxSpin, striker.spin + m_config.knockoutReward);
+    }
 }
 
 /// Avec rebord, une toupie qui atteint le bord lentement rebondit ; seule une
@@ -397,6 +408,9 @@ void Battle::resolveCollision(int i, int j)
 
     a.spin -= damageToA;
     b.spin -= damageToB;
+    a.lastHitBy = j;
+    b.lastHitBy = i;
+    a.lastHitTime = b.lastHitTime = m_elapsed;
 
     // Un dash s'arrête au premier contact (le bonus d'attaque reste actif).
     a.dashTimer = 0.0;

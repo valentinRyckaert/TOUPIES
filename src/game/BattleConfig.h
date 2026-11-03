@@ -86,6 +86,12 @@ struct BattleConfig
     double dashBoostDuration = 0.35; ///< Durée du bonus d'attaque.
     double postDashSpeed = 0.45;
 
+    // --- Mêlée (3-4 toupies) ---------------------------------------------------
+    /// Endurance rendue à la toupie qui provoque une élimination (dernier choc
+    /// reçu par la victime il y a moins de knockoutWindow secondes).
+    double knockoutReward = 35.0;
+    double knockoutWindow = 4.0;
+
     // --- Partie -------------------------------------------------------------------
     double maxDuration = 90.0;      ///< Au-delà : victoire à l'endurance restante.
     double fixedStep = 1.0 / 240.0;

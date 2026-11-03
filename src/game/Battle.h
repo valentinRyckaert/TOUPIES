@@ -33,6 +33,8 @@ struct Spinner
     double boostTimer = 0.0;   ///< > 0 : bonus d'attaque actif.
     Vec2 dashDirection;
     bool escaping = false;     ///< A franchi le rebord : sera éjectée.
+    int lastHitBy = -1;        ///< Dernière toupie à l'avoir frappée.
+    double lastHitTime = -1e9;
 
     Status status = Status::Waiting;
 
@@ -86,8 +88,9 @@ public:
     void launch(double firstAngle, double secondAngle);
 
     bool canDash(int index) const;
-    /// Déclenche un dash vers la toupie adverse la plus proche si c'est possible.
-    bool requestDash(int index);
+    /// Déclenche un dash vers `target` (par défaut la toupie adverse la plus
+    /// proche) si c'est possible.
+    bool requestDash(int index, int target = -1);
     /// Adversaire en jeu le plus proche (-1 s'il n'y en a pas).
     int nearestOpponent(int index) const;
 
