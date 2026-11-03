@@ -20,6 +20,11 @@ endif()
 
 add_subdirectory(src)
 
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
+
 option(TOUPIE_BUILD_TOOLS "Construire les outils (simulateur d'équilibrage)" ON)
 if(TOUPIE_BUILD_TOOLS)
     add_subdirectory(tools)
