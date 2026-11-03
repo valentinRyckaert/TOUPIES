@@ -10,6 +10,8 @@ namespace toupie {
 /// dans Battle.cpp et dans le README.
 struct BattleConfig
 {
+    // Valeurs réglées avec tools/balance_sim (voir README, section Équilibrage).
+
     // --- Stadium et lancement ---------------------------------------------
     double stadiumRadius = 1.0;
     double topRadius = 0.075;
@@ -17,7 +19,7 @@ struct BattleConfig
     double launchSpeed = 1.0;      ///< Vitesse initiale.
     /// Vitesse radiale minimale pour franchir le rebord du stadium ; en
     /// dessous, la toupie rebondit avec ce coefficient de restitution.
-    double rimEscapeSpeed = 0.8;
+    double rimEscapeSpeed = 0.4981;
     double rimRestitution = 0.4;
 
     // --- Mouvement -----------------------------------------------------------
@@ -28,7 +30,7 @@ struct BattleConfig
     /// Propulsion tangentielle due à la rotation (la toupie se déplace dans
     /// le sens inverse de sa rotation) : base + parAttaque * attaque.
     double orbitBase = 0.22;
-    double orbitPerAttack = 0.022;
+    double orbitPerAttack = 0.04;
     /// En dessous de ce ratio de rotation, la toupie vacille.
     double wobbleThreshold = 0.25;
     double wobbleStrength = 1.2;
@@ -39,27 +41,27 @@ struct BattleConfig
     ///   base * max(plancher, 1 - parEndurance * endurance) * (1 + drain * vitesse).
     /// Les stats ont des effets linéaires : se spécialiser n'a pas de
     /// rendement décroissant par rapport à une répartition équilibrée.
-    double passiveBase = 3.2;
-    double passivePerEndurance = 0.035;
-    double speedDrain = 0.5;
+    double passiveBase = 2.416;
+    double passivePerEndurance = 0.045;
+    double speedDrain = 0.2;
 
     // --- Chocs ----------------------------------------------------------------
     /// Dégâts = base * attaqueAdverse * impact * max(plancher, 1 - parDéfense * défense).
-    double damageBase = 0.75;
-    double damagePerDefense = 0.045;
+    double damageBase = 1.0;
+    double damagePerDefense = 0.0557;
     /// impact = min(maxImpact, minImpact + vitesseDeRapprochement / impactRef).
-    double minImpact = 0.5;
+    double minImpact = 0.741;
     double impactRef = 2.0;
-    double maxImpact = 1.8;
+    double maxImpact = 1.0;
     /// Recul = (base + parAttaque * attaqueAdverse + parMasse * défenseAdverse
     ///          + approche * vitesseRapprochement)
     ///         * max(plancher, 1 - parDéfense * défense).
     double knockbackBase = 0.12;
-    double knockbackPerAttack = 0.03;
+    double knockbackPerAttack = 0.06;
     /// Une toupie lourde (défense élevée) repousse plus fort.
-    double knockbackPerAttackerDefense = 0.03;
-    double knockbackApproach = 0.2;
-    double knockbackPerDefense = 0.05;
+    double knockbackPerAttackerDefense = 0.0231;
+    double knockbackApproach = 0.2115;
+    double knockbackPerDefense = 0.0298;
     /// Plancher des facteurs de réduction linéaires.
     double minReduction = 0.15;
     /// Masse utilisée pour séparer les toupies qui se chevauchent.
@@ -69,18 +71,18 @@ struct BattleConfig
     /// Deux toupies de même sens : surfaces de contact opposées, choc plus violent.
     double sameSpinKnockback = 1.1;
     /// Deux toupies de sens opposés : frottement, plus de perte d'endurance.
-    double oppositeSpinDamage = 1.2;
-    double contactCooldown = 0.35;
+    double oppositeSpinDamage = 1.2186;
+    double contactCooldown = 0.25;
     /// Bonus du type équilibre : réduction (en fraction) de la perte
     /// d'endurance, des dégâts et du recul subis.
-    double balanceStability = 0.1;
+    double balanceStability = 0.0439;
 
     // --- Dash -------------------------------------------------------------------
-    double dashCost = 7.0;          ///< Points d'endurance consommés.
+    double dashCost = 5.868;        ///< Points d'endurance consommés.
     double dashSpeed = 2.6;
     double dashDuration = 0.15;     ///< Distance du dash = vitesse * durée (~0,39).
     double dashCooldown = 1.8;
-    double dashAttackMultiplier = 1.6;
+    double dashAttackMultiplier = 1.2;
     double dashBoostDuration = 0.35; ///< Durée du bonus d'attaque.
     double postDashSpeed = 0.45;
 
