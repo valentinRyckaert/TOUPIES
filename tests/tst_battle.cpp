@@ -537,3 +537,4 @@ void TestBattle::disarmBlocksDash()
 
 QTEST_GUILESS_MAIN(TestBattle)
 #include "tst_battle.moc"
+#include <QtMath>

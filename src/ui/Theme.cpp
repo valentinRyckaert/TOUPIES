@@ -4,6 +4,7 @@
 #include <QFont>
 #include <QPalette>
 #include <QStyleFactory>
+#include <algorithm>
 
 namespace toupie::Theme {
 

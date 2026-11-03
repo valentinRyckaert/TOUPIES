@@ -6,6 +6,7 @@
 #include <QSet>
 #include <QTcpSocket>
 #include <QTimer>
+#include <algorithm>
 
 namespace toupie::net {
 

@@ -1,6 +1,7 @@
 #include "net/HostSession.h"
 
 #include "net/LobbyServer.h"
+#include <algorithm>
 
 namespace toupie::net {
 

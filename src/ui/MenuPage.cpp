@@ -13,6 +13,8 @@
 #include <QVBoxLayout>
 
 #include <cmath>
+#include <algorithm>
+#include <QtMath>
 
 namespace toupie {
 

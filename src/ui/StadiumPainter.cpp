@@ -8,6 +8,7 @@
 #include <QTextOption>
 
 #include <cmath>
+#include <QtMath>
 
 namespace toupie {
 

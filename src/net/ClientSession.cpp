@@ -3,6 +3,7 @@
 #include "net/LobbyClient.h"
 
 #include <cmath>
+#include <algorithm>
 
 namespace toupie::net {
 
