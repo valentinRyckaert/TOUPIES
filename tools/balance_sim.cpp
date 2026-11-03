@@ -7,6 +7,8 @@
 //   -n <nombre>       combats par confrontation de presets (défaut 200)
 //   -r <nombre>       combats aléatoires pour la matrice des types (défaut 4000)
 //   -d <niveau>       facile | normal | difficile (défaut normal)
+//   -s <stadium|all>  stadium (identifiant, défaut classique) ou tous les stadiums
+//   -p <2..4>         nombre de toupies par combat (mêlée générale au-delà de 2)
 //   paramètre=valeur  surcharge d'un champ de BattleConfig (ex. dashCost=8)
 
 #include "core/PartCatalog.h"
@@ -17,10 +19,12 @@
 #include <QStringList>
 #include <QTextStream>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <map>
 #include <random>
+#include <vector>
 
 using namespace toupie;
 
@@ -28,24 +32,33 @@ namespace {
 
 struct Outcome
 {
-    int winner = -1; ///< 0 = première toupie, 1 = seconde, -1 = nul.
+    int winner = -1; ///< Indice dans la liste fournie, -1 = nul.
     Battle::EndReason reason = Battle::EndReason::None;
     double duration = 0.0;
 };
 
-Outcome simulate(const Top &a, const Top &b, const BattleConfig &config, Difficulty difficulty,
-                 std::uint32_t seed)
+Outcome simulate(const QList<Top> &tops, const Stadium &stadium, const BattleConfig &config,
+                 Difficulty difficulty, std::uint32_t seed)
 {
-    // On alterne les côtés pour neutraliser l'avantage de position.
-    const bool swapped = (seed % 2) == 1;
+    // On fait tourner les places pour neutraliser l'avantage de position.
+    const int n = static_cast<int>(tops.size());
+    const int shift = static_cast<int>(seed % static_cast<std::uint32_t>(n));
+    QList<Top> seated;
+    for (int i = 0; i < n; ++i)
+        seated.append(tops.at((i + shift) % n));
+
     const double dt = 1.0 / 60.0;
-    Battle battle(swapped ? b : a, swapped ? a : b, config, seed);
-    BotController bot0(0, difficulty, seed * 3 + 1);
-    BotController bot1(1, difficulty, seed * 3 + 2);
-    battle.launch(bot0.chooseLaunchAngle(battle), bot1.chooseLaunchAngle(battle));
+    Battle battle(seated, stadium, config, seed);
+    std::vector<BotController> bots;
+    QList<double> angles;
+    for (int i = 0; i < n; ++i) {
+        bots.emplace_back(i, difficulty, seed * 7 + static_cast<std::uint32_t>(i) + 1);
+        angles.append(bots.back().chooseLaunchAngle(battle));
+    }
+    battle.launch(angles);
     while (!battle.isFinished()) {
-        bot0.update(battle, dt);
-        bot1.update(battle, dt);
+        for (BotController &bot : bots)
+            bot.update(battle, dt);
         battle.advance(dt);
     }
 
@@ -53,8 +66,63 @@ Outcome simulate(const Top &a, const Top &b, const BattleConfig &config, Difficu
     outcome.reason = battle.endReason();
     outcome.duration = battle.elapsed();
     if (battle.winner() >= 0)
-        outcome.winner = swapped ? 1 - battle.winner() : battle.winner();
+        outcome.winner = (battle.winner() + shift) % n;
     return outcome;
+}
+
+Outcome simulate(const Top &a, const Top &b, const Stadium &stadium, const BattleConfig &config,
+                 Difficulty difficulty, std::uint32_t seed)
+{
+    return simulate(QList<Top>{a, b}, stadium, config, difficulty, seed);
+}
+
+constexpr int kTypes = 4;
+const TopType kTypeOrder[kTypes] = {TopType::Attack, TopType::Defense, TopType::Endurance,
+                                    TopType::Balance};
+
+struct TypeMatrix
+{
+    std::array<std::array<double, kTypes>, kTypes> score{};
+    std::array<std::array<int, kTypes>, kTypes> games{};
+    int fights = 0;
+    int ringOuts = 0;
+    double duration = 0.0;
+
+    double rate(int i, int j) const { return games[i][j] ? 100.0 * score[i][j] / games[i][j] : 0.0; }
+    double global(int i) const
+    {
+        double total = 0.0;
+        int count = 0;
+        for (int j = 0; j < kTypes; ++j) {
+            total += score[i][j];
+            count += games[i][j];
+        }
+        return count ? 100.0 * total / count : 0.0;
+    }
+};
+
+TypeMatrix runTypeMatrix(const QList<Top> &pool, const Stadium &stadium,
+                         const BattleConfig &config, Difficulty difficulty, int fights)
+{
+    TypeMatrix m;
+    std::mt19937 rng(42);
+    std::uniform_int_distribution<qsizetype> pick(0, pool.size() - 1);
+    for (int k = 0; k < fights; ++k) {
+        const Top &a = pool.at(pick(rng));
+        const Top &b = pool.at(pick(rng));
+        const int ta = static_cast<int>(a.type());
+        const int tb = static_cast<int>(b.type());
+        const Outcome o = simulate(a, b, stadium, config, difficulty, static_cast<std::uint32_t>(k));
+        const double sa = o.winner == 0 ? 1.0 : (o.winner == -1 ? 0.5 : 0.0);
+        m.score[ta][tb] += sa;
+        m.score[tb][ta] += 1.0 - sa;
+        ++m.games[ta][tb];
+        ++m.games[tb][ta];
+        m.ringOuts += o.reason == Battle::EndReason::RingOut;
+        m.duration += o.duration;
+    }
+    m.fights = fights;
+    return m;
 }
 
 Difficulty parseDifficulty(const QString &text)
@@ -94,6 +162,8 @@ std::map<QString, double BattleConfig::*> configFields()
         {"oppositeSpinDamage", &BattleConfig::oppositeSpinDamage},
         {"contactCooldown", &BattleConfig::contactCooldown},
         {"balanceStability", &BattleConfig::balanceStability},
+        {"knockoutReward", &BattleConfig::knockoutReward},
+        {"knockoutWindow", &BattleConfig::knockoutWindow},
         {"dashCost", &BattleConfig::dashCost},
         {"dashSpeed", &BattleConfig::dashSpeed},
         {"dashDuration", &BattleConfig::dashDuration},
@@ -123,6 +193,8 @@ int main(int argc, char *argv[])
 
     int presetFights = 200;
     int randomFights = 4000;
+    int players = 2;
+    QList<Stadium> stadiums{Stadium::classic()};
     Difficulty difficulty = Difficulty::Normal;
     BattleConfig config;
     const auto fields = configFields();
@@ -136,6 +208,18 @@ int main(int argc, char *argv[])
             randomFights = qMax(0, args.at(++i).toInt());
         } else if (arg == QLatin1String("-d") && i + 1 < args.size()) {
             difficulty = parseDifficulty(args.at(++i));
+        } else if (arg == QLatin1String("-p") && i + 1 < args.size()) {
+            players = std::clamp(args.at(++i).toInt(), Battle::kMinPlayers, Battle::kMaxPlayers);
+        } else if (arg == QLatin1String("-s") && i + 1 < args.size()) {
+            const QString id = args.at(++i);
+            if (id == QLatin1String("all")) {
+                stadiums = Stadium::all();
+            } else if (const auto stadium = Stadium::find(id)) {
+                stadiums = {*stadium};
+            } else {
+                err << "Stadium inconnu : " << id << "\n";
+                return 1;
+            }
         } else if (arg.contains('=')) {
             const QString key = arg.section('=', 0, 0);
             const auto it = fields.find(key);
@@ -160,14 +244,15 @@ int main(int argc, char *argv[])
 
     // --- Presets ------------------------------------------------------------
     const QList<Top> presets = PartCatalog::instance().presets();
-    if (presetFights > 0) {
+    if (presetFights > 0 && players == 2 && stadiums.size() == 1) {
         out << "\nPresets (" << presetFights << " combats par confrontation)\n";
         for (int i = 0; i < presets.size(); ++i) {
             for (int j = i + 1; j < presets.size(); ++j) {
                 int wins = 0, draws = 0, ringOuts = 0;
                 double duration = 0.0;
                 for (int k = 0; k < presetFights; ++k) {
-                    const Outcome o = simulate(presets.at(i), presets.at(j), config, difficulty,
+                    const Outcome o = simulate(presets.at(i), presets.at(j), stadiums.first(),
+                                               config, difficulty,
                                                1000u + static_cast<std::uint32_t>(k));
                     wins += o.winner == 0;
                     draws += o.winner == -1;
@@ -185,59 +270,84 @@ int main(int argc, char *argv[])
         }
     }
 
+    const QList<Top> pool = allCombinations(PartCatalog::instance());
+
     // --- Matrice des types --------------------------------------------------
-    if (randomFights > 0) {
-        const QList<Top> pool = allCombinations(PartCatalog::instance());
-        std::mt19937 rng(42);
-        std::uniform_int_distribution<qsizetype> pick(0, pool.size() - 1);
-
-        constexpr int kTypes = 4;
-        std::array<std::array<double, kTypes>, kTypes> score{};
-        std::array<std::array<int, kTypes>, kTypes> games{};
-        int ringOuts = 0;
-        double duration = 0.0;
-
-        for (int k = 0; k < randomFights; ++k) {
-            const Top &a = pool.at(pick(rng));
-            const Top &b = pool.at(pick(rng));
-            const int ta = static_cast<int>(a.type());
-            const int tb = static_cast<int>(b.type());
-            const Outcome o = simulate(a, b, config, difficulty, static_cast<std::uint32_t>(k));
-            const double sa = o.winner == 0 ? 1.0 : (o.winner == -1 ? 0.5 : 0.0);
-            score[ta][tb] += sa;
-            score[tb][ta] += 1.0 - sa;
-            ++games[ta][tb];
-            ++games[tb][ta];
-            ringOuts += o.reason == Battle::EndReason::RingOut;
-            duration += o.duration;
-        }
-
-        const TopType types[kTypes] = {TopType::Attack, TopType::Defense, TopType::Endurance,
-                                       TopType::Balance};
-        out << "\nTypes (" << randomFights << " combats entre toupies aléatoires)\n"
+    if (randomFights > 0 && players == 2 && stadiums.size() == 1) {
+        const TypeMatrix m = runTypeMatrix(pool, stadiums.first(), config, difficulty, randomFights);
+        out << "\nTypes (" << randomFights << " combats entre toupies aléatoires, stadium "
+            << stadiums.first().name << ")\n"
             << "  ligne = taux de victoire contre la colonne\n"
             << qSetFieldWidth(12) << Qt::left << "";
-        for (TopType t : types)
+        for (TopType t : kTypeOrder)
             out << qSetFieldWidth(11) << Qt::right << toString(t);
         out << qSetFieldWidth(11) << "Global" << qSetFieldWidth(0) << "\n";
 
         double worst = 50.0;
         for (int i = 0; i < kTypes; ++i) {
-            out << qSetFieldWidth(12) << Qt::left << toString(types[i]) << qSetFieldWidth(0);
-            double total = 0.0;
-            int count = 0;
-            for (int j = 0; j < kTypes; ++j) {
-                const double rate = games[i][j] ? 100.0 * score[i][j] / games[i][j] : 0.0;
-                out << QString::asprintf("%10.1f%%", rate);
-                total += score[i][j];
-                count += games[i][j];
-            }
-            const double global = count ? 100.0 * total / count : 0.0;
-            worst = qMin(worst, global);
-            out << QString::asprintf("%10.1f%%\n", global);
+            out << qSetFieldWidth(12) << Qt::left << toString(kTypeOrder[i]) << qSetFieldWidth(0);
+            for (int j = 0; j < kTypes; ++j)
+                out << QString::asprintf("%10.1f%%", m.rate(i, j));
+            worst = qMin(worst, m.global(i));
+            out << QString::asprintf("%10.1f%%\n", m.global(i));
         }
         out << QString::asprintf("\nÉjections : %.1f%%, durée moyenne : %.1fs, pire type : %.1f%%\n",
-                                 100.0 * ringOuts / randomFights, duration / randomFights, worst);
+                                 100.0 * m.ringOuts / m.fights, m.duration / m.fights, worst);
+    } else if (randomFights > 0 && players == 2) {
+        // Résumé par stadium : taux de victoire global de chaque type.
+        out << "\nTaux de victoire global par type et par stadium (" << randomFights
+            << " combats chacun)\n"
+            << qSetFieldWidth(12) << Qt::left << "Stadium";
+        for (TopType t : kTypeOrder)
+            out << qSetFieldWidth(11) << Qt::right << toString(t);
+        out << qSetFieldWidth(12) << "Pire duel" << qSetFieldWidth(11) << "Éjections"
+            << qSetFieldWidth(9) << "Durée" << qSetFieldWidth(0) << "\n";
+        for (const Stadium &stadium : stadiums) {
+            const TypeMatrix m = runTypeMatrix(pool, stadium, config, difficulty, randomFights);
+            out << qSetFieldWidth(12) << Qt::left << stadium.name << qSetFieldWidth(0);
+            double worstDuel = 50.0;
+            for (int i = 0; i < kTypes; ++i) {
+                out << QString::asprintf("%10.1f%%", m.global(i));
+                for (int j = 0; j < kTypes; ++j)
+                    worstDuel = qMin(worstDuel, m.rate(i, j));
+            }
+            out << QString::asprintf("%11.1f%%%10.1f%%%8.1fs\n", worstDuel,
+                                     100.0 * m.ringOuts / m.fights, m.duration / m.fights);
+        }
+    } else if (randomFights > 0) {
+        // Mêlée générale : victoires par type rapportées à la part attendue (1/N).
+        out << "\nMêlée à " << players << " (" << randomFights
+            << " combats) — indice 100 % = victoires conformes au hasard\n"
+            << qSetFieldWidth(12) << Qt::left << "Stadium";
+        for (TopType t : kTypeOrder)
+            out << qSetFieldWidth(11) << Qt::right << toString(t);
+        out << qSetFieldWidth(9) << "Durée" << qSetFieldWidth(0) << "\n";
+        for (const Stadium &stadium : stadiums) {
+            std::mt19937 rng(7);
+            std::uniform_int_distribution<qsizetype> pick(0, pool.size() - 1);
+            std::array<double, kTypes> wins{};
+            std::array<int, kTypes> appearances{};
+            double duration = 0.0;
+            for (int k = 0; k < randomFights; ++k) {
+                QList<Top> tops;
+                for (int p = 0; p < players; ++p)
+                    tops.append(pool.at(pick(rng)));
+                const Outcome o = simulate(tops, stadium, config, difficulty,
+                                           static_cast<std::uint32_t>(k));
+                for (const Top &t : tops)
+                    ++appearances[static_cast<int>(t.type())];
+                if (o.winner >= 0)
+                    wins[static_cast<int>(tops.at(o.winner).type())] += 1.0;
+                duration += o.duration;
+            }
+            out << qSetFieldWidth(12) << Qt::left << stadium.name << qSetFieldWidth(0);
+            for (int i = 0; i < kTypes; ++i) {
+                const double index = appearances[i] ? 100.0 * wins[i] * players / appearances[i]
+                                                    : 0.0;
+                out << QString::asprintf("%10.1f%%", index);
+            }
+            out << QString::asprintf("%8.1fs\n", duration / randomFights);
+        }
     }
     return 0;
 }
