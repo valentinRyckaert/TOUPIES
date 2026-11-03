@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Top.h"
+#include "game/MatchRules.h"
 
 #include <QHostAddress>
 #include <QJsonObject>
@@ -25,10 +26,11 @@ class PartCatalog;
 /// - Lobby et partie : connexion TCP vers l'hôte, un message JSON compact
 ///   par ligne. Chaque message possède un champ "type".
 /// - L'hôte fait autorité : il simule le combat et diffuse l'état ; les
-///   clients n'envoient que leur visée et leurs dashs.
+///   clients n'envoient que leur visée (angle et force), leur pilotage,
+///   leurs dashs et leurs coups spéciaux.
 namespace net {
 
-constexpr int kProtocolVersion = 1;
+constexpr int kProtocolVersion = 2;
 constexpr quint16 kDefaultTcpPort = 45455;
 constexpr quint16 kDiscoveryPort = 45454;
 constexpr int kPortAttempts = 10;           ///< Ports essayés à partir du port par défaut.
@@ -45,6 +47,8 @@ const QString SelectTop = QStringLiteral("top");
 const QString Ready = QStringLiteral("ready");
 const QString Aim = QStringLiteral("aim");
 const QString Dash = QStringLiteral("dash");
+const QString Special = QStringLiteral("special");
+const QString Steer = QStringLiteral("steer");
 // Hôte -> client
 const QString Welcome = QStringLiteral("welcome");
 const QString Info = QStringLiteral("info");
@@ -78,6 +82,7 @@ struct LobbyInfo
     int maxPlayers = 2;
     QString stadiumId;
     bool inGame = false;
+    MatchRules rules;
     QList<LobbyPlayer> players;
 
     const LobbyPlayer *player(int id) const;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "game/Battle.h"
+#include "game/MatchRules.h"
 
 #include <QList>
 #include <QObject>
@@ -23,6 +24,8 @@ struct MatchState
     QStringList names;
     QList<Vec2> startPositions;
     QList<bool> aimed;              ///< Joueurs ayant validé leur visée.
+    std::vector<Projectile> projectiles; ///< Vagues des coups spéciaux en cours.
+    MatchRules rules;
 
     MatchPhase phase = MatchPhase::Aiming;
     double countdown = 0.0;
@@ -51,9 +54,12 @@ public:
     bool localHasAimed() const { return m_state.aimed.value(m_localPlayer); }
 
     virtual void update(double dt) = 0;
-    /// Valide l'angle de lancement du joueur local.
-    virtual void submitAim(double angle) = 0;
+    /// Valide l'angle et la force de lancement du joueur local.
+    virtual void submitAim(double angle, double power) = 0;
     virtual void requestDash() = 0;
+    virtual void requestSpecial() = 0;
+    /// Pilotage aux flèches du joueur local (vecteur nul = aucun).
+    virtual void setSteering(Vec2 direction) = 0;
 
     /// Chocs survenus depuis le dernier appel (effets visuels).
     QList<ImpactEvent> takeImpacts();

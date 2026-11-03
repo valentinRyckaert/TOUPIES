@@ -78,12 +78,12 @@ void MainWindow::setupSolo()
     connect(m_setup, &SetupPage::backRequested, this, &MainWindow::showMenu);
     connect(m_setup, &SetupPage::fightRequested, this,
             [this](const Top &player, const Top &opponent, Difficulty difficulty,
-                   const QString &stadiumId) {
+                   const QString &stadiumId, const MatchRules &rules) {
                 const Stadium stadium = Stadium::find(stadiumId).value_or(Stadium::classic());
                 auto session = std::make_unique<LocalSession>(
                     QList<Top>{player, opponent},
                     QStringList{tr("Vous"), tr("Bot %1").arg(toString(difficulty))}, stadium,
-                    difficulty);
+                    difficulty, rules);
                 showPage(m_battle);
                 m_battle->start(std::move(session), BattlePage::Mode::Solo);
             });

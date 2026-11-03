@@ -75,6 +75,7 @@ QJsonObject toJson(const LobbyInfo &lobby)
         {"max", lobby.maxPlayers},
         {"stadium", lobby.stadiumId},
         {"inGame", lobby.inGame},
+        {"rules", lobby.rules.toJson()},
         {"players", players},
     };
 }
@@ -87,6 +88,7 @@ LobbyInfo lobbyFromJson(const QJsonObject &json, const PartCatalog &catalog)
     lobby.maxPlayers = json.value("max").toInt(2);
     lobby.stadiumId = json.value("stadium").toString();
     lobby.inGame = json.value("inGame").toBool();
+    lobby.rules = MatchRules::fromJson(json.value("rules").toObject());
     const QJsonArray players = json.value("players").toArray();
     for (const QJsonValue &value : players) {
         const QJsonObject o = value.toObject();

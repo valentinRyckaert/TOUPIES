@@ -1,11 +1,13 @@
 #include "ui/ArenaWidget.h"
 
+#include "game/SpecialMove.h"
 #include "ui/StadiumPainter.h"
 #include "ui/TopPainter.h"
 
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QtMath>
 
 #include <algorithm>
@@ -14,10 +16,13 @@
 namespace toupie {
 
 namespace {
-constexpr double kHudHeight = 78.0;
+constexpr double kHudHeight = 100.0;
 constexpr int kTrailLength = 36;
 constexpr double kSparkLifetime = 0.4;
 constexpr double kAimStep = qDegreesToRadians(3.0);
+constexpr double kPowerStep = 0.05;
+constexpr double kMinArrow = 0.14; ///< Longueur de flèche (monde) à la force minimale.
+constexpr double kMaxArrow = 0.6;  ///< … et à la force maximale.
 
 QString endReasonText(Battle::EndReason reason, int players)
 {
@@ -109,6 +114,8 @@ void ArenaWidget::resetVisuals()
         // Visée par défaut : vers le centre du stadium.
         const Vec2 start = s.startPositions.value(m_session->localPlayer());
         m_aimAngle = (-start).angle();
+        m_aimPower = 1.0;
+        m_steerKeys.clear();
     }
 }
 
@@ -134,7 +141,8 @@ void ArenaWidget::tick()
     }
 
     for (const ImpactEvent &impact : m_session->takeImpacts())
-        m_sparks.append({QPointF(impact.point.x, impact.point.y), 0.0, impact.intensity});
+        m_sparks.append({QPointF(impact.point.x, impact.point.y), 0.0, impact.intensity,
+                         impact.special ? QColor::fromRgb(impact.color) : QColor()});
 
     if (state.phase == MatchPhase::Fighting) {
         m_trails.resize(state.spinners.size());
@@ -162,7 +170,50 @@ void ArenaWidget::confirmLaunch()
 {
     if (m_session && m_session->state().phase == MatchPhase::Aiming
         && !m_session->localHasAimed())
-        m_session->submitAim(m_aimAngle);
+        m_session->submitAim(m_aimAngle, m_aimPower);
+}
+
+void ArenaWidget::trySpecial()
+{
+    if (m_session && m_session->state().phase == MatchPhase::Fighting)
+        m_session->requestSpecial();
+    setFocus();
+}
+
+double ArenaWidget::powerForLength(double length) const
+{
+    if (!m_session)
+        return 1.0;
+    const BattleConfig &cfg = m_session->state().config;
+    const double t = std::clamp((length - kMinArrow) / (kMaxArrow - kMinArrow), 0.0, 1.0);
+    return cfg.launchPowerMin + t * (cfg.launchPowerMax - cfg.launchPowerMin);
+}
+
+double ArenaWidget::lengthForPower(double power) const
+{
+    if (!m_session)
+        return (kMinArrow + kMaxArrow) / 2.0;
+    const BattleConfig &cfg = m_session->state().config;
+    const double t = std::clamp((power - cfg.launchPowerMin)
+                                    / std::max(1e-6, cfg.launchPowerMax - cfg.launchPowerMin),
+                                0.0, 1.0);
+    return kMinArrow + t * (kMaxArrow - kMinArrow);
+}
+
+void ArenaWidget::updateSteering()
+{
+    if (!m_session)
+        return;
+    Vec2 steer;
+    if (m_steerKeys.contains(Qt::Key_Left) || m_steerKeys.contains(Qt::Key_Q))
+        steer.x -= 1.0;
+    if (m_steerKeys.contains(Qt::Key_Right) || m_steerKeys.contains(Qt::Key_D))
+        steer.x += 1.0;
+    if (m_steerKeys.contains(Qt::Key_Up) || m_steerKeys.contains(Qt::Key_Z))
+        steer.y -= 1.0;
+    if (m_steerKeys.contains(Qt::Key_Down) || m_steerKeys.contains(Qt::Key_S))
+        steer.y += 1.0;
+    m_session->setSteering(steer.normalized());
 }
 
 void ArenaWidget::tryDash()
@@ -182,8 +233,12 @@ void ArenaWidget::mouseMoveEvent(QMouseEvent *event)
         return;
     const Vec2 target = toWorld(event->position());
     const Vec2 start = m_session->state().startPositions.value(m_session->localPlayer());
-    if ((target - start).length() > 0.02)
+    const double length = (target - start).length();
+    if (length > 0.02) {
         m_aimAngle = (target - start).angle();
+        // Plus le curseur est loin, plus le lancer est puissant.
+        m_aimPower = powerForLength(length);
+    }
 }
 
 void ArenaWidget::mousePressEvent(QMouseEvent *event)
@@ -204,16 +259,41 @@ void ArenaWidget::keyPressEvent(QKeyEvent *event)
 {
     const MatchPhase phase = m_session ? m_session->state().phase : MatchPhase::Finished;
     const bool aiming = phase == MatchPhase::Aiming && m_session && !m_session->localHasAimed();
-    switch (event->key()) {
+    const int key = event->key();
+    const bool steeringKey = key == Qt::Key_Left || key == Qt::Key_Right || key == Qt::Key_Up
+                          || key == Qt::Key_Down || key == Qt::Key_Z || key == Qt::Key_Q
+                          || key == Qt::Key_S || key == Qt::Key_D;
+    if (steeringKey && !aiming) {
+        // Pendant le combat : pilotage tant que la touche est enfoncée.
+        if (!event->isAutoRepeat()) {
+            m_steerKeys.insert(key);
+            updateSteering();
+        }
+        return;
+    }
+    const BattleConfig *cfg = m_session ? &m_session->state().config : nullptr;
+    switch (key) {
     case Qt::Key_Left:
-    case Qt::Key_Up:
-        if (aiming)
-            m_aimAngle -= kAimStep;
+    case Qt::Key_Q:
+        m_aimAngle -= kAimStep;
         break;
     case Qt::Key_Right:
+    case Qt::Key_D:
+        m_aimAngle += kAimStep;
+        break;
+    case Qt::Key_Up:
+    case Qt::Key_Z:
+        if (cfg)
+            m_aimPower = std::min(cfg->launchPowerMax, m_aimPower + kPowerStep);
+        break;
     case Qt::Key_Down:
-        if (aiming)
-            m_aimAngle += kAimStep;
+    case Qt::Key_S:
+        if (cfg)
+            m_aimPower = std::max(cfg->launchPowerMin, m_aimPower - kPowerStep);
+        break;
+    case Qt::Key_E:
+    case Qt::Key_Shift:
+        trySpecial();
         break;
     case Qt::Key_Return:
     case Qt::Key_Enter:
@@ -234,6 +314,25 @@ void ArenaWidget::keyPressEvent(QKeyEvent *event)
         return;
     }
     update();
+}
+
+void ArenaWidget::keyReleaseEvent(QKeyEvent *event)
+{
+    if (!event->isAutoRepeat() && m_steerKeys.remove(event->key())) {
+        updateSteering();
+        return;
+    }
+    QWidget::keyReleaseEvent(event);
+}
+
+void ArenaWidget::focusOutEvent(QFocusEvent *event)
+{
+    // Touches relâchées hors de la fenêtre : on arrête de piloter.
+    if (!m_steerKeys.isEmpty()) {
+        m_steerKeys.clear();
+        updateSteering();
+    }
+    QWidget::focusOutEvent(event);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,6 +389,7 @@ void ArenaWidget::paintEvent(QPaintEvent *)
     if (m_session->state().phase == MatchPhase::Aiming)
         paintAim(p);
     paintSpinners(p);
+    paintProjectiles(p);
     paintHud(p);
     paintOverlay(p);
 }
@@ -330,20 +430,86 @@ void ArenaWidget::paintAim(QPainter &p)
     const int local = m_session->localPlayer();
     const Vec2 start = state.startPositions.value(local);
     const Vec2 dir = Vec2::fromAngle(m_aimAngle);
+    const double length = lengthForPower(m_aimPower);
     const QPointF from = toScreen(start + dir * (state.config.topRadius * 1.3));
-    const QPointF to = toScreen(start + dir * 0.4);
+    const QPointF to = toScreen(start + dir * length);
     const QColor color = slotColor(local);
 
-    p.setPen(QPen(color, 4.0, Qt::SolidLine, Qt::RoundCap));
+    // Plus la flèche est longue et épaisse, plus le lancer est puissant.
+    const double t = (m_aimPower - state.config.launchPowerMin)
+                   / std::max(1e-6, state.config.launchPowerMax - state.config.launchPowerMin);
+    QColor glow = color;
+    glow.setAlpha(70);
+    p.setPen(QPen(glow, 10.0 + 8.0 * t, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(from, to);
+    p.setPen(QPen(color, 3.0 + 4.0 * t, Qt::SolidLine, Qt::RoundCap));
     p.drawLine(from, to);
 
     const QPointF d = (to - from) / std::max(1e-6, std::hypot((to - from).x(), (to - from).y()));
     const QPointF n(-d.y(), d.x());
     QPolygonF head;
-    head << to + d * 14 << to + n * 9 << to - n * 9;
+    const double size = 12.0 + 6.0 * t;
+    head << to + d * size << to + n * size * 0.65 << to - n * size * 0.65;
     p.setPen(Qt::NoPen);
     p.setBrush(color);
     p.drawPolygon(head);
+
+    QFont f = font();
+    f.setBold(true);
+    p.setFont(f);
+    p.setPen(color);
+    p.drawText(QRectF(to.x() + d.x() * 24 - 50, to.y() + d.y() * 24 - 10, 100, 20), Qt::AlignCenter,
+               tr("Force %1 %").arg(qRound(m_aimPower * 100)));
+}
+
+void ArenaWidget::paintProjectiles(QPainter &p)
+{
+    const MatchState &state = m_session->state();
+    const double s = scale();
+    for (const Projectile &proj : state.projectiles) {
+        const QColor color = QColor::fromRgb(proj.color);
+        const double fade = std::clamp(1.0 - proj.traveled / std::max(1e-6, proj.range), 0.0, 1.0);
+        if (proj.ring) {
+            // Anneau qui s'élargit, de plus en plus transparent.
+            const QPointF c = toScreen(proj.origin);
+            const double r = proj.radius * s;
+            QColor glow = color;
+            glow.setAlphaF(0.25 * (0.3 + 0.7 * fade));
+            p.setBrush(Qt::NoBrush);
+            p.setPen(QPen(glow, proj.width * s * 3.0));
+            p.drawEllipse(c, r, r);
+            QColor core = color;
+            core.setAlphaF(0.4 + 0.6 * fade);
+            p.setPen(QPen(core, std::max(2.0, proj.width * s * 0.8)));
+            p.drawEllipse(c, r, r);
+            // Portée maximale en pointillés.
+            QColor limit = color;
+            limit.setAlpha(60);
+            p.setPen(QPen(limit, 1.0, Qt::DotLine));
+            p.drawEllipse(c, proj.range * s, proj.range * s);
+            continue;
+        }
+        // Vague : front en arc perpendiculaire à la direction, avec une traînée.
+        const QPointF c = toScreen(proj.position);
+        const double angle = qRadiansToDegrees(std::atan2(proj.direction.y, proj.direction.x));
+        const double half = (proj.width + state.config.topRadius * 0.6) * s;
+        p.save();
+        p.translate(c);
+        p.rotate(angle);
+        for (int k = 4; k >= 0; --k) {
+            QColor trail = color;
+            trail.setAlphaF((k == 0 ? 0.95 : 0.18) * (0.4 + 0.6 * fade));
+            const double back = k * half * 0.45;
+            const double w = half * (1.0 - k * 0.12);
+            QPainterPath arc;
+            arc.moveTo(-back - w * 0.35, -w);
+            arc.quadTo(-back + w * 0.55, 0.0, -back - w * 0.35, w);
+            p.setPen(QPen(trail, k == 0 ? 4.0 : 6.0, Qt::SolidLine, Qt::RoundCap));
+            p.setBrush(Qt::NoBrush);
+            p.drawPath(arc);
+        }
+        p.restore();
+    }
 }
 
 void ArenaWidget::paintSpinners(QPainter &p)
@@ -406,7 +572,7 @@ void ArenaWidget::paintSpinners(QPainter &p)
         const double t = spark.age / kSparkLifetime;
         const QPointF c = toScreen({spark.position.x(), spark.position.y()});
         const double size = radius * (0.6 + 1.6 * t) * (0.6 + spark.intensity);
-        QColor color(255, 230, 120);
+        QColor color = spark.color.isValid() ? spark.color : QColor(255, 230, 120);
         color.setAlphaF(1.0 - t);
         p.setPen(QPen(color, 2.5));
         p.setBrush(Qt::NoBrush);
@@ -505,14 +671,53 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
     p.setPen(Qt::white);
     p.drawText(bar, Qt::AlignCenter, tr("Endurance %1").arg(qRound(s.spin)));
 
+    // Jauge du coup spécial.
+    const auto move = SpecialMove::find(s.top.special());
+    const QRectF gauge(inner.left(), bar.bottom() + 4, inner.width(), 12);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0, 120));
+    p.drawRoundedRect(gauge, 4, 4);
+    if (move && state.config.specialsEnabled) {
+        const double charge = std::clamp(s.special / 100.0, 0.0, 1.0);
+        QColor gaugeColor = QColor::fromRgb(move->color);
+        const bool full = charge >= 1.0;
+        if (full) {
+            // Jauge pleine : pulsation.
+            const double pulse = 0.5 + 0.5 * std::sin(state.elapsed * 8.0);
+            gaugeColor = gaugeColor.lighter(100 + int(40 * pulse));
+        } else {
+            gaugeColor.setAlpha(170);
+        }
+        QRectF gaugeFill = gauge;
+        gaugeFill.setWidth(gauge.width() * charge);
+        if (alignRight)
+            gaugeFill.moveRight(gauge.right());
+        p.setBrush(gaugeColor);
+        p.drawRoundedRect(gaugeFill, 4, 4);
+        QFont small = font();
+        small.setPointSizeF(font().pointSizeF() * 0.75);
+        small.setBold(full);
+        p.setFont(small);
+        p.setPen(full ? QColor(20, 22, 26) : QColor(235, 238, 242));
+        const QString label = full && local ? tr("E : %1 !").arg(move->name) : move->name;
+        p.drawText(gauge, Qt::AlignCenter, label);
+        p.setFont(f);
+    }
+
     // Indicateur de dash ou état.
-    const QRectF dashRect(inner.left(), bar.bottom() + 4, inner.width(), 14);
+    const QRectF dashRect(inner.left(), gauge.bottom() + 3, inner.width(), 14);
     QString text;
     QColor color;
     const QString status = statusText(s.status);
     if (!status.isEmpty()) {
         text = status;
         color = QColor(230, 110, 100);
+    } else if (s.isSlowed()) {
+        text = tr("Gelée (%1 s)").arg(s.slowTimer, 0, 'f', 1);
+        color = QColor(155, 231, 255);
+    } else if (s.isDisarmed()) {
+        text = tr("Sonnée : ni dash ni coup spécial (%1 s)").arg(s.disarmTimer, 0, 'f', 1);
+        color = QColor(255, 179, 71);
     } else if (state.phase == MatchPhase::Aiming) {
         text = state.aimed.value(index) ? tr("Prêt à lancer") : tr("Vise…");
         color = state.aimed.value(index) ? QColor(120, 230, 150) : QColor(170, 170, 180);
@@ -526,7 +731,7 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
         text = tr("Dash impossible");
         color = QColor(170, 90, 90);
     } else {
-        text = local ? tr("Dash prêt (Espace / clic)") : tr("Dash prêt");
+        text = local ? tr("Dash prêt (Espace / clic) · Flèches : piloter") : tr("Dash prêt");
         color = QColor(120, 230, 150);
     }
     p.setPen(color);
@@ -558,13 +763,13 @@ void ArenaWidget::paintOverlay(QPainter &p)
             const int ready = static_cast<int>(std::count(state.aimed.begin(), state.aimed.end(), true));
             hint = tr("En attente des autres joueurs (%1/%2)").arg(ready).arg(state.playerCount());
         } else {
-            hint = tr("Visez : souris ou ← →   ·   Lancer : clic ou Entrée");
+            hint = tr("Direction : souris ou ← →  ·  Force : distance ou ↑ ↓  ·  Lancer : clic / Entrée");
         }
         QFont f = font();
         f.setBold(true);
         f.setPointSizeF(font().pointSizeF() * 1.15);
         p.setFont(f);
-        const QRectF box(width() / 2.0 - 230, area.top() + 4, 460, 30);
+        const QRectF box(width() / 2.0 - 330, area.top() + 4, 660, 30);
         p.setPen(Qt::NoPen);
         p.setBrush(QColor(0, 0, 0, 150));
         p.drawRoundedRect(box, 8, 8);

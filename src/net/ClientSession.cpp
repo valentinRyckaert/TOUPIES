@@ -17,8 +17,10 @@ ClientSession::ClientSession(LobbyClient *client, const MatchSetup &setup, QObje
     , m_client(client)
 {
     // Un combat local (jamais lancé) fournit stadium, constantes et positions de départ.
-    const Battle reference(setup.tops, setup.stadium, BattleConfig{}, setup.seed);
+    const Battle reference(setup.tops, setup.stadium, setup.rules.apply(BattleConfig{}),
+                           setup.seed);
     initFromBattle(reference, setup.names);
+    m_state.rules = setup.rules;
     m_localPlayer = client ? std::max(0, static_cast<int>(setup.playerIds.indexOf(client->playerId())))
                            : 0;
 
@@ -59,6 +61,12 @@ void ClientSession::update(double dt)
 
     // Extrapolation entre deux états : déplacement à vitesse constante.
     m_state.elapsed += dt;
+    for (Projectile &p : m_state.projectiles) {
+        if (p.ring)
+            p.radius += p.speed * dt;
+        else
+            p.position += p.direction * (p.speed * dt);
+    }
     for (Spinner &s : m_state.spinners) {
         if (!s.isActive())
             continue;
@@ -69,13 +77,28 @@ void ClientSession::update(double dt)
     }
 }
 
-void ClientSession::submitAim(double angle)
+void ClientSession::submitAim(double angle, double power)
 {
     if (m_state.phase != MatchPhase::Aiming || localHasAimed())
         return;
     m_state.aimed[m_localPlayer] = true;
     if (m_client)
-        m_client->send({{"type", Msg::Aim}, {"angle", angle}});
+        m_client->send({{"type", Msg::Aim}, {"angle", angle}, {"power", power}});
+}
+
+void ClientSession::requestSpecial()
+{
+    if (m_state.phase == MatchPhase::Fighting && m_client)
+        m_client->send({{"type", Msg::Special}});
+}
+
+void ClientSession::setSteering(Vec2 direction)
+{
+    // N'envoie que les changements (touches enfoncées / relâchées).
+    if ((direction - m_steer).lengthSquared() < 1e-9 || !m_client)
+        return;
+    m_steer = direction;
+    m_client->send({{"type", Msg::Steer}, {"x", direction.x}, {"y", direction.y}});
 }
 
 void ClientSession::requestDash()

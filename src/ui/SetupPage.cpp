@@ -2,6 +2,7 @@
 
 #include "core/TopRepository.h"
 #include "game/Stadium.h"
+#include "ui/RulesWidget.h"
 #include "ui/StadiumPainter.h"
 #include "ui/StatsWidget.h"
 
@@ -65,21 +66,20 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
     root->addLayout(form);
     m_stadiumPreview = new StadiumWidget(this);
     root->addWidget(m_stadiumPreview);
+    m_rules = new RulesWidget(this);
+    root->addWidget(m_rules);
     connect(m_stadiumCombo, &QComboBox::currentIndexChanged, this, [this] {
         if (const auto stadium = Stadium::find(m_stadiumCombo->currentData().toString()))
             m_stadiumPreview->setStadium(*stadium);
     });
 
     auto *rules = new QLabel(
-        tr("<b>Règles</b> — Visez puis lancez votre toupie. Elle parcourt le stadium dans le "
-           "sens inverse de sa rotation. À chaque choc, chaque toupie perd de l'endurance selon "
-           "l'attaque adverse et sa propre défense, et recule d'autant moins que sa défense est "
-           "élevée. <b>Dash</b> (Espace ou clic) : ruée vers l'adversaire avec un bonus "
-           "d'attaque, au prix d'un peu d'endurance. Une toupie éjectée du stadium ou à court "
-           "d'endurance perd la partie.<br><br>"
+        tr("<b>Commandes</b> — Visez à la souris (la distance règle la force) ou avec "
+           "← → / ↑ ↓, lancez d'un clic ou avec Entrée. En combat : <b>flèches</b> pour piloter "
+           "légèrement, <b>Espace</b> ou clic pour dasher, <b>E</b> pour le coup spécial quand "
+           "sa jauge est pleine. Une toupie éjectée ou à court d'endurance perd.<br>"
            "<b>Repères</b> — Attaque bat Endurance, Endurance bat Défense, Défense bat Attaque ; "
-           "le type Équilibre n'a ni point fort ni point faible marqué. Chaque stadium "
-           "avantage légèrement certains types."),
+           "chaque stadium avantage légèrement certains types."),
         this);
     rules->setWordWrap(true);
     root->addWidget(rules);
@@ -158,7 +158,7 @@ void SetupPage::startFight()
 
     const auto difficulty = static_cast<Difficulty>(m_difficultyCombo->currentData().toInt());
     emit fightRequested(m_tops.at(player), m_tops.at(opponent), difficulty,
-                        m_stadiumCombo->currentData().toString());
+                        m_stadiumCombo->currentData().toString(), m_rules->rules());
 }
 
 } // namespace toupie

@@ -19,6 +19,7 @@ namespace toupie::net {
 struct MatchSetup
 {
     Stadium stadium;
+    MatchRules rules;
     quint32 seed = 0;
     QList<int> playerIds;
     QStringList names;

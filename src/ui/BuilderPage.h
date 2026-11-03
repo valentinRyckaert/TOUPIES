@@ -48,7 +48,8 @@ private:
     QListWidget *m_list = nullptr;
     QPushButton *m_deleteButton = nullptr;
     QLineEdit *m_nameEdit = nullptr;
-    QComboBox *m_partCombos[3] = {};
+    QComboBox *m_partCombos[4] = {};
+    QLabel *m_specialLabel = nullptr;
     QTableWidget *m_table = nullptr;
     StatsWidget *m_preview = nullptr;
     QLabel *m_status = nullptr;

@@ -52,6 +52,7 @@ public:
     void setHostTop(const Top &top);
     void setMaxPlayers(int maxPlayers);
     void setStadium(const QString &stadiumId);
+    void setRules(const MatchRules &rules);
 
     /// Lobby complet, toutes les toupies choisies, tous les clients prêts.
     bool canStart() const;

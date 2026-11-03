@@ -7,6 +7,7 @@
 #include "net/HostSession.h"
 #include "net/MatchCodec.h"
 #include "ui/ArenaWidget.h"
+#include "ui/RulesWidget.h"
 #include "ui/StadiumPainter.h"
 #include "ui/StatsWidget.h"
 
@@ -85,6 +86,8 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     m_stadiumPreview = new StadiumWidget(this);
     settingsRow->addWidget(m_stadiumPreview, 1);
     root->addLayout(settingsRow);
+    m_rules = new RulesWidget(this);
+    root->addWidget(m_rules);
 
     // --- Joueurs ----------------------------------------------------------------
     m_table = new QTableWidget(0, 4, this);
@@ -137,6 +140,10 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
         if (m_server)
             m_server->setMaxPlayers(m_playersCombo->currentData().toInt());
         rebuild(); // Valeur refusée : on réaffiche la valeur réelle.
+    });
+    connect(m_rules, &RulesWidget::rulesChanged, this, [this](const MatchRules &rules) {
+        if (m_server)
+            m_server->setRules(rules);
     });
     connect(m_stadiumCombo, &QComboBox::activated, this, [this] {
         if (m_server)
@@ -327,6 +334,9 @@ void LobbyPage::rebuild()
     const Stadium stadium = Stadium::find(info->stadiumId).value_or(Stadium::classic());
     m_stadiumLabel->setText(stadium.name);
     m_stadiumPreview->setStadium(stadium);
+    m_rules->setReadOnly(!hosting);
+    if (m_rules->rules() != info->rules)
+        m_rules->setRules(info->rules);
 
     // Tableau des places.
     m_table->setRowCount(info->maxPlayers);

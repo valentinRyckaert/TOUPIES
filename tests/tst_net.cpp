@@ -318,11 +318,11 @@ void TestNet::networkMatchRunsEndToEnd()
         }
     };
 
-    host.submitAim(0.0);
+    host.submitAim(0.0, 1.0);
     pump(0.2);
     QCOMPARE(host.state().phase, MatchPhase::Aiming); // Le client n'a pas visé.
     QTRY_VERIFY(guest.state().aimed.value(0));
-    guest.submitAim(3.14);
+    guest.submitAim(3.14, 1.2);
     QTRY_VERIFY_WITH_TIMEOUT((pump(0.05), host.state().phase == MatchPhase::Countdown), 3000);
     QTRY_VERIFY_WITH_TIMEOUT((pump(0.05), guest.state().phase == MatchPhase::Fighting), 6000);
     QVERIFY(host.state().phase == MatchPhase::Fighting

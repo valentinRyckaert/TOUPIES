@@ -22,20 +22,23 @@ public:
     ~HostSession() override;
 
     void update(double dt) override;
-    void submitAim(double angle) override;
+    void submitAim(double angle, double power) override;
     void requestDash() override;
+    void requestSpecial() override;
+    void setSteering(Vec2 direction) override;
 
 private:
     void onGameMessage(int playerId, const QJsonObject &message);
     void onPlayerLeft(int playerId);
     int slotOf(int playerId) const;
-    void setAim(int slot, double angle);
+    void setAim(int slot, double angle, double power);
     void sendState();
 
     QPointer<LobbyServer> m_server;
     MatchSetup m_setup;
     std::unique_ptr<Battle> m_battle;
     QList<double> m_angles;
+    QList<double> m_powers;
     QList<ImpactEvent> m_pendingImpacts;
     double m_aimTimer = 0.0;
     double m_sendTimer = 0.0;

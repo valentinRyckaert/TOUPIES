@@ -2,6 +2,7 @@
 
 #include "core/Top.h"
 #include "game/BotController.h"
+#include "game/MatchRules.h"
 
 #include <QList>
 #include <QWidget>
@@ -10,6 +11,7 @@ class QComboBox;
 
 namespace toupie {
 
+class RulesWidget;
 class StadiumWidget;
 class StatsWidget;
 class TopRepository;
@@ -28,7 +30,8 @@ public:
 signals:
     void backRequested();
     void fightRequested(const toupie::Top &player, const toupie::Top &opponent,
-                        toupie::Difficulty difficulty, const QString &stadiumId);
+                        toupie::Difficulty difficulty, const QString &stadiumId,
+                        const toupie::MatchRules &rules);
 
 private:
     void updatePreviews();
@@ -41,6 +44,7 @@ private:
     QComboBox *m_difficultyCombo = nullptr;
     QComboBox *m_stadiumCombo = nullptr;
     StadiumWidget *m_stadiumPreview = nullptr;
+    RulesWidget *m_rules = nullptr;
     StatsWidget *m_playerPreview = nullptr;
     StatsWidget *m_opponentPreview = nullptr;
 };

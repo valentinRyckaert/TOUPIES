@@ -24,22 +24,25 @@ BattlePage::BattlePage(QWidget *parent)
     m_leaveButton = new QPushButton(this);
     m_setupButton = new QPushButton(tr("Changer de toupies"), this);
     m_rematchButton = new QPushButton(this);
+    m_specialButton = new QPushButton(tr("Coup spécial (E)"), this);
     m_score = new QLabel(this);
     bar->addWidget(m_leaveButton);
     bar->addWidget(m_setupButton);
     bar->addStretch();
+    bar->addWidget(m_specialButton);
     bar->addWidget(m_score);
     bar->addStretch();
     bar->addWidget(m_rematchButton);
     root->addLayout(bar);
 
     // Les boutons ne doivent pas voler le focus clavier à l'arène.
-    for (QPushButton *b : {m_leaveButton, m_setupButton, m_rematchButton})
+    for (QPushButton *b : {m_leaveButton, m_setupButton, m_rematchButton, m_specialButton})
         b->setFocusPolicy(Qt::NoFocus);
 
     connect(m_leaveButton, &QPushButton::clicked, this, &BattlePage::leaveRequested);
     connect(m_setupButton, &QPushButton::clicked, this, &BattlePage::setupRequested);
     connect(m_rematchButton, &QPushButton::clicked, this, &BattlePage::rematchRequested);
+    connect(m_specialButton, &QPushButton::clicked, m_arena, &ArenaWidget::trySpecial);
     connect(new QShortcut(QKeySequence(Qt::Key_Escape), this), &QShortcut::activated, this,
             &BattlePage::leaveRequested);
     connect(m_arena, &ArenaWidget::matchFinished, this, &BattlePage::onFinished);
@@ -91,6 +94,8 @@ void BattlePage::updateButtons()
 {
     const bool finished = m_session && m_session->state().phase == MatchPhase::Finished;
     m_setupButton->setVisible(m_mode == Mode::Solo);
+    m_specialButton->setVisible(m_session && m_session->state().config.specialsEnabled);
+    m_specialButton->setEnabled(m_session && m_session->state().phase == MatchPhase::Fighting);
 
     switch (m_mode) {
     case Mode::Solo:

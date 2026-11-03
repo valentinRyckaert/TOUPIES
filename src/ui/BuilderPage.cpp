@@ -2,6 +2,7 @@
 
 #include "core/PartCatalog.h"
 #include "core/TopRepository.h"
+#include "game/SpecialMove.h"
 #include "ui/StatsWidget.h"
 
 #include <QComboBox>
@@ -20,10 +21,15 @@
 namespace toupie {
 
 namespace {
-constexpr PartKind kKinds[3] = {PartKind::Wheel, PartKind::Middle, PartKind::Tip};
+constexpr PartKind kKinds[4] = {PartKind::Bolt, PartKind::Wheel, PartKind::Middle, PartKind::Tip};
+constexpr int kKindCount = 4;
 
 QString partLabel(const Part &part)
 {
+    if (part.kind == PartKind::Bolt) {
+        const auto move = SpecialMove::find(part.special);
+        return QStringLiteral("%1  — coup spécial : %2").arg(part.name, move ? move->name : part.special);
+    }
     QString label = QStringLiteral("%1  (%2 / %3 / %4)")
                         .arg(part.name)
                         .arg(part.stats.attack)
@@ -68,10 +74,10 @@ BuilderPage::BuilderPage(const PartCatalog &catalog, TopRepository &repository, 
     editor->addWidget(title);
 
     auto *help = new QLabel(
-        tr("Une toupie = une roue métallique + une partie intermédiaire + une pointe. "
-           "Ses stats sont la somme de celles des pièces (attaque / défense / endurance). "
-           "Toutes les pièces d'un même emplacement ont le même total de points : "
-           "il s'agit de répartir, pas d'accumuler. La roue fixe le sens de rotation."),
+        tr("Une toupie = un boulon + une roue métallique + une partie intermédiaire + une "
+           "pointe. Ses stats sont la somme de celles des pièces (attaque / défense / "
+           "endurance) ; toutes les pièces d'un même emplacement ont le même total de points. "
+           "La roue fixe le sens de rotation, le boulon (sans stats) donne le coup spécial."),
         this);
     help->setWordWrap(true);
     editor->addWidget(help);
@@ -81,9 +87,12 @@ BuilderPage::BuilderPage(const PartCatalog &catalog, TopRepository &repository, 
     m_nameEdit->setMaxLength(24);
     m_nameEdit->setPlaceholderText(tr("Nom de la toupie"));
     form->addRow(tr("Nom"), m_nameEdit);
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < kKindCount; ++i)
         form->addRow(toString(kKinds[i]), createPartCombo(i));
     editor->addLayout(form);
+    m_specialLabel = new QLabel(this);
+    m_specialLabel->setWordWrap(true);
+    editor->addWidget(m_specialLabel);
 
     m_table = new QTableWidget(4, 4, this);
     m_table->setHorizontalHeaderLabels({tr("Pièce"), tr("Attaque"), tr("Défense"), tr("Endurance")});
@@ -178,11 +187,15 @@ void BuilderPage::updatePreview()
             m_table->setItem(row, col, item);
         }
     };
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 1; i < kKindCount; ++i) {
         const Part &part = top.part(kKinds[i]);
-        setRow(i, part.name, part.stats, false);
+        setRow(i - 1, part.name, part.stats, false);
     }
     setRow(3, tr("Total"), top.stats(), true);
+    if (const auto move = SpecialMove::find(top.special())) {
+        m_specialLabel->setText(tr("<b>Coup spécial — %1</b> : %2").arg(move->name,
+                                                                       move->description));
+    }
 
     m_preview->setTop(top);
 }
@@ -190,7 +203,7 @@ void BuilderPage::updatePreview()
 void BuilderPage::loadTop(const Top &top)
 {
     m_nameEdit->setText(top.name());
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < kKindCount; ++i) {
         QComboBox *combo = m_partCombos[i];
         const QSignalBlocker blocker(combo);
         combo->setCurrentIndex(qMax(0, combo->findData(top.part(kKinds[i]).id)));

@@ -8,13 +8,17 @@ HostSession::HostSession(LobbyServer *server, const MatchSetup &setup, QObject *
     : MatchSession(parent)
     , m_server(server)
     , m_setup(setup)
-    , m_battle(std::make_unique<Battle>(setup.tops, setup.stadium, BattleConfig{}, setup.seed))
+    , m_battle(std::make_unique<Battle>(setup.tops, setup.stadium,
+                                        setup.rules.apply(BattleConfig{}), setup.seed))
 {
     initFromBattle(*m_battle, setup.names);
+    m_state.rules = setup.rules;
     m_localPlayer = std::max(0, slotOf(LobbyServer::kHostId));
     m_angles.clear();
-    for (int i = 0; i < m_battle->playerCount(); ++i)
+    for (int i = 0; i < m_battle->playerCount(); ++i) {
         m_angles.append((-m_battle->startPosition(i)).angle()); // Défaut : vers le centre.
+        m_powers.append(1.0);
+    }
 
     if (m_server) {
         connect(m_server, &LobbyServer::gameMessage, this, &HostSession::onGameMessage);
@@ -30,19 +34,31 @@ int HostSession::slotOf(int playerId) const
     return static_cast<int>(m_setup.playerIds.indexOf(playerId));
 }
 
-void HostSession::setAim(int slot, double angle)
+void HostSession::setAim(int slot, double angle, double power)
 {
     if (m_state.phase != MatchPhase::Aiming || slot < 0 || slot >= m_angles.size()
         || m_state.aimed.value(slot))
         return;
     m_angles[slot] = angle;
+    m_powers[slot] = power;
     m_state.aimed[slot] = true;
     m_sendTimer = 1.0; // Diffusion immédiate.
 }
 
-void HostSession::submitAim(double angle)
+void HostSession::submitAim(double angle, double power)
 {
-    setAim(m_localPlayer, angle);
+    setAim(m_localPlayer, angle, power);
+}
+
+void HostSession::requestSpecial()
+{
+    if (m_state.phase == MatchPhase::Fighting)
+        m_battle->requestSpecial(m_localPlayer);
+}
+
+void HostSession::setSteering(Vec2 direction)
+{
+    m_battle->setSteering(m_localPlayer, direction);
 }
 
 void HostSession::requestDash()
@@ -57,10 +73,16 @@ void HostSession::onGameMessage(int playerId, const QJsonObject &message)
     if (slot < 0)
         return;
     const QString type = message.value("type").toString();
-    if (type == Msg::Aim)
-        setAim(slot, message.value("angle").toDouble());
-    else if (type == Msg::Dash && m_state.phase == MatchPhase::Fighting)
-        m_battle->requestDash(slot);
+    if (type == Msg::Aim) {
+        setAim(slot, message.value("angle").toDouble(), message.value("power").toDouble(1.0));
+    } else if (type == Msg::Steer) {
+        m_battle->setSteering(slot, {message.value("x").toDouble(), message.value("y").toDouble()});
+    } else if (m_state.phase == MatchPhase::Fighting) {
+        if (type == Msg::Dash)
+            m_battle->requestDash(slot);
+        else if (type == Msg::Special)
+            m_battle->requestSpecial(slot);
+    }
 }
 
 void HostSession::onPlayerLeft(int playerId)
@@ -95,7 +117,7 @@ void HostSession::update(double dt)
         m_state.countdown -= dt;
         if (m_state.countdown <= 0.0) {
             m_state.countdown = 0.0;
-            m_battle->launch(m_angles);
+            m_battle->launch(m_angles, m_powers);
             m_pendingImpacts.append(syncFromBattle(*m_battle));
             setPhase(m_battle->isFinished() ? MatchPhase::Finished : MatchPhase::Fighting);
         }

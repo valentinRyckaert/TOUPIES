@@ -1,6 +1,7 @@
 #include "ui/StatsWidget.h"
 
 #include "core/PartCatalog.h"
+#include "game/SpecialMove.h"
 #include "ui/TopPainter.h"
 
 #include <QPainter>
@@ -128,9 +129,10 @@ void StatsWidget::paintEvent(QPaintEvent *)
     y += line;
 
     p.setFont(font());
-    const QString info = tr("Type %1  ·  rotation %2  ·  total %3")
-                             .arg(toString(top.type()), toString(top.spin()).toLower())
-                             .arg(stats.total());
+    const auto move = SpecialMove::find(top.special());
+    const QString info = tr("Type %1  ·  rotation %2  ·  spécial : %3")
+                             .arg(toString(top.type()), toString(top.spin()).toLower(),
+                                  move ? move->name : tr("aucun"));
     p.setPen(accent);
     p.drawText(QRectF(left, y, width, line), Qt::AlignVCenter | Qt::AlignLeft, info);
     y += line;

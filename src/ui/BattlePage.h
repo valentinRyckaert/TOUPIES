@@ -49,6 +49,7 @@ private:
     QPushButton *m_leaveButton = nullptr;
     QPushButton *m_setupButton = nullptr;
     QPushButton *m_rematchButton = nullptr;
+    QPushButton *m_specialButton = nullptr;
     std::unique_ptr<MatchSession> m_session;
     Mode m_mode = Mode::Solo;
     int m_wins = 0;

@@ -17,6 +17,7 @@ class QTableWidget;
 
 namespace toupie {
 
+class RulesWidget;
 class StadiumWidget;
 class StatsWidget;
 class TopRepository;
@@ -80,6 +81,7 @@ private:
     QComboBox *m_stadiumCombo = nullptr;
     QLabel *m_stadiumLabel = nullptr;
     StadiumWidget *m_stadiumPreview = nullptr;
+    RulesWidget *m_rules = nullptr;
     QTableWidget *m_table = nullptr;
     QComboBox *m_topCombo = nullptr;
     StatsWidget *m_topPreview = nullptr;

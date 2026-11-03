@@ -138,6 +138,14 @@ void LobbyServer::setStadium(const QString &stadiumId)
     }
 }
 
+void LobbyServer::setRules(const MatchRules &rules)
+{
+    if (rules != m_lobby.rules) {
+        m_lobby.rules = rules;
+        lobbyUpdated();
+    }
+}
+
 bool LobbyServer::canStart() const
 {
     if (m_lobby.inGame || m_lobby.players.size() != m_lobby.maxPlayers)
@@ -162,6 +170,7 @@ QJsonObject LobbyServer::startMatch(quint32 seed)
         {"type", Msg::Start},
         {"stadium", m_lobby.stadiumId},
         {"seed", static_cast<qint64>(seed)},
+        {"rules", m_lobby.rules.toJson()},
         {"players", players},
     };
     broadcast(start);
@@ -268,7 +277,8 @@ void LobbyServer::onMessage(JsonChannel *channel, const QJsonObject &message)
             return;
         player->ready = message.value("ready").toBool();
         lobbyUpdated();
-    } else if (type == Msg::Aim || type == Msg::Dash) {
+    } else if (type == Msg::Aim || type == Msg::Dash || type == Msg::Special
+               || type == Msg::Steer) {
         if (m_lobby.inGame)
             emit gameMessage(client->id, message);
     }

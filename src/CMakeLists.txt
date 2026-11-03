@@ -55,6 +55,8 @@ qt_add_executable(toupie_arena
     main.cpp
     ui/TopPainter.h
     ui/TopPainter.cpp
+    ui/RulesWidget.h
+    ui/RulesWidget.cpp
     ui/StadiumPainter.h
     ui/StadiumPainter.cpp
     ui/StatsWidget.h

@@ -7,6 +7,7 @@
 #include <QPixmap>
 #include <QPointF>
 #include <QPointer>
+#include <QSet>
 #include <QTimer>
 #include <QWidget>
 
@@ -47,6 +48,8 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
+    void focusOutEvent(QFocusEvent *event) override;
 
 private:
     struct Spark
@@ -54,12 +57,22 @@ private:
         QPointF position; // Coordonnées du monde.
         double age = 0.0;
         double intensity = 0.0;
+        QColor color;          ///< Invalide : étincelle de choc classique.
     };
 
     void tick();
     void resetVisuals();
     void confirmLaunch();
     void tryDash();
+public:
+    /// Lance le coup spécial du joueur local (touche E ou bouton).
+    void trySpecial();
+private:
+    void updateSteering();
+    /// Force de lancer correspondant à une longueur de flèche (unités du monde).
+    double powerForLength(double length) const;
+    double lengthForPower(double power) const;
+    void paintProjectiles(QPainter &p);
 
     double scale() const;
     QPointF center() const;
@@ -76,6 +89,8 @@ private:
     QPointer<MatchSession> m_session;
     MatchPhase m_lastPhase = MatchPhase::Aiming;
     double m_aimAngle = 0.0;
+    double m_aimPower = 1.0;
+    QSet<int> m_steerKeys;
     double m_flash = 0.0;
 
     std::vector<QList<QPointF>> m_trails;

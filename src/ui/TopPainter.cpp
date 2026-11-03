@@ -1,11 +1,14 @@
 #include "ui/TopPainter.h"
 
 #include "core/Top.h"
+#include "game/SpecialMove.h"
 
 #include <QPainter>
 #include <QPainterPath>
 #include <QRadialGradient>
 #include <QtMath>
+
+#include <cmath>
 
 namespace toupie::TopPainter {
 
@@ -86,11 +89,29 @@ void paint(QPainter &painter, const Top &top, QPointF center, double radius, dou
     painter.setPen(QPen(Qt::white, qMax(1.0, radius * 0.08), Qt::SolidLine, Qt::RoundCap));
     painter.drawLine(QPointF(radius * 0.12, 0), QPointF(radius * 0.42, 0));
 
-    // Pointe (au centre).
+    // Pointe : visible en liseré sous le boulon.
     const QColor tipColor = QColor::fromHsv(top.tip().hue, 200, 230);
     painter.setPen(Qt::NoPen);
     painter.setBrush(tipColor);
-    painter.drawEllipse(QPointF(0, 0), radius * 0.16, radius * 0.16);
+    painter.drawEllipse(QPointF(0, 0), radius * 0.24, radius * 0.24);
+
+    // Boulon (tout en haut) : écrou hexagonal à la couleur de son coup spécial.
+    if (top.bolt().isValid()) {
+        const auto move = SpecialMove::find(top.special());
+        const QColor boltColor = move ? QColor::fromRgb(move->color)
+                                      : QColor::fromHsv(top.bolt().hue, 120, 220);
+        QPolygonF nut;
+        for (int i = 0; i < 6; ++i) {
+            const double a = qDegreesToRadians(60.0 * i + 30.0);
+            nut << QPointF(std::cos(a), std::sin(a)) * radius * 0.2;
+        }
+        painter.setBrush(boltColor);
+        painter.setPen(QPen(boltColor.darker(170), qMax(1.0, radius * 0.04)));
+        painter.drawPolygon(nut);
+        painter.setBrush(boltColor.darker(140));
+        painter.setPen(Qt::NoPen);
+        painter.drawEllipse(QPointF(0, 0), radius * 0.07, radius * 0.07);
+    }
 
     painter.restore();
 }
