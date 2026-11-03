@@ -1,10 +1,15 @@
 #include "core/PartCatalog.h"
+#include "net/ClientSession.h"
+#include "net/HostSession.h"
 #include "net/LobbyBrowser.h"
+#include "net/MatchCodec.h"
 #include "net/LobbyClient.h"
 #include "net/LobbyServer.h"
 #include "net/Protocol.h"
 
 #include <QSignalSpy>
+
+#include <cmath>
 #include <QJsonArray>
 #include <QTest>
 
@@ -34,6 +39,8 @@ private slots:
     void serverNoticesDisconnection();
     void gameMessagesAreRelayedDuringMatch();
     void lobbyIsDiscoveredByName();
+    void stateCodecRoundTrip();
+    void networkMatchRunsEndToEnd();
 };
 
 void TestNet::sanitizeNames()
@@ -198,6 +205,109 @@ void TestNet::lobbyIsDiscoveredByName()
     QCOMPARE(lobby.maxPlayers, 3);
     QCOMPARE(lobby.players, 1);
     QCOMPARE(lobby.stadiumId, QStringLiteral("glace"));
+}
+
+void TestNet::stateCodecRoundTrip()
+{
+    const PartCatalog &catalog = PartCatalog::instance();
+    const QList<Top> tops{catalog.presets().at(0), catalog.presets().at(1), catalog.presets().at(2)};
+    Battle battle(tops, *Stadium::find(QStringLiteral("beton")), BattleConfig{}, 5);
+    battle.launch({0.0, 1.0, 2.0});
+    battle.advance(1.0);
+
+    MatchState source;
+    source.spinners = battle.spinners();
+    source.aimed = {true, true, true};
+    source.phase = MatchPhase::Fighting;
+    source.elapsed = battle.elapsed();
+    source.ranking = {2, 0, 1};
+    source.winner = 2;
+    ImpactEvent impact;
+    impact.point = {0.25, -0.5};
+    impact.intensity = 0.75;
+
+    MatchState target;
+    target.spinners = std::vector<Spinner>(3);
+    target.aimed = {false, false, false};
+    QList<ImpactEvent> impacts;
+    QVERIFY(decodeState(encodeState(source, {impact}), target, &impacts));
+    QCOMPARE(target.phase, MatchPhase::Fighting);
+    QCOMPARE(target.winner, 2);
+    QCOMPARE(target.ranking, source.ranking);
+    QCOMPARE(impacts.size(), 1);
+    QCOMPARE(impacts.first().intensity, 0.75);
+    for (int i = 0; i < 3; ++i) {
+        QVERIFY(std::abs(target.spinners[i].position.x - source.spinners[i].position.x) < 1e-3);
+        QVERIFY(std::abs(target.spinners[i].spin - source.spinners[i].spin) < 1e-3);
+        QVERIFY(target.spinners[i].status == source.spinners[i].status);
+    }
+
+    // Nombre de toupies incohérent : message ignoré.
+    MatchState wrong;
+    wrong.spinners = std::vector<Spinner>(2);
+    QVERIFY(!decodeState(encodeState(source, {}), wrong, nullptr));
+}
+
+void TestNet::networkMatchRunsEndToEnd()
+{
+    const PartCatalog &catalog = PartCatalog::instance();
+    LobbyServer server(catalog);
+    QVERIFY(server.start(settings(), 0, 0));
+    auto *client = new LobbyClient(catalog);
+    QSignalSpy started(client, &LobbyClient::matchStarted);
+    client->connectToHost(QStringLiteral("127.0.0.1"), server.port(), QStringLiteral("Alice"));
+    QTRY_VERIFY(client->isJoined());
+    server.setHostTop(catalog.presets().at(1));
+    client->selectTop(catalog.presets().at(3));
+    client->setReady(true);
+    QTRY_VERIFY(server.canStart());
+
+    const auto hostSetup = parseStart(server.startMatch(7), catalog);
+    QVERIFY(hostSetup.has_value());
+    HostSession host(&server, *hostSetup);
+    QTRY_COMPARE(started.count(), 1);
+    const auto clientSetup = parseStart(started.first().first().toJsonObject(), catalog);
+    QVERIFY(clientSetup.has_value());
+    ClientSession guest(client, *clientSetup);
+
+    QCOMPARE(host.localPlayer(), 0);
+    QCOMPARE(guest.localPlayer(), 1);
+    QCOMPARE(guest.state().stadium.id, QStringLiteral("glace"));
+
+    auto pump = [&](double seconds) {
+        for (double t = 0; t < seconds; t += 1.0 / 60.0) {
+            host.update(1.0 / 60.0);
+            guest.update(1.0 / 60.0);
+            QTest::qWait(2);
+        }
+    };
+
+    host.submitAim(0.0);
+    pump(0.2);
+    QCOMPARE(host.state().phase, MatchPhase::Aiming); // Le client n'a pas visé.
+    QTRY_VERIFY(guest.state().aimed.value(0));
+    guest.submitAim(3.14);
+    QTRY_VERIFY_WITH_TIMEOUT((pump(0.05), host.state().phase == MatchPhase::Countdown), 3000);
+    QTRY_VERIFY_WITH_TIMEOUT((pump(0.05), guest.state().phase == MatchPhase::Fighting), 6000);
+    QVERIFY(host.state().phase == MatchPhase::Fighting
+            || host.state().phase == MatchPhase::Finished);
+
+    // Le dash du client est appliqué par l'hôte (s'il est encore en jeu).
+    if (host.state().phase == MatchPhase::Fighting && host.state().spinners[1].isActive()) {
+        guest.requestDash();
+        QTRY_VERIFY_WITH_TIMEOUT((pump(0.02), host.state().spinners[1].dashCooldown > 0.0
+                                                  || host.state().phase == MatchPhase::Finished),
+                                 2000);
+    }
+
+    // Le client se déconnecte : l'hôte gagne par abandon s'il restait en jeu.
+    const bool stillRunning = host.state().phase == MatchPhase::Fighting;
+    delete client;
+    QTRY_VERIFY_WITH_TIMEOUT((pump(0.05), host.state().phase == MatchPhase::Finished), 3000);
+    if (stillRunning) {
+        QCOMPARE(host.state().winner, 0);
+        QVERIFY(host.state().endReason == Battle::EndReason::Forfeit);
+    }
 }
 
 QTEST_GUILESS_MAIN(TestNet)
