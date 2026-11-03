@@ -50,13 +50,13 @@ struct BattleConfig
     /// Les stats ont des effets linéaires : se spécialiser n'a pas de
     /// rendement décroissant par rapport à une répartition équilibrée.
     double passiveBase = 1.8491;
-    double passivePerEndurance = 0.05;
+    double passivePerEndurance = 0.03;
     double speedDrain = 0.7327;
 
     // --- Chocs ----------------------------------------------------------------
     /// Dégâts = base * attaqueAdverse * impact * max(plancher, 1 - parDéfense * défense).
     double damageBase = 0.4;
-    double damagePerDefense = 0.057;
+    double damagePerDefense = 0.0482;
     /// impact = min(maxImpact, minImpact + vitesseDeRapprochement / impactRef).
     double minImpact = 0.8969;
     double impactRef = 2.0;
@@ -69,7 +69,7 @@ struct BattleConfig
     /// Une toupie lourde (défense élevée) repousse plus fort.
     double knockbackPerAttackerDefense = 0.0418;
     double knockbackApproach = 0.1427;
-    double knockbackPerDefense = 0.0264;
+    double knockbackPerDefense = 0.0279;
     /// Plancher des facteurs de réduction linéaires.
     double minReduction = 0.15;
     /// Masse utilisée pour séparer les toupies qui se chevauchent.
@@ -83,7 +83,7 @@ struct BattleConfig
     double contactCooldown = 0.2337;
     /// Bonus du type équilibre : réduction (en fraction) de la perte
     /// d'endurance, des dégâts et du recul subis.
-    double balanceStability = 0.0428;
+    double balanceStability = 0.02;
 
     // --- Dash -------------------------------------------------------------------
     double dashCost = 3.5722;        ///< Points d'endurance consommés.
@@ -95,11 +95,11 @@ struct BattleConfig
     double postDashSpeed = 0.45;
 
     // --- Coups spéciaux ------------------------------------------------------
-    /// La jauge (0 à 100) se remplit avec le temps et à chaque choc ; pleine,
-    /// elle permet de lancer le coup spécial du boulon.
-    double specialChargeRate = 9.138;  ///< Points par seconde.
-    double specialHitCharge = 6.0;   ///< Points par choc reçu ou donné.
-    double specialDamageScale = 0.6; ///< Multiplicateur des dégâts des coups spéciaux.
+    /// Chaque toupie ne peut lancer le coup spécial de son boulon qu'une seule
+    /// fois par partie ; le lancer lui coûte cette fraction de son endurance
+    /// courante.
+    double specialCost = 0.5;
+    double specialDamageScale = 1.0; ///< Multiplicateur des dégâts des coups spéciaux.
     double specialKnockbackScale = 1.0;
     bool specialsEnabled = true;
 

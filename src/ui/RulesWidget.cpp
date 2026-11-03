@@ -1,5 +1,6 @@
 #include "ui/RulesWidget.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -70,9 +71,11 @@ RulesWidget::RulesWidget(QWidget *parent)
     m_steering = addRight(1, tr("Pilotage (flèches)"),
                           tr("Force de la correction de trajectoire aux flèches. 0 = désactivé."),
                           0, 250, true);
-    m_special = addRight(2, tr("Charge des coups spéciaux"),
-                         tr("Vitesse de remplissage de la jauge. 0 = coups spéciaux désactivés."),
-                         0, 300, true);
+    m_specials = new QCheckBox(tr("Coups spéciaux"), this);
+    m_specials->setToolTip(tr("Chaque toupie peut lancer son coup spécial une fois par partie, "
+                              "au prix de la moitié de son endurance."));
+    grid->addWidget(m_specials, 2, 3, 1, 3);
+    connect(m_specials, &QCheckBox::toggled, this, &RulesWidget::emitChanged);
 
     m_endurance = new QSpinBox(this);
     m_endurance->setRange(30, 500);
@@ -142,7 +145,7 @@ MatchRules RulesWidget::rules() const
     r.damage = m_damage.slider->value() / 100.0;
     r.dashPower = m_dash.slider->value() / 100.0;
     r.steering = m_steering.slider->value() / 100.0;
-    r.specialCharge = m_special.slider->value() / 100.0;
+    r.specials = m_specials->isChecked();
     r.maxEndurance = m_endurance->value();
     r.timeLimit = m_timeLimit->currentData().toInt();
     return r;
@@ -157,7 +160,7 @@ void RulesWidget::setRules(const MatchRules &r)
     m_damage.slider->setValue(toPercent(r.damage));
     m_dash.slider->setValue(toPercent(r.dashPower));
     m_steering.slider->setValue(toPercent(r.steering));
-    m_special.slider->setValue(toPercent(r.specialCharge));
+    m_specials->setChecked(r.specials);
     m_endurance->setValue(qRound(r.maxEndurance));
     const int index = m_timeLimit->findData(qRound(r.timeLimit));
     if (index >= 0) {
@@ -175,7 +178,7 @@ void RulesWidget::setReadOnly(bool readOnly)
     for (QWidget *w : {static_cast<QWidget *>(m_speed.slider), static_cast<QWidget *>(m_knockback.slider),
                        static_cast<QWidget *>(m_wear.slider), static_cast<QWidget *>(m_damage.slider),
                        static_cast<QWidget *>(m_dash.slider), static_cast<QWidget *>(m_steering.slider),
-                       static_cast<QWidget *>(m_special.slider), static_cast<QWidget *>(m_endurance),
+                       static_cast<QWidget *>(m_specials), static_cast<QWidget *>(m_endurance),
                        static_cast<QWidget *>(m_timeLimit)})
         w->setEnabled(!readOnly);
     m_reset->setVisible(!readOnly);
@@ -191,8 +194,7 @@ void RulesWidget::emitChanged()
 
 void RulesWidget::updateLabels()
 {
-    for (const PercentRow *r : {&m_speed, &m_knockback, &m_wear, &m_damage, &m_dash, &m_steering,
-                                &m_special}) {
+    for (const PercentRow *r : {&m_speed, &m_knockback, &m_wear, &m_damage, &m_dash, &m_steering}) {
         const int value = r->slider->value();
         const bool off = value == 0 && r->slider->property("zeroIsOff").toBool();
         r->value->setText(off ? tr("désactivé") : QStringLiteral("%1 %").arg(value));

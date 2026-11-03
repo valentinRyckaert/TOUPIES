@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QShortcut>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace toupie {
@@ -47,6 +48,10 @@ BattlePage::BattlePage(QWidget *parent)
     connect(new QShortcut(QKeySequence(Qt::Key_Escape), this), &QShortcut::activated, this,
             &BattlePage::leaveRequested);
     connect(m_arena, &ArenaWidget::matchFinished, this, &BattlePage::onFinished);
+    // État du bouton « coup spécial » (il peut être lancé au clavier).
+    auto *refresh = new QTimer(this);
+    connect(refresh, &QTimer::timeout, this, &BattlePage::updateButtons);
+    refresh->start(200);
     connect(m_arena, &ArenaWidget::rematchRequested, this, [this] {
         if (m_mode != Mode::LanClient)
             emit rematchRequested();
@@ -96,7 +101,8 @@ void BattlePage::updateButtons()
     const bool finished = m_session && m_session->state().phase == MatchPhase::Finished;
     m_setupButton->setVisible(m_mode == Mode::Solo);
     m_specialButton->setVisible(m_session && m_session->state().config.specialsEnabled);
-    m_specialButton->setEnabled(m_session && m_session->state().phase == MatchPhase::Fighting);
+    m_specialButton->setEnabled(m_session && m_session->state().phase == MatchPhase::Fighting
+                                && !m_session->state().spinners[m_session->localPlayer()].specialUsed);
 
     switch (m_mode) {
     case Mode::Solo:

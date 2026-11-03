@@ -9,7 +9,11 @@
 //   -d <niveau>       facile | normal | difficile (défaut normal)
 //   -s <stadium|all>  stadium (identifiant, défaut classique) ou tous les stadiums
 //   -p <2..4>         nombre de toupies par combat (mêlée générale au-delà de 2)
+//   -d2 <niveau>      face à face : bots de niveau -d contre bots de niveau -d2
+//   --sans-speciaux-2 face à face : le second camp ne lance jamais son coup spécial
 //   paramètre=valeur  surcharge d'un champ de BattleConfig (ex. dashCost=8)
+//   move.<coup>.<champ>=valeur  surcharge d'un coup spécial (ex. move.lance.damage=40)
+//   stadium.<id>.<champ>=valeur surcharge d'un stadium (ex. stadium.glace.friction=0.9)
 
 #include "core/PartCatalog.h"
 #include "game/Battle.h"
@@ -25,6 +29,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <random>
 #include <vector>
 
@@ -37,7 +42,13 @@ struct Outcome
     int winner = -1; ///< Indice dans la liste fournie, -1 = nul.
     Battle::EndReason reason = Battle::EndReason::None;
     double duration = 0.0;
+    int specialsUsed = 0;
 };
+
+/// Difficulté du second camp (face à face) ; identique au premier par défaut.
+std::optional<Difficulty> g_secondDifficulty;
+/// Face à face : le second camp s'interdit les coups spéciaux.
+bool g_secondWithoutSpecials = false;
 
 Outcome simulate(const QList<Top> &tops, const Stadium &stadium, const BattleConfig &config,
                  Difficulty difficulty, std::uint32_t seed)
@@ -55,7 +66,12 @@ Outcome simulate(const QList<Top> &tops, const Stadium &stadium, const BattleCon
     QList<double> angles;
     QList<double> powers;
     for (int i = 0; i < n; ++i) {
-        bots.emplace_back(i, difficulty, seed * 7 + static_cast<std::uint32_t>(i) + 1);
+        // Face à face : la toupie d'origine 0 garde le niveau -d, les autres -d2.
+        const bool first = (i + shift) % n == 0;
+        const Difficulty level = first || !g_secondDifficulty ? difficulty : *g_secondDifficulty;
+        bots.emplace_back(i, level, seed * 7 + static_cast<std::uint32_t>(i) + 1);
+        if (!first && g_secondWithoutSpecials)
+            bots.back().setSpecialsAllowed(false);
         angles.append(bots.back().chooseLaunchAngle(battle));
         powers.append(bots.back().chooseLaunchPower(battle));
     }
@@ -69,6 +85,8 @@ Outcome simulate(const QList<Top> &tops, const Stadium &stadium, const BattleCon
     Outcome outcome;
     outcome.reason = battle.endReason();
     outcome.duration = battle.elapsed();
+    for (const Spinner &s : battle.spinners())
+        outcome.specialsUsed += s.specialUsed ? 1 : 0;
     if (battle.winner() >= 0)
         outcome.winner = (battle.winner() + shift) % n;
     return outcome;
@@ -186,8 +204,8 @@ std::map<QString, double BattleConfig::*> configFields()
         {"dashBoostDuration", &BattleConfig::dashBoostDuration},
         {"centerPull", &BattleConfig::centerPull},
         {"steerAcceleration", &BattleConfig::steerAcceleration},
-        {"specialChargeRate", &BattleConfig::specialChargeRate},
-        {"specialHitCharge", &BattleConfig::specialHitCharge},
+        {"specialCost", &BattleConfig::specialCost},
+        {"specialKnockbackScale", &BattleConfig::specialKnockbackScale},
         {"specialDamageScale", &BattleConfig::specialDamageScale},
         {"maxDuration", &BattleConfig::maxDuration},
     };
@@ -227,6 +245,12 @@ int main(int argc, char *argv[])
             presetFights = qMax(0, args.at(++i).toInt());
         } else if (arg == QLatin1String("-r") && i + 1 < args.size()) {
             randomFights = qMax(0, args.at(++i).toInt());
+        } else if (arg == QLatin1String("--sans-speciaux-2")) {
+            g_secondWithoutSpecials = true;
+            if (!g_secondDifficulty)
+                g_secondDifficulty = difficulty;
+        } else if (arg == QLatin1String("-d2") && i + 1 < args.size()) {
+            g_secondDifficulty = parseDifficulty(args.at(++i));
         } else if (arg == QLatin1String("-d") && i + 1 < args.size()) {
             difficulty = parseDifficulty(args.at(++i));
         } else if (arg == QLatin1String("-p") && i + 1 < args.size()) {
@@ -239,6 +263,24 @@ int main(int argc, char *argv[])
                 stadiums = {*stadium};
             } else {
                 err << "Stadium inconnu : " << id << "\n";
+                return 1;
+            }
+        } else if (arg.startsWith(QLatin1String("stadium.")) && arg.contains('=')) {
+            // stadium.<id>.<champ>=valeur
+            const QString path = arg.section('=', 0, 0);
+            bool ok = false;
+            const double value = arg.section('=', 1).toDouble(&ok);
+            if (!ok || !Stadium::overrideStat(path.section('.', 1, 1), path.section('.', 2), value)) {
+                err << "Surcharge de stadium invalide : " << arg << "\n";
+                return 1;
+            }
+        } else if (arg.startsWith(QLatin1String("move.")) && arg.contains('=')) {
+            // move.<coup>.<champ>=valeur
+            const QString path = arg.section('=', 0, 0);
+            bool ok = false;
+            const double value = arg.section('=', 1).toDouble(&ok);
+            if (!ok || !SpecialMove::overrideStat(path.section('.', 1, 1), path.section('.', 2), value)) {
+                err << "Surcharge de coup invalide : " << arg << "\n";
                 return 1;
             }
         } else if (arg.contains('=')) {
@@ -262,6 +304,33 @@ int main(int argc, char *argv[])
     }
 
     out << "Difficulté des bots : " << toString(difficulty) << "\n";
+
+    // --- Face à face entre difficultés --------------------------------------------
+    if (g_secondDifficulty) {
+        const QList<Top> pool = allCombinations(PartCatalog::instance());
+        std::mt19937 rng(99);
+        std::uniform_int_distribution<qsizetype> pick(0, pool.size() - 1);
+        for (const Stadium &stadium : stadiums) {
+            double score = 0.0;
+            int specials = 0;
+            for (int k = 0; k < randomFights; ++k) {
+                QList<Top> tops;
+                for (int p = 0; p < players; ++p)
+                    tops.append(pool.at(pick(rng)));
+                const Outcome o = simulate(tops, stadium, config, difficulty,
+                                           static_cast<std::uint32_t>(k));
+                score += o.winner == 0 ? 1.0 : (o.winner < 0 ? 1.0 / players : 0.0);
+                specials += o.specialsUsed;
+            }
+            out << QString::asprintf("%-10s bot %s contre %d bot(s) %s : %5.1f %% de victoires "
+                                     "(part équitable %4.1f %%), coups spéciaux lancés : %4.1f %%\n",
+                                     qPrintable(stadium.name), qPrintable(toString(difficulty)),
+                                     players - 1, qPrintable(toString(*g_secondDifficulty)),
+                                     100.0 * score / randomFights, 100.0 / players,
+                                     100.0 * specials / (randomFights * players));
+        }
+        return 0;
+    }
 
     // --- Presets ------------------------------------------------------------
     const QList<Top> presets = PartCatalog::instance().presets();

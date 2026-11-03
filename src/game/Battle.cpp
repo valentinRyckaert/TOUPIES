@@ -111,7 +111,7 @@ bool Battle::canSpecial(int index) const
         return false;
     const Spinner &self = m_spinners[index];
     return m_phase == Phase::Running && self.isActive() && !self.isDisarmed()
-        && self.special >= 100.0 && SpecialMove::find(self.top.special()).has_value()
+        && !self.specialUsed && SpecialMove::find(self.top.special()).has_value()
         && nearestOpponent(index) >= 0;
 }
 
@@ -137,7 +137,8 @@ bool Battle::requestSpecial(int index)
     p.width = move.width;
     p.color = move.color;
     m_projectiles.push_back(p);
-    self.special = 0.0;
+    self.specialUsed = true;
+    self.spin *= 1.0 - m_config.specialCost;
     return true;
 }
 
@@ -405,8 +406,6 @@ void Battle::integrate(Spinner &s, double h)
     s.boostTimer = std::max(0.0, s.boostTimer - h);
     s.slowTimer = std::max(0.0, s.slowTimer - h);
     s.disarmTimer = std::max(0.0, s.disarmTimer - h);
-    if (m_config.specialsEnabled)
-        s.special = std::min(100.0, s.special + m_config.specialChargeRate * h);
 }
 
 void Battle::resolveCollision(int i, int j)
@@ -472,10 +471,6 @@ void Battle::resolveCollision(int i, int j)
     a.lastHitBy = j;
     b.lastHitBy = i;
     a.lastHitTime = b.lastHitTime = m_elapsed;
-    if (m_config.specialsEnabled) {
-        a.special = std::min(100.0, a.special + m_config.specialHitCharge);
-        b.special = std::min(100.0, b.special + m_config.specialHitCharge);
-    }
 
     // Un dash s'arrête au premier contact (le bonus d'attaque reste actif).
     a.dashTimer = 0.0;
@@ -594,7 +589,7 @@ void Battle::applySpecialHit(const Projectile &projectile, const SpecialMove &mo
         const Vec2 dir = Vec2::fromAngle(angle(m_rng));
         const double level = std::max(1e-6, m_geometry.level(dir));
         t.position = dir * (move.effectStrength / level);
-        t.velocity = dir * 0.25;
+        t.velocity = dir * (move.knockback * m_config.specialKnockbackScale);
         t.dashTimer = 0.0;
         t.escaping = false;
         break;

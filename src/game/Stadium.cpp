@@ -155,7 +155,36 @@ StadiumGeometry Stadium::geometry(const BattleConfig &applied) const
 
 const QList<Stadium> &Stadium::all()
 {
-    static const QList<Stadium> stadiums = [] {
+    return registry();
+}
+
+bool Stadium::overrideStat(const QString &id, const QString &field, double value)
+{
+    for (Stadium &stadium : registry()) {
+        if (stadium.id != id)
+            continue;
+        double Stadium::*member = nullptr;
+        if (field == QLatin1String("size")) member = &Stadium::size;
+        else if (field == QLatin1String("rimHeight")) member = &Stadium::rimHeight;
+        else if (field == QLatin1String("slope")) member = &Stadium::slope;
+        else if (field == QLatin1String("friction")) member = &Stadium::friction;
+        else if (field == QLatin1String("speed")) member = &Stadium::speed;
+        else if (field == QLatin1String("enduranceDrain")) member = &Stadium::enduranceDrain;
+        else if (field == QLatin1String("damage")) member = &Stadium::damage;
+        else if (field == QLatin1String("knockback")) member = &Stadium::knockback;
+        else if (field == QLatin1String("dashSpeed")) member = &Stadium::dashSpeed;
+        else if (field == QLatin1String("dashPower")) member = &Stadium::dashPower;
+        if (!member)
+            return false;
+        stadium.*member = value;
+        return true;
+    }
+    return false;
+}
+
+QList<Stadium> &Stadium::registry()
+{
+    static QList<Stadium> stadiums = [] {
         using Kind = StadiumGeometry::Kind;
         QList<Stadium> list;
 
@@ -210,16 +239,18 @@ const QList<Stadium> &Stadium::all()
         ice.id = QStringLiteral("glace");
         ice.name = QStringLiteral("Glace");
         ice.description = QStringLiteral(
-            "Patinoire elliptique au haut rebord. La glace use très peu la rotation et les "
-            "chocs repoussent moins : idéal pour durer.");
+            "Patinoire elliptique au haut rebord et aux pentes douces. La glace use peu la "
+            "rotation et les chocs repoussent moins, mais ils frappent plus fort.");
         ice.shape = Kind::Ellipse;
         ice.aspect = 0.8;
-        ice.rimHeight = 1.7;
-        ice.friction = 0.9;
-        ice.slope = 1.0;
-        ice.enduranceDrain = 0.7;
-        ice.knockback = 0.85;
-        ice.damage = 0.9;
+        ice.rimHeight = 1.87;
+        ice.friction = 0.99;
+        ice.slope = 0.75;
+        ice.enduranceDrain = 0.75;
+        ice.knockback = 0.83;
+        ice.damage = 1.19;
+        ice.speed = 1.05;
+        ice.dashPower = 1.1;
         ice.floorCenter = 0xf1f8ff;
         ice.floorEdge = 0x92badb;
         ice.rimColor = 0x4d6f8c;
@@ -251,12 +282,15 @@ const QList<Stadium> &Stadium::all()
         volcano.description = QStringLiteral(
             "Petit cratère aux pentes très raides, sans rebord, entouré de lave. Les chocs "
             "et les dashs y sont plus puissants.");
-        volcano.size = 0.9;
+        volcano.size = 0.85;
+        volcano.knockback = 0.89;
         volcano.hasRim = false;
-        volcano.slope = 2.0;
-        volcano.damage = 1.1;
+        volcano.slope = 1.82;
+        volcano.damage = 1.14;
         volcano.dashPower = 1.2;
-        volcano.enduranceDrain = 1.0;
+        volcano.enduranceDrain = 1.1;
+        volcano.friction = 1.01;
+        volcano.speed = 1.05;
         volcano.floorCenter = 0x6a4741;
         volcano.floorEdge = 0x2a1512;
         volcano.rimColor = 0xff5a1f;

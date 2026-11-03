@@ -4,6 +4,8 @@
 #include "game/MatchRules.h"
 
 #include <QSet>
+
+#include <random>
 #include <QTest>
 
 #include <cmath>
@@ -46,6 +48,8 @@ private slots:
     void topWithoutEnduranceLoses();
     void simulationIsDeterministic();
     void botMatchTerminates();
+    void harderBotsWinMoreOften();
+    void botKeepsSpecialForLater();
     void stadiumGeometry();
     void stadiumsAreDistinct();
     void topFallsOffStadiumWithoutRim();
@@ -56,7 +60,7 @@ private slots:
     void launchPowerScalesSpeed();
     void steeringChangesTrajectory();
     void topsDriftTowardCenter();
-    void specialRequiresFullGauge();
+    void specialIsSingleUseAndCostsHalfEndurance();
     void waveHitsTargetAndAppliesEffect_data();
     void waveHitsTargetAndAppliesEffect();
     void ringHitsEveryOpponentInRange();
@@ -370,7 +374,6 @@ BattleConfig staticConfig()
     c.slopeStrength = 0.0;
     c.centerPull = 0.0;
     c.orbitBase = c.orbitPerAttack = 0.0;
-    c.specialChargeRate = 1e6; // Jauge pleine dès le premier pas.
     return c;
 }
 
@@ -395,7 +398,7 @@ void TestBattle::rulesModifyConstants()
     rules.maxEndurance = 200;
     rules.timeLimit = 60;
     rules.steering = 0.0;
-    rules.specialCharge = 0.0;
+    rules.specials = false;
     const BattleConfig c = rules.apply(base);
     QCOMPARE(c.launchSpeed, base.launchSpeed * 2.0);
     QCOMPARE(c.passiveBase, base.passiveBase * 0.5);
@@ -445,18 +448,30 @@ void TestBattle::topsDriftTowardCenter()
     QVERIFY(battle.spinner(0).position.length() < before);
 }
 
-void TestBattle::specialRequiresFullGauge()
+void TestBattle::specialIsSingleUseAndCostsHalfEndurance()
 {
-    Battle battle(attackTop(), defenseTop());
+    Battle battle(withBolt(attackTop(), "B2"), defenseTop(), staticConfig(), 1);
+    QVERIFY(!battle.canSpecial(0)); // Pas avant le lancement.
     battle.launch(0.0, M_PI);
-    QVERIFY(!battle.canSpecial(0)); // Jauge vide au départ.
-    run(battle, 100.0 / battle.config().specialChargeRate + 0.2);
-    if (!battle.isFinished()) {
-        QVERIFY(battle.canSpecial(0));
-        QVERIFY(battle.requestSpecial(0));
-        QCOMPARE(battle.spinner(0).special, 0.0);
-        QCOMPARE(battle.projectiles().size(), size_t(1));
-    }
+    battle.advance(0.5);
+    QVERIFY(battle.canSpecial(0)); // Disponible dès le début, sans charge.
+    const double before = battle.spinner(0).spin;
+    QVERIFY(battle.requestSpecial(0));
+    QCOMPARE(battle.spinner(0).spin, before * (1.0 - battle.config().specialCost));
+    QVERIFY(battle.spinner(0).specialUsed);
+    QCOMPARE(battle.projectiles().size(), size_t(1));
+    // Une seule fois par partie.
+    battle.advance(3.0);
+    QVERIFY(!battle.canSpecial(0));
+    QVERIFY(!battle.requestSpecial(0));
+
+    // Désactivés par les règles.
+    MatchRules rules;
+    rules.specials = false;
+    Battle without(attackTop(), defenseTop(), rules.apply(BattleConfig{}), 1);
+    without.launch(0.0, M_PI);
+    without.advance(0.1);
+    QVERIFY(!without.canSpecial(0));
 }
 
 void TestBattle::waveHitsTargetAndAppliesEffect_data()
@@ -472,12 +487,12 @@ void TestBattle::waveHitsTargetAndAppliesEffect()
 {
     QFETCH(QString, bolt);
     const Top shooter = withBolt(attackTop(), bolt.toLatin1().constData());
-    Battle battle({shooter, defenseTop()}, Stadium::classic(), staticConfig(), 1);
+    Battle battle({shooter, enduranceTop()}, Stadium::classic(), staticConfig(), 1);
     battle.launch({0.0, 0.0});
     battle.advance(0.01);
     const double spinBefore = battle.spinner(1).spin;
-    const double ownerBefore = battle.spinner(0).spin;
     QVERIFY(battle.requestSpecial(0));
+    const double ownerAfterLaunch = battle.spinner(0).spin;
     const SpecialMove move = *SpecialMove::find(shooter.special());
     QVERIFY(move.shape == SpecialMove::Shape::Wave);
 
@@ -495,8 +510,8 @@ void TestBattle::waveHitsTargetAndAppliesEffect()
         QVERIFY(std::abs(battle.geometry().level(target.position) - move.effectStrength) < 0.1);
         break;
     case SpecialMove::Effect::Drain:
-        // La toupie lanceuse a récupéré de l'endurance malgré l'usure.
-        QVERIFY(battle.spinner(0).spin > ownerBefore - 1.0);
+        // Après le coût du lancer, le vol rend plus que l'usure du trajet.
+        QVERIFY(battle.spinner(0).spin > ownerAfterLaunch);
         break;
     default:
         break;
@@ -508,13 +523,15 @@ void TestBattle::ringHitsEveryOpponentInRange()
     // 4 toupies : celle d'en face (loin) n'est pas touchée par un anneau court.
     const Top quake = withBolt(defenseTop(), "B7"); // Séisme, portée 0,5.
     BattleConfig config = staticConfig();
-    config.startOffset = 0.3;
+    // Toupie d'en face juste hors de portée, voisines (à 0,71 × la distance) dedans.
+    const SpecialMove move = *SpecialMove::find(quake.special());
+    config.startOffset = (move.range + config.topRadius + 0.06) / 2.0;
     Battle battle({quake, attackTop(), attackTop(), attackTop()}, Stadium::classic(), config, 1);
     battle.launch({0.0, 0.0, 0.0, 0.0});
     battle.advance(0.01);
     QVERIFY(battle.requestSpecial(0));
     runUntil(battle, 2.0, [&] { return battle.projectiles().empty(); });
-    // Voisins à 0,42 (touchés), toupie opposée à 0,6 (hors portée).
+    // Voisines touchées, toupie opposée hors de portée.
     QVERIFY(battle.spinner(1).isDisarmed());
     QVERIFY(battle.spinner(3).isDisarmed());
     QVERIFY(!battle.spinner(2).isDisarmed());
@@ -533,6 +550,66 @@ void TestBattle::disarmBlocksDash()
     QVERIFY(battle.spinner(1).isDisarmed());
     QVERIFY(!battle.canDash(1));
     QVERIFY(!battle.canSpecial(1));
+}
+
+namespace {
+/// Part des victoires du niveau `strong` contre `weak` (toupies tirées au hasard).
+double winRate(Difficulty strong, Difficulty weak, int fights)
+{
+    const PartCatalog &c = PartCatalog::instance();
+    QList<Top> pool;
+    for (const Part &w : c.parts(PartKind::Wheel))
+        for (const Part &m : c.parts(PartKind::Middle))
+            for (const Part &t : c.parts(PartKind::Tip))
+                pool.append(Top(QStringLiteral("t"), w, m, t, c.parts(PartKind::Bolt).at(
+                                    (w.hue + m.hue + t.hue) % c.parts(PartKind::Bolt).size())));
+    std::mt19937 rng(2024);
+    std::uniform_int_distribution<qsizetype> pick(0, pool.size() - 1);
+    double score = 0.0;
+    double totalTime = 0.0;
+    for (int k = 0; k < fights; ++k) {
+        const int strongSeat = k % 2;
+        Battle battle({pool.at(pick(rng)), pool.at(pick(rng))}, Stadium::classic(), BattleConfig{},
+                      static_cast<std::uint32_t>(k));
+        std::vector<BotController> bots;
+        QList<double> angles, powers;
+        for (int i = 0; i < 2; ++i) {
+            bots.emplace_back(i, i == strongSeat ? strong : weak, 77u * k + i);
+            angles.append(bots.back().chooseLaunchAngle(battle));
+            powers.append(bots.back().chooseLaunchPower(battle));
+        }
+        battle.launch(angles, powers);
+        while (!battle.isFinished()) {
+            for (BotController &bot : bots)
+                bot.update(battle, 1.0 / 30.0);
+            battle.advance(1.0 / 30.0);
+        }
+        score += battle.winner() == strongSeat ? 1.0 : (battle.winner() < 0 ? 0.5 : 0.0);
+        totalTime += battle.elapsed();
+    }
+    qInfo("%s contre %s : %.1f %% (durée moyenne %.1f s)", qPrintable(toString(strong)),
+          qPrintable(toString(weak)), 100.0 * score / fights, totalTime / fights);
+    return score / fights;
+}
+} // namespace
+
+void TestBattle::harderBotsWinMoreOften()
+{
+    // Statistique sur des combats déterministes : les niveaux doivent rester ordonnés.
+    QVERIFY2(winRate(Difficulty::Normal, Difficulty::Easy, 300) > 0.6, "normal > facile");
+    QVERIFY2(winRate(Difficulty::Hard, Difficulty::Easy, 300) > 0.6, "difficile > facile");
+    QVERIFY2(winRate(Difficulty::Hard, Difficulty::Normal, 300) > 0.58, "difficile > normal");
+}
+
+void TestBattle::botKeepsSpecialForLater()
+{
+    // En pleine forme, le coup spécial coûterait 50 points : le bot difficile attend.
+    Battle battle(withBolt(attackTop(), "B2"), enduranceTop(), staticConfig(), 1);
+    battle.launch(0.0, M_PI);
+    battle.advance(0.2);
+    BotController bot(0, Difficulty::Hard, 1);
+    QVERIFY(battle.canSpecial(0));
+    QVERIFY(bot.specialValue(battle) < 0.0);
 }
 
 QTEST_GUILESS_MAIN(TestBattle)

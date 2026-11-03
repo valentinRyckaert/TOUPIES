@@ -91,7 +91,6 @@ void TestGui::soloMatchRunsToTheEnd()
     const QList<Top> presets = PartCatalog::instance().presets();
     MatchRules rules;
     rules.timeLimit = 8;      // Partie courte.
-    rules.specialCharge = 3;  // Coups spéciaux disponibles rapidement.
     emit window.findChild<SetupPage *>()->fightRequested(presets.at(0), presets.at(2),
                                                          Difficulty::Hard,
                                                          QStringLiteral("glace"), rules);
@@ -112,14 +111,15 @@ void TestGui::soloMatchRunsToTheEnd()
     QTest::keyPress(arena, Qt::Key_Left);
     QTest::qWait(300);
     QTest::keyRelease(arena, Qt::Key_Left);
-    QTRY_VERIFY_WITH_TIMEOUT(battle->session()->state().phase == MatchPhase::Finished
-                                 || battle->session()->state().spinners[0].special >= 100.0,
-                             6000);
-    if (battle->session()->state().phase == MatchPhase::Fighting) {
-        QTest::keyClick(arena, Qt::Key_E);
+    if (battle->session()->state().phase == MatchPhase::Fighting
+        && battle->session()->state().spinners[0].isActive()) {
+        const double before = battle->session()->state().spinners[0].spin;
+        QTest::keyClick(arena, Qt::Key_E); // Coup spécial (une fois par partie).
         QTRY_VERIFY_WITH_TIMEOUT(battle->session()->state().phase == MatchPhase::Finished
-                                     || battle->session()->state().spinners[0].special < 100.0,
+                                     || battle->session()->state().spinners[0].specialUsed,
                                  2000);
+        if (battle->session()->state().spinners[0].specialUsed)
+            QVERIFY(battle->session()->state().spinners[0].spin <= before * 0.5 + 1.0);
     }
     QTRY_COMPARE_WITH_TIMEOUT(battle->session()->state().phase, MatchPhase::Finished, 12000);
 

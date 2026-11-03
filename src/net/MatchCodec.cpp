@@ -46,7 +46,7 @@ QJsonObject encodeState(const MatchState &state, const QList<ImpactEvent> &impac
         spinners.append(QJsonArray{r(s.position.x), r(s.position.y), r(s.velocity.x),
                                    r(s.velocity.y), r(s.spin), r(s.angle), r(s.dashCooldown),
                                    r(s.boostTimer), r(s.dashTimer), static_cast<int>(s.status),
-                                   r(s.special), r(s.slowTimer), r(s.disarmTimer)});
+                                   s.specialUsed ? 1 : 0, r(s.slowTimer), r(s.disarmTimer)});
     }
     QJsonArray projectiles;
     for (const Projectile &p : state.projectiles) {
@@ -102,7 +102,7 @@ bool decodeState(const QJsonObject &message, MatchState &state, QList<ImpactEven
         s.dashTimer = a.at(8).toDouble();
         s.status = static_cast<Spinner::Status>(
             std::clamp(a.at(9).toInt(), 0, static_cast<int>(Spinner::Status::Forfeit)));
-        s.special = a.at(10).toDouble();
+        s.specialUsed = a.at(10).toInt() != 0;
         s.slowTimer = a.at(11).toDouble();
         s.disarmTimer = a.at(12).toDouble();
     }

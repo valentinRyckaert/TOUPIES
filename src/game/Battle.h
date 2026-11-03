@@ -38,7 +38,7 @@ struct Spinner
     double lastHitTime = -1e9;
 
     Vec2 steer;                ///< Pilotage demandé (longueur <= 1).
-    double special = 0.0;      ///< Jauge du coup spécial (0 à 100).
+    bool specialUsed = false;  ///< Coup spécial déjà lancé (une fois par partie).
     double slowTimer = 0.0;    ///< > 0 : ralentie (coup spécial « givre »).
     double slowStrength = 0.0;
     double disarmTimer = 0.0;  ///< > 0 : ni dash ni coup spécial.
@@ -129,7 +129,8 @@ public:
     void setSteering(int index, Vec2 direction);
 
     bool canSpecial(int index) const;
-    /// Lance le coup spécial du boulon vers l'adversaire le plus proche.
+    /// Lance le coup spécial du boulon vers l'adversaire le plus proche (une
+    /// seule fois par partie, au prix de specialCost × l'endurance courante).
     bool requestSpecial(int index);
     const std::vector<Projectile> &projectiles() const { return m_projectiles; }
 

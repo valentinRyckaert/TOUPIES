@@ -77,8 +77,10 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
     auto *rules = new QLabel(
         tr("<b>Commandes</b> — Visez à la souris (la distance règle la force) ou avec "
            "← → / ↑ ↓, lancez d'un clic ou avec Entrée. En combat : <b>flèches</b> pour piloter "
-           "légèrement, <b>Espace</b> ou clic pour dasher, <b>E</b> pour le coup spécial quand "
-           "sa jauge est pleine. Une toupie éjectée ou à court d'endurance perd.<br>"
+           "légèrement, <b>Espace</b> ou clic pour dasher, <b>E</b> pour le coup spécial : une "
+           "seule fois par partie, il coûte la moitié de votre endurance du moment, mieux vaut "
+           "donc le garder pour un moment décisif. Une toupie éjectée ou à court d'endurance "
+           "perd.<br>"
            "<b>Repères</b> — Attaque bat Endurance, Endurance bat Défense, Défense bat Attaque ; "
            "chaque stadium avantage légèrement certains types."),
         this);

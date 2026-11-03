@@ -4,6 +4,7 @@
 
 #include <QGroupBox>
 
+class QCheckBox;
 class QComboBox;
 class QGridLayout;
 class QLabel;
@@ -47,7 +48,7 @@ private:
     PercentRow m_damage;
     PercentRow m_dash;
     PercentRow m_steering;
-    PercentRow m_special;
+    QCheckBox *m_specials = nullptr;
     QSpinBox *m_endurance = nullptr;
     QComboBox *m_timeLimit = nullptr;
     QPushButton *m_reset = nullptr;

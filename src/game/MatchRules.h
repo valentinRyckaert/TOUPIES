@@ -20,7 +20,7 @@ struct MatchRules
     double maxEndurance = 100.0; ///< Endurance de départ.
     double timeLimit = 0.0;      ///< Secondes ; 0 = aucune limite.
     double steering = 1.0;       ///< Pilotage aux flèches ; 0 = désactivé.
-    double specialCharge = 1.0;  ///< Vitesse de charge des coups spéciaux ; 0 = désactivés.
+    bool specials = true;        ///< Coups spéciaux autorisés.
     double dashPower = 1.0;      ///< Bonus d'attaque des dashs.
 
     static constexpr double kMinMultiplier = 0.0;

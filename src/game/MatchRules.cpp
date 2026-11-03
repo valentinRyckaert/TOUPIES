@@ -43,9 +43,7 @@ BattleConfig MatchRules::apply(const BattleConfig &base) const
     c.maxSpin = std::max(10.0, maxEndurance);
     c.maxDuration = std::max(0.0, timeLimit);
 
-    c.specialChargeRate *= specialCharge;
-    c.specialHitCharge *= specialCharge;
-    c.specialsEnabled = base.specialsEnabled && specialCharge > 0.0;
+    c.specialsEnabled = base.specialsEnabled && specials;
     return c;
 }
 
@@ -74,10 +72,8 @@ QString MatchRules::summary() const
         parts << QStringLiteral("Sans pilotage");
     else
         percent(QStringLiteral("Pilotage"), steering);
-    if (specialCharge <= 0.0)
+    if (!specials)
         parts << QStringLiteral("Sans coups spéciaux");
-    else
-        percent(QStringLiteral("Charge spéciale"), specialCharge);
     return parts.isEmpty() ? QStringLiteral("Règles normales") : parts.join(QStringLiteral(" · "));
 }
 
@@ -87,7 +83,7 @@ QJsonObject MatchRules::toJson() const
         {"speed", speed},           {"knockback", knockback},
         {"wear", wear},             {"damage", damage},
         {"maxEndurance", maxEndurance}, {"timeLimit", timeLimit},
-        {"steering", steering},     {"specialCharge", specialCharge},
+        {"steering", steering},     {"specials", specials},
         {"dashPower", dashPower},
     };
 }
@@ -102,7 +98,7 @@ MatchRules MatchRules::fromJson(const QJsonObject &json)
     r.maxEndurance = std::clamp(json.value("maxEndurance").toDouble(100.0), 10.0, 1000.0);
     r.timeLimit = std::clamp(json.value("timeLimit").toDouble(0.0), 0.0, 3600.0);
     r.steering = clampMultiplier(json.value("steering").toDouble(1.0));
-    r.specialCharge = clampMultiplier(json.value("specialCharge").toDouble(1.0));
+    r.specials = json.value("specials").toBool(true);
     r.dashPower = clampMultiplier(json.value("dashPower").toDouble(1.0));
     return r;
 }
@@ -112,7 +108,7 @@ bool MatchRules::operator==(const MatchRules &o) const
     return same(speed, o.speed) && same(knockback, o.knockback) && same(wear, o.wear)
         && same(damage, o.damage) && same(maxEndurance, o.maxEndurance)
         && same(timeLimit, o.timeLimit) && same(steering, o.steering)
-        && same(specialCharge, o.specialCharge) && same(dashPower, o.dashPower);
+        && specials == o.specials && same(dashPower, o.dashPower);
 }
 
 } // namespace toupie

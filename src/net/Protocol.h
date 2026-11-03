@@ -30,7 +30,7 @@ class PartCatalog;
 ///   leurs dashs et leurs coups spéciaux.
 namespace net {
 
-constexpr int kProtocolVersion = 2;
+constexpr int kProtocolVersion = 3;
 constexpr quint16 kDefaultTcpPort = 45455;
 constexpr quint16 kDiscoveryPort = 45454;
 constexpr int kPortAttempts = 10;           ///< Ports essayés à partir du port par défaut.

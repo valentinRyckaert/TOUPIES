@@ -46,6 +46,14 @@ struct SpecialMove
 
     static const QList<SpecialMove> &all();
     static std::optional<SpecialMove> find(const QString &id);
+
+    /// Outils d'équilibrage uniquement : modifie une statistique d'un coup
+    /// (champs : damage, knockback, speed, range, width, effectStrength,
+    /// effectDuration). Retourne false si le coup ou le champ est inconnu.
+    static bool overrideStat(const QString &id, const QString &field, double value);
+
+private:
+    static QList<SpecialMove> &registry();
 };
 
 } // namespace toupie

@@ -79,6 +79,14 @@ struct Stadium
     static const QList<Stadium> &all();
     static const Stadium &classic();
     static std::optional<Stadium> find(const QString &id);
+
+    /// Outils d'équilibrage uniquement : modifie un modificateur d'un stadium
+    /// (size, rimHeight, slope, friction, speed, enduranceDrain, damage,
+    /// knockback, dashSpeed, dashPower). Retourne false si inconnu.
+    static bool overrideStat(const QString &id, const QString &field, double value);
+
+private:
+    static QList<Stadium> &registry();
 };
 
 } // namespace toupie

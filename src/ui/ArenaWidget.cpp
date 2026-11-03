@@ -697,36 +697,35 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
     p.setPen(Qt::white);
     p.drawText(bar, Qt::AlignCenter, tr("Endurance %1").arg(qRound(s.spin)));
 
-    // Jauge du coup spécial.
+    // Coup spécial : disponible une seule fois par partie.
     const auto move = SpecialMove::find(s.top.special());
     const QRectF gauge(inner.left(), bar.bottom() + 4, inner.width(), 12);
     p.setPen(Qt::NoPen);
     p.setBrush(QColor(0, 0, 0, 120));
     p.drawRoundedRect(gauge, 4, 4);
     if (move && state.config.specialsEnabled) {
-        const double charge = std::clamp(s.special / 100.0, 0.0, 1.0);
-        QColor gaugeColor = QColor::fromRgb(move->color);
-        const bool full = charge >= 1.0;
-        if (full) {
-            // Jauge pleine : pulsation.
-            const double pulse = 0.5 + 0.5 * std::sin(state.elapsed * 8.0);
-            gaugeColor = gaugeColor.lighter(100 + int(40 * pulse));
+        const bool available = !s.specialUsed && s.isActive() && !s.isDisarmed();
+        QColor pill = QColor::fromRgb(move->color);
+        if (available) {
+            const double pulse = 0.5 + 0.5 * std::sin(state.elapsed * 5.0);
+            pill = pill.lighter(100 + int(25 * pulse));
         } else {
-            gaugeColor.setAlpha(170);
+            pill = QColor(70, 76, 84);
         }
-        QRectF gaugeFill = gauge;
-        gaugeFill.setWidth(gauge.width() * charge);
-        if (alignRight)
-            gaugeFill.moveRight(gauge.right());
-        p.setBrush(gaugeColor);
-        p.drawRoundedRect(gaugeFill, 4, 4);
+        p.setBrush(pill);
+        p.drawRoundedRect(gauge, 4, 4);
         QFont small = font();
         small.setPointSizeF(font().pointSizeF() * 0.75);
-        small.setBold(full);
+        small.setBold(available);
         p.setFont(small);
-        p.setPen(full ? QColor(20, 22, 26) : QColor(235, 238, 242));
-        const QString label = full && local ? tr("E : %1 !").arg(move->name) : move->name;
-        p.drawText(gauge, Qt::AlignCenter, label);
+        p.setPen(available ? QColor(20, 22, 26) : QColor(160, 166, 174));
+        QString label = move->name;
+        if (s.specialUsed)
+            label = tr("%1 — utilisé").arg(move->name);
+        else if (local && state.phase == MatchPhase::Fighting)
+            label = tr("E : %1 (coûte ½ endurance)").arg(move->name);
+        p.drawText(gauge, Qt::AlignCenter,
+                   QFontMetrics(small).elidedText(label, Qt::ElideRight, int(gauge.width()) - 6));
         p.setFont(f);
     }
 
