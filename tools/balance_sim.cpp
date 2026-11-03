@@ -14,6 +14,8 @@
 #include "core/PartCatalog.h"
 #include "game/Battle.h"
 #include "game/BotController.h"
+#include "game/MatchRules.h"
+#include "game/SpecialMove.h"
 
 #include <QCoreApplication>
 #include <QStringList>
@@ -51,11 +53,13 @@ Outcome simulate(const QList<Top> &tops, const Stadium &stadium, const BattleCon
     Battle battle(seated, stadium, config, seed);
     std::vector<BotController> bots;
     QList<double> angles;
+    QList<double> powers;
     for (int i = 0; i < n; ++i) {
         bots.emplace_back(i, difficulty, seed * 7 + static_cast<std::uint32_t>(i) + 1);
         angles.append(bots.back().chooseLaunchAngle(battle));
+        powers.append(bots.back().chooseLaunchPower(battle));
     }
-    battle.launch(angles);
+    battle.launch(angles, powers);
     while (!battle.isFinished()) {
         for (BotController &bot : bots)
             bot.update(battle, dt);
@@ -101,6 +105,10 @@ struct TypeMatrix
     }
 };
 
+/// Taux de victoire de chaque coup spécial (duels entre boulons différents).
+std::map<QString, double> g_specialScore;
+std::map<QString, int> g_specialGames;
+
 TypeMatrix runTypeMatrix(const QList<Top> &pool, const Stadium &stadium,
                          const BattleConfig &config, Difficulty difficulty, int fights)
 {
@@ -114,6 +122,12 @@ TypeMatrix runTypeMatrix(const QList<Top> &pool, const Stadium &stadium,
         const int tb = static_cast<int>(b.type());
         const Outcome o = simulate(a, b, stadium, config, difficulty, static_cast<std::uint32_t>(k));
         const double sa = o.winner == 0 ? 1.0 : (o.winner == -1 ? 0.5 : 0.0);
+        if (a.special() != b.special()) {
+            g_specialScore[a.special()] += sa;
+            g_specialScore[b.special()] += 1.0 - sa;
+            ++g_specialGames[a.special()];
+            ++g_specialGames[b.special()];
+        }
         m.score[ta][tb] += sa;
         m.score[tb][ta] += 1.0 - sa;
         ++m.games[ta][tb];
@@ -170,6 +184,12 @@ std::map<QString, double BattleConfig::*> configFields()
         {"dashCooldown", &BattleConfig::dashCooldown},
         {"dashAttackMultiplier", &BattleConfig::dashAttackMultiplier},
         {"dashBoostDuration", &BattleConfig::dashBoostDuration},
+        {"centerPull", &BattleConfig::centerPull},
+        {"steerAcceleration", &BattleConfig::steerAcceleration},
+        {"specialChargeRate", &BattleConfig::specialChargeRate},
+        {"specialHitCharge", &BattleConfig::specialHitCharge},
+        {"specialDamageScale", &BattleConfig::specialDamageScale},
+        {"maxDuration", &BattleConfig::maxDuration},
     };
 }
 
@@ -179,7 +199,8 @@ QList<Top> allCombinations(const PartCatalog &catalog)
     for (const Part &w : catalog.parts(PartKind::Wheel))
         for (const Part &m : catalog.parts(PartKind::Middle))
             for (const Part &t : catalog.parts(PartKind::Tip))
-                tops.append(Top(w.name + '/' + m.name + '/' + t.name, w, m, t));
+                for (const Part &b : catalog.parts(PartKind::Bolt))
+                    tops.append(Top(w.name + '/' + m.name + '/' + t.name, w, m, t, b));
     return tops;
 }
 
@@ -293,6 +314,13 @@ int main(int argc, char *argv[])
         }
         out << QString::asprintf("\nÉjections : %.1f%%, durée moyenne : %.1fs, pire type : %.1f%%\n",
                                  100.0 * m.ringOuts / m.fights, m.duration / m.fights, worst);
+        out << "\nCoups spéciaux (duels entre boulons différents)\n";
+        for (const auto &[id, score] : g_specialScore) {
+            const auto move = SpecialMove::find(id);
+            out << "  " << qSetFieldWidth(18) << Qt::left << (move ? move->name : id)
+                << qSetFieldWidth(0)
+                << QString::asprintf("%5.1f%%\n", 100.0 * score / g_specialGames[id]);
+        }
     } else if (randomFights > 0 && players == 2) {
         // Résumé par stadium : taux de victoire global de chaque type.
         out << "\nTaux de victoire global par type et par stadium (" << randomFights
