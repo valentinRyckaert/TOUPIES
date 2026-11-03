@@ -31,6 +31,7 @@ struct Spinner
     double dashCooldown = 0.0; ///< > 0 : dash indisponible.
     double boostTimer = 0.0;   ///< > 0 : bonus d'attaque actif.
     Vec2 dashDirection;
+    bool escaping = false;     ///< A franchi le rebord : sera éjectée.
 
     Status status = Status::Waiting;
 
@@ -94,10 +95,12 @@ public:
 private:
     void step(double h);
     void integrate(Spinner &s, double h);
+    void applyRim(Spinner &s);
     void resolveCollision();
     void checkEnd();
     void finish(int winner, EndReason reason);
     double mass(const Spinner &s) const;
+    double stability(const Spinner &s) const;
 
     BattleConfig m_config;
     std::array<Spinner, 2> m_spinners;

@@ -101,9 +101,9 @@ QList<ImpactEvent> Battle::takeImpacts()
 /// perte est faible. Se déplacer vite use aussi la rotation.
 double Battle::passiveLossPerSecond(const Spinner &s) const
 {
-    const double enduranceFactor
-        = m_config.passiveRef / (m_config.passiveRef + s.stats.endurance);
-    return m_config.passiveBase * enduranceFactor
+    const double enduranceFactor = std::max(
+        m_config.minReduction, 1.0 - m_config.passivePerEndurance * s.stats.endurance);
+    return m_config.passiveBase * enduranceFactor * stability(s)
          * (1.0 + m_config.speedDrain * s.velocity.length());
 }
 
@@ -119,11 +119,14 @@ double Battle::effectiveAttack(const Spinner &s) const
 double Battle::collisionDamage(const Spinner &attacker, const Spinner &target,
                                double approachSpeed) const
 {
-    const double impact = m_config.minImpact + approachSpeed / m_config.impactRef;
-    const double mitigation = m_config.defenseRef / (m_config.defenseRef + target.stats.defense);
+    const double impact = std::min(m_config.maxImpact,
+                                   m_config.minImpact + approachSpeed / m_config.impactRef);
+    const double mitigation = std::max(
+        m_config.minReduction, 1.0 - m_config.damagePerDefense * target.stats.defense);
     const double spinFactor
         = attacker.spinSign != target.spinSign ? m_config.oppositeSpinDamage : 1.0;
-    return m_config.damageBase * effectiveAttack(attacker) * impact * mitigation * spinFactor;
+    return m_config.damageBase * effectiveAttack(attacker) * impact * mitigation * spinFactor
+         * stability(target);
 }
 
 /// Vitesse de recul imprimée à `target` : la défense réduit le recul.
@@ -131,10 +134,20 @@ double Battle::knockback(const Spinner &attacker, const Spinner &target, double 
 {
     const double push = m_config.knockbackBase
                       + m_config.knockbackPerAttack * effectiveAttack(attacker)
+                      + m_config.knockbackPerAttackerDefense * attacker.stats.defense
                       + m_config.knockbackApproach * approachSpeed;
     const double spinFactor
         = attacker.spinSign == target.spinSign ? m_config.sameSpinKnockback : 1.0;
-    return push * spinFactor / (1.0 + m_config.knockbackPerDefense * target.stats.defense);
+    const double resistance = std::max(
+        m_config.minReduction, 1.0 - m_config.knockbackPerDefense * target.stats.defense);
+    return push * spinFactor * resistance * stability(target);
+}
+
+/// Bonus du type équilibre : sans stat dominante, la toupie est plus stable
+/// (moins d'usure, de dégâts et de recul).
+double Battle::stability(const Spinner &s) const
+{
+    return classify(s.stats) == TopType::Balance ? 1.0 - m_config.balanceStability : 1.0;
 }
 
 double Battle::mass(const Spinner &s) const
@@ -159,6 +172,7 @@ void Battle::step(double h)
     for (Spinner &s : m_spinners) {
         if (!s.isActive())
             continue;
+        applyRim(s);
         if (s.spin <= 0.0) {
             s.spin = 0.0;
             s.status = Spinner::Status::Stopped;
@@ -169,6 +183,31 @@ void Battle::step(double h)
 
     m_elapsed += h;
     checkEnd();
+}
+
+/// Le bord du stadium est un rebord : une toupie qui l'atteint lentement
+/// rebondit, seule une toupie lancée assez vite le franchit (et est éjectée
+/// quand son centre sort du cercle).
+void Battle::applyRim(Spinner &s)
+{
+    const double r = s.position.length();
+    const double rimRadius = m_config.stadiumRadius - m_config.topRadius;
+    if (r <= rimRadius) {
+        s.escaping = false;
+        return;
+    }
+    if (s.escaping)
+        return;
+
+    const Vec2 normal = s.position / r;
+    const double outward = s.velocity.dot(normal);
+    if (outward > m_config.rimEscapeSpeed) {
+        s.escaping = true;
+        return;
+    }
+    if (outward > 0.0)
+        s.velocity -= normal * (outward * (1.0 + m_config.rimRestitution));
+    s.position = normal * rimRadius;
 }
 
 void Battle::integrate(Spinner &s, double h)
@@ -243,13 +282,15 @@ void Battle::resolveCollision()
     a.position -= n * (overlap * mb / total);
     b.position += n * (overlap * ma / total);
 
-    // Suppression de la composante de rapprochement (choc mou, quantité de
-    // mouvement conservée le long de la normale).
+    // Le choc absorbe la vitesse de rapprochement de chaque toupie : c'est
+    // ensuite le recul (fonction des stats) qui détermine la séparation.
     const double closing = (a.velocity - b.velocity).dot(n);
-    if (closing > 0.0) {
-        a.velocity -= n * (closing * mb / total);
-        b.velocity += n * (closing * ma / total);
-    }
+    const double aTowardB = a.velocity.dot(n);
+    const double bTowardA = -b.velocity.dot(n);
+    if (aTowardB > 0.0)
+        a.velocity -= n * aTowardB;
+    if (bTowardA > 0.0)
+        b.velocity += n * bTowardA;
 
     if (m_contactCooldown > 0.0)
         return; // Contact prolongé : un seul choc comptabilisé.

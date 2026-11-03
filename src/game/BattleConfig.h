@@ -15,6 +15,10 @@ struct BattleConfig
     double topRadius = 0.075;
     double startOffset = 0.55;     ///< Distance au centre des points de départ.
     double launchSpeed = 1.0;      ///< Vitesse initiale.
+    /// Vitesse radiale minimale pour franchir le rebord du stadium ; en
+    /// dessous, la toupie rebondit avec ce coefficient de restitution.
+    double rimEscapeSpeed = 0.8;
+    double rimRestitution = 0.4;
 
     // --- Mouvement -----------------------------------------------------------
     /// Le stadium est une cuvette : accélération vers le centre = k * distance.
@@ -31,36 +35,48 @@ struct BattleConfig
 
     // --- Endurance -----------------------------------------------------------
     double maxSpin = 100.0;
-    /// Perte passive par seconde = base * ref / (ref + endurance) * (1 + drain * vitesse).
+    /// Perte passive par seconde =
+    ///   base * max(plancher, 1 - parEndurance * endurance) * (1 + drain * vitesse).
+    /// Les stats ont des effets linéaires : se spécialiser n'a pas de
+    /// rendement décroissant par rapport à une répartition équilibrée.
     double passiveBase = 3.2;
-    double passiveRef = 8.0;
+    double passivePerEndurance = 0.035;
     double speedDrain = 0.5;
 
     // --- Chocs ----------------------------------------------------------------
-    /// Dégâts = base * attaqueAdverse * impact * defRef / (defRef + défense).
+    /// Dégâts = base * attaqueAdverse * impact * max(plancher, 1 - parDéfense * défense).
     double damageBase = 0.75;
-    double defenseRef = 8.0;
-    /// impact = minImpact + vitesseDeRapprochement / impactRef.
-    double minImpact = 0.4;
-    double impactRef = 1.0;
-    /// Recul = (base + parAttaque * attaqueAdverse + approche * vitesseRapprochement)
-    ///         / (1 + parDéfense * défense).
-    double knockbackBase = 0.25;
-    double knockbackPerAttack = 0.05;
-    double knockbackApproach = 0.5;
-    double knockbackPerDefense = 0.12;
+    double damagePerDefense = 0.045;
+    /// impact = min(maxImpact, minImpact + vitesseDeRapprochement / impactRef).
+    double minImpact = 0.5;
+    double impactRef = 2.0;
+    double maxImpact = 1.8;
+    /// Recul = (base + parAttaque * attaqueAdverse + parMasse * défenseAdverse
+    ///          + approche * vitesseRapprochement)
+    ///         * max(plancher, 1 - parDéfense * défense).
+    double knockbackBase = 0.12;
+    double knockbackPerAttack = 0.03;
+    /// Une toupie lourde (défense élevée) repousse plus fort.
+    double knockbackPerAttackerDefense = 0.03;
+    double knockbackApproach = 0.2;
+    double knockbackPerDefense = 0.05;
+    /// Plancher des facteurs de réduction linéaires.
+    double minReduction = 0.15;
     /// Masse utilisée pour séparer les toupies qui se chevauchent.
     double massPerDefense = 0.1;
     /// Déviation latérale provoquée par la rotation au contact.
-    double spinDeflection = 0.18;
+    double spinDeflection = 0.1;
     /// Deux toupies de même sens : surfaces de contact opposées, choc plus violent.
-    double sameSpinKnockback = 1.25;
+    double sameSpinKnockback = 1.1;
     /// Deux toupies de sens opposés : frottement, plus de perte d'endurance.
     double oppositeSpinDamage = 1.2;
-    double contactCooldown = 0.15;
+    double contactCooldown = 0.35;
+    /// Bonus du type équilibre : réduction (en fraction) de la perte
+    /// d'endurance, des dégâts et du recul subis.
+    double balanceStability = 0.1;
 
     // --- Dash -------------------------------------------------------------------
-    double dashCost = 6.0;          ///< Points d'endurance consommés.
+    double dashCost = 7.0;          ///< Points d'endurance consommés.
     double dashSpeed = 2.6;
     double dashDuration = 0.15;     ///< Distance du dash = vitesse * durée (~0,39).
     double dashCooldown = 1.8;
