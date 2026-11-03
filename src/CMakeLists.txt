@@ -25,6 +25,19 @@ add_library(toupie_core STATIC
 target_include_directories(toupie_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(toupie_core PUBLIC Qt6::Core)
 
+# Multijoueur en réseau local : lobby, découverte et sessions réseau
+add_library(toupie_net STATIC
+    net/Protocol.h
+    net/Protocol.cpp
+    net/LobbyServer.h
+    net/LobbyServer.cpp
+    net/LobbyClient.h
+    net/LobbyClient.cpp
+    net/LobbyBrowser.h
+    net/LobbyBrowser.cpp
+)
+target_link_libraries(toupie_net PUBLIC toupie_core Qt6::Network)
+
 # Application graphique
 qt_add_executable(toupie_arena
     main.cpp
