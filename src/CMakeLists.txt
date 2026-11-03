@@ -35,6 +35,8 @@ add_library(toupie_net STATIC
     net/LobbyClient.cpp
     net/LobbyBrowser.h
     net/LobbyBrowser.cpp
+    net/LobbyScanner.h
+    net/LobbyScanner.cpp
     net/MatchCodec.h
     net/MatchCodec.cpp
     net/HostSession.h

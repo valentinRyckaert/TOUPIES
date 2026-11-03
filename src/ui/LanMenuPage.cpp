@@ -84,7 +84,11 @@ LanMenuPage::LanMenuPage(QWidget *parent)
     // --- Rejoindre --------------------------------------------------------------
     auto *joinBox = new QGroupBox(tr("Rejoindre un lobby"), this);
     auto *joinLayout = new QVBoxLayout(joinBox);
-    joinLayout->addWidget(new QLabel(tr("Lobbys détectés sur le réseau :"), joinBox));
+    auto *discoveryRow = new QHBoxLayout;
+    discoveryRow->addWidget(new QLabel(tr("Lobbys détectés sur le réseau :"), joinBox), 1);
+    m_refreshButton = new QPushButton(tr("Actualiser"), joinBox);
+    discoveryRow->addWidget(m_refreshButton);
+    joinLayout->addLayout(discoveryRow);
     m_lobbyList = new QTreeWidget(joinBox);
     m_lobbyList->setHeaderLabels({tr("Lobby"), tr("Hôte"), tr("Joueurs"), tr("Stadium"),
                                   tr("Adresse")});
@@ -93,6 +97,9 @@ LanMenuPage::LanMenuPage(QWidget *parent)
     m_lobbyList->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
     m_lobbyList->header()->setStretchLastSection(true);
     joinLayout->addWidget(m_lobbyList, 1);
+    m_discoveryStatus = new QLabel(joinBox);
+    m_discoveryStatus->setWordWrap(true);
+    joinLayout->addWidget(m_discoveryStatus);
     m_joinSelectedButton = new QPushButton(tr("Rejoindre le lobby sélectionné"), joinBox);
     joinLayout->addWidget(m_joinSelectedButton);
 
@@ -126,6 +133,12 @@ LanMenuPage::LanMenuPage(QWidget *parent)
             m_stadiumPreview->setStadium(*stadium);
     });
     connect(&m_browser, &net::LobbyBrowser::lobbiesChanged, this, &LanMenuPage::refreshLobbies);
+    connect(&m_browser, &net::LobbyBrowser::scanFinished, this,
+            &LanMenuPage::updateDiscoveryStatus);
+    connect(m_refreshButton, &QPushButton::clicked, this, [this] {
+        m_browser.rescan();
+        updateDiscoveryStatus();
+    });
     connect(m_lobbyList, &QTreeWidget::itemDoubleClicked, this, &LanMenuPage::joinSelected);
     connect(m_lobbyList, &QTreeWidget::itemSelectionChanged, this, [this] {
         m_joinSelectedButton->setEnabled(!m_lobbyList->selectedItems().isEmpty());
@@ -146,12 +159,28 @@ QString LanMenuPage::playerName() const
 
 void LanMenuPage::activate()
 {
-    if (!m_browser.start()) {
-        m_status->setText(tr("Détection des lobbys indisponible (port UDP %1 occupé) : "
-                             "vous pouvez toujours rejoindre par adresse IP.")
-                              .arg(net::kDiscoveryPort));
-    }
+    m_udpAvailable = m_browser.start();
     refreshLobbies();
+    updateDiscoveryStatus();
+}
+
+void LanMenuPage::updateDiscoveryStatus()
+{
+    QStringList lines;
+    if (m_browser.isScanning())
+        lines << tr("Recherche des lobbys sur le réseau local…");
+    if (!m_udpAvailable) {
+        lines << tr("Port UDP %1 indisponible : seule la recherche par balayage est active.")
+                     .arg(net::kDiscoveryPort);
+    } else if (!m_browser.udpWorks() && !m_browser.lobbies().isEmpty()) {
+        // Des lobbys sont trouvés par balayage mais aucune annonce n'arrive.
+        lines << tr("Les annonces UDP n'arrivent pas (pare-feu ?). Pour une détection "
+                    "instantanée, autorisez le port UDP %1 en entrée, par exemple : "
+                    "sudo firewall-cmd --permanent --add-port=%1/udp && sudo firewall-cmd --reload")
+                     .arg(net::kDiscoveryPort);
+    }
+    m_discoveryStatus->setText(lines.join('\n'));
+    m_discoveryStatus->setVisible(!lines.isEmpty());
 }
 
 void LanMenuPage::deactivate()
@@ -195,9 +224,12 @@ void LanMenuPage::refreshLobbies()
             m_lobbyList->setCurrentItem(item);
     }
     if (m_lobbyList->topLevelItemCount() == 0) {
-        auto *item = new QTreeWidgetItem(m_lobbyList, {tr("Recherche de lobbys…")});
+        auto *item = new QTreeWidgetItem(
+            m_lobbyList, {m_browser.isScanning() ? tr("Recherche de lobbys…")
+                                                 : tr("Aucun lobby détecté pour l'instant")});
         item->setFlags(Qt::NoItemFlags);
     }
+    updateDiscoveryStatus();
 }
 
 void LanMenuPage::joinSelected()

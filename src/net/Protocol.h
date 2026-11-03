@@ -19,7 +19,9 @@ class PartCatalog;
 /// Protocole réseau du mode multijoueur local.
 ///
 /// - Découverte : l'hôte diffuse toutes les secondes une annonce JSON en UDP
-///   (port kDiscoveryPort) ; les clients écoutent et listent les lobbys.
+///   (port kDiscoveryPort) ; les clients écoutent et listent les lobbys. En
+///   secours (UDP filtré), les clients sondent les sous-réseaux locaux en TCP
+///   avec un message « probe » auquel l'hôte répond par « info ».
 /// - Lobby et partie : connexion TCP vers l'hôte, un message JSON compact
 ///   par ligne. Chaque message possède un champ "type".
 /// - L'hôte fait autorité : il simule le combat et diffuse l'état ; les
@@ -38,12 +40,14 @@ const QString kApplicationTag = QStringLiteral("ToupieArena");
 namespace Msg {
 // Client -> hôte
 const QString Hello = QStringLiteral("hello");
+const QString Probe = QStringLiteral("probe");
 const QString SelectTop = QStringLiteral("top");
 const QString Ready = QStringLiteral("ready");
 const QString Aim = QStringLiteral("aim");
 const QString Dash = QStringLiteral("dash");
 // Hôte -> client
 const QString Welcome = QStringLiteral("welcome");
+const QString Info = QStringLiteral("info");
 const QString Reject = QStringLiteral("reject");
 const QString Lobby = QStringLiteral("lobby");
 const QString Start = QStringLiteral("start");
@@ -124,3 +128,5 @@ private:
 
 } // namespace net
 } // namespace toupie
+
+Q_DECLARE_METATYPE(toupie::net::LobbyAnnouncement)

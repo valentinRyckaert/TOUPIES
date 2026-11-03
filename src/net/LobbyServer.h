@@ -81,6 +81,7 @@ private:
     void onDisconnected(JsonChannel *channel);
     void handleHello(Client &client, const QJsonObject &message);
     void reject(JsonChannel *channel, const QString &reason);
+    QJsonObject announcementJson() const;
     void announce();
     void lobbyUpdated();
     Client *clientFor(JsonChannel *channel);

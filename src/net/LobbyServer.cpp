@@ -71,6 +71,7 @@ bool LobbyServer::start(const Settings &settings, quint16 port, quint16 discover
     m_discoveryPort = discoveryPort;
     if (m_discoveryPort != 0) {
         m_udp = new QUdpSocket(this);
+        m_udp->bind(QHostAddress::AnyIPv4, 0); // Socket IPv4 explicite pour les diffusions.
         announce();
         m_announceTimer.start();
     }
@@ -238,8 +239,15 @@ void LobbyServer::onMessage(JsonChannel *channel, const QJsonObject &message)
     const QString type = message.value("type").toString();
 
     if (client->id < 0) {
-        if (type == Msg::Hello)
+        if (type == Msg::Hello) {
             handleHello(*client, message);
+        } else if (type == Msg::Probe) {
+            // Découverte par balayage TCP : description du lobby puis fermeture.
+            QJsonObject info = announcementJson();
+            info.insert("type", Msg::Info);
+            channel->send(info);
+            channel->close();
+        }
         return;
     }
 
@@ -338,26 +346,32 @@ void LobbyServer::lobbyUpdated()
     announce();
 }
 
-void LobbyServer::announce()
+QJsonObject LobbyServer::announcementJson() const
 {
-    if (!m_udp || !m_server)
-        return;
-
     const LobbyPlayer *host = m_lobby.player(kHostId);
-    const QJsonObject announcement{
+    return {
         {"app", kApplicationTag},
         {"v", kProtocolVersion},
         {"id", m_lobby.lobbyId},
         {"name", m_lobby.name},
         {"host", host ? host->name : QString()},
-        {"port", m_server->serverPort()},
+        {"port", m_server ? m_server->serverPort() : 0},
         {"players", static_cast<int>(m_lobby.players.size())},
         {"max", m_lobby.maxPlayers},
         {"stadium", m_lobby.stadiumId},
         {"inGame", m_lobby.inGame},
     };
-    const QByteArray datagram = QJsonDocument(announcement).toJson(QJsonDocument::Compact);
+}
 
+void LobbyServer::announce()
+{
+    if (!m_udp || !m_server)
+        return;
+
+    const QByteArray datagram = QJsonDocument(announcementJson()).toJson(QJsonDocument::Compact);
+
+    // Diffusion générale, diffusion dirigée sur chaque interface et boucle
+    // locale (plusieurs instances sur une même machine).
     QList<QHostAddress> targets{QHostAddress(QHostAddress::Broadcast),
                                 QHostAddress(QHostAddress::LocalHost)};
     const auto interfaces = QNetworkInterface::allInterfaces();

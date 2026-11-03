@@ -37,6 +37,7 @@ signals:
 
 private:
     void refreshLobbies();
+    void updateDiscoveryStatus();
     void joinSelected();
     void joinTyped();
     void requestHost();
@@ -52,6 +53,9 @@ private:
     QPushButton *m_createButton = nullptr;
     QPushButton *m_joinSelectedButton = nullptr;
     QPushButton *m_joinButton = nullptr;
+    QPushButton *m_refreshButton = nullptr;
+    QLabel *m_discoveryStatus = nullptr;
+    bool m_udpAvailable = true;
     QLabel *m_status = nullptr;
 };
 

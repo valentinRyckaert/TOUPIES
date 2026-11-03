@@ -4,6 +4,7 @@
 #include "net/LobbyBrowser.h"
 #include "net/MatchCodec.h"
 #include "net/LobbyClient.h"
+#include "net/LobbyScanner.h"
 #include "net/LobbyServer.h"
 #include "net/Protocol.h"
 
@@ -39,6 +40,8 @@ private slots:
     void serverNoticesDisconnection();
     void gameMessagesAreRelayedDuringMatch();
     void lobbyIsDiscoveredByName();
+    void lobbyIsFoundByTcpScan();
+    void localScanTargetsExcludeVirtualInterfaces();
     void stateCodecRoundTrip();
     void networkMatchRunsEndToEnd();
 };
@@ -194,7 +197,7 @@ void TestNet::gameMessagesAreRelayedDuringMatch()
 void TestNet::lobbyIsDiscoveredByName()
 {
     LobbyBrowser browser(kTestDiscoveryPort);
-    QVERIFY(browser.start());
+    QVERIFY(browser.start(false));
 
     LobbyServer server(PartCatalog::instance());
     QVERIFY(server.start(settings(3), 0, kTestDiscoveryPort));
@@ -205,6 +208,39 @@ void TestNet::lobbyIsDiscoveredByName()
     QCOMPARE(lobby.maxPlayers, 3);
     QCOMPARE(lobby.players, 1);
     QCOMPARE(lobby.stadiumId, QStringLiteral("glace"));
+}
+
+void TestNet::lobbyIsFoundByTcpScan()
+{
+    // Découverte de secours quand l'UDP est filtré : sonde TCP « probe ».
+    LobbyServer server(PartCatalog::instance());
+    QVERIFY(server.start(settings(4), 0, 0)); // Aucune annonce UDP.
+
+    LobbyScanner scanner;
+    scanner.setPorts({static_cast<quint16>(server.port() + 1), server.port()});
+    QSignalSpy found(&scanner, &LobbyScanner::lobbyFound);
+    QSignalSpy finished(&scanner, &LobbyScanner::finished);
+    scanner.scan({QHostAddress(QHostAddress::LocalHost)});
+    QTRY_COMPARE(finished.count(), 1);
+    QCOMPARE(found.count(), 1);
+    const auto lobby = found.first().first().value<LobbyAnnouncement>();
+    QCOMPARE(lobby.name, QStringLiteral("Salon test"));
+    QCOMPARE(lobby.port, server.port());
+    QCOMPARE(lobby.maxPlayers, 4);
+    QVERIFY(lobby.address.isLoopback());
+
+    // La sonde n'occupe pas de place dans le lobby.
+    QCOMPARE(server.lobby().players.size(), 1);
+}
+
+void TestNet::localScanTargetsExcludeVirtualInterfaces()
+{
+    const QList<QHostAddress> targets = LobbyScanner::localTargets();
+    QVERIFY(targets.size() <= 4 * 4094);
+    for (const QHostAddress &address : targets) {
+        QVERIFY(!address.isLoopback());
+        QCOMPARE(address.protocol(), QAbstractSocket::IPv4Protocol);
+    }
 }
 
 void TestNet::stateCodecRoundTrip()
