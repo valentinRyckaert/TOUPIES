@@ -45,7 +45,7 @@ Les toupies assemblées sont enregistrées en JSON dans le dossier de données d
 | Visée  | souris : direction, et **force** selon la distance du curseur (flèche plus ou moins longue) ; ou `←` `→` pour la direction et `↑` `↓` pour la force ; clic ou `Entrée` pour lancer |
 | Combat | **flèches** (ou `Z` `Q` `S` `D`) maintenues : pilotage, légère correction de trajectoire |
 |        | `Espace` ou clic : dash |
-|        | `E` ou bouton « Coup spécial » : coup spécial (jauge pleine) |
+|        | `E` ou bouton « Coup spécial » : coup spécial (une fois par partie, coûte la moitié de l'endurance) |
 | Fin    | `R` : revanche (solo) ou retour au lobby (hôte) |
 | Partout| `Échap` : retour au menu / quitter le lobby |
 
@@ -101,26 +101,30 @@ partent à égale distance du centre, dans la direction et avec la force choisie
 
 ### Coups spéciaux
 
-Une jauge se remplit avec le temps et à chaque choc. Pleine, elle permet de lancer le coup
-spécial du boulon, sous forme d'une **vague** qui file vers l'adversaire le plus proche
-(sans le suivre : on peut l'esquiver en pilotant) ou d'un **anneau** qui s'élargit et touche
-tous les adversaires jusqu'à sa portée. La défense de la cible réduit dégâts et recul.
+Chaque toupie peut lancer le coup spécial de son boulon **une seule fois par partie**, et ce
+lancer lui coûte **la moitié de son endurance du moment** : à 100 d'endurance on en perd 50,
+à 20 on n'en perd que 10. Lancer son coup dès le début est donc rarement payant ; il vaut
+mieux le garder pour un moment décisif (cible au bord, adversaire affaibli, fin de partie).
+
+Le coup part sous forme d'une **vague** qui file vers l'adversaire le plus proche (sans le
+suivre : on peut l'esquiver en pilotant) ou d'un **anneau** qui s'élargit et touche tous les
+adversaires jusqu'à sa portée. La défense de la cible réduit dégâts et recul.
 
 | Boulon    | Coup             | Forme  | Point fort | Contrepartie |
 |-----------|------------------|--------|------------|--------------|
-| Tempête   | Onde de choc     | anneau | gros recul, pour éjecter | peu de dégâts, portée courte |
-| Perçant   | Lance d'acier    | vague  | gros dégâts, très rapide | presque aucun recul, trait fin |
-| Polaire   | Souffle de givre | vague  | ralentit et bloque le pilotage 3,5 s | dégâts faibles |
-| Abysse    | Vortex           | anneau | aspire tout le monde vers le centre | presque aucun dégât |
-| Spectral  | Distorsion       | vague  | téléporte la cible près du bord | aucun dégât, esquivable |
-| Vampire   | Siphon           | vague  | rend une partie de l'endurance volée | dégâts moyens, peu de recul |
-| Tellurique| Séisme           | anneau | blesse et bloque dash + coup spécial 3 s | portée très courte |
+| Tempête   | Onde de choc     | anneau | gros recul : éjecte une cible déjà au bord | portée courte |
+| Perçant   | Lance d'acier    | vague  | très lourds dégâts | presque aucun recul, esquivable de loin |
+| Polaire   | Souffle de givre | vague  | ralentit et bloque le pilotage 3 s | dégâts moyens |
+| Abysse    | Vortex           | anneau | aspire tout le monde vers le centre | dégâts modérés |
+| Spectral  | Distorsion       | vague  | blesse et téléporte la cible près du bord | lente, facile à esquiver |
+| Vampire   | Siphon           | vague  | rend toute l'endurance volée | dégâts moyens, peu de recul |
+| Tellurique| Séisme           | anneau | blesse et bloque dash + coup spécial 4,5 s | portée très courte |
 
 ### Personnalisation
 
 Dans la préparation du combat (solo) et dans le lobby (réglée par l'hôte, visible par tous) :
 vitesse, rebonds après un choc, usure, dégâts, puissance des dashs, pilotage (0 = désactivé),
-charge des coups spéciaux (0 = désactivés), endurance max et temps maximal (aucun par défaut).
+coups spéciaux (activés ou non), endurance max et temps maximal (aucun par défaut).
 
 ### Stadiums
 
@@ -129,9 +133,9 @@ charge des coups spéciaux (0 = désactivés), endurance max et temps maximal (a
 | Classique | cercle       | oui        | référence, aucun modificateur |
 | Béton     | octogone     | très haut  | sol lisse : vitesse +5 %, dégâts +10 %, recul −10 %, usure +10 % |
 | Terre     | cercle       | non        | le sol accroche : usure +20 %, dégâts +40 %, dashs −5 % |
-| Glace     | ellipse      | haut       | usure −30 %, recul −15 %, dégâts −10 % |
+| Glace     | ellipse      | très haut  | pentes douces, usure −25 %, recul −17 %, dégâts +19 % |
 | Sable     | hexagone     | haut       | frottement +30 %, usure +30 %, dégâts +30 %, dash plus court mais 2× plus puissant |
-| Volcan    | petit cercle | non        | pentes très raides, dégâts +10 %, dash plus puissant |
+| Volcan    | petit cercle | non        | pentes très raides, dégâts +14 %, usure +10 %, dash plus puissant |
 
 ### Formules
 
@@ -160,48 +164,54 @@ pilotent, esquivent et utilisent leur coup spécial) sur des milliers de combats
 tirées au hasard parmi toutes les combinaisons :
 
 ```sh
-./build/tools/toupie_balance_sim -n 0 -r 6000              # types et coups spéciaux
-./build/tools/toupie_balance_sim -n 0 -r 3000 -s all       # résumé par stadium
-./build/tools/toupie_balance_sim -n 0 -r 1500 -s all -p 4  # mêlées à 4
-./build/tools/toupie_balance_sim -n 200 -r 0 dashCost=8    # presets, avec une surcharge
+./build/tools/toupie_balance_sim -n 0 -r 6000                  # types et coups spéciaux
+./build/tools/toupie_balance_sim -n 0 -r 3000 -s all           # résumé par stadium
+./build/tools/toupie_balance_sim -n 0 -r 1500 -s all -p 4      # mêlées à 4
+./build/tools/toupie_balance_sim -n 0 -r 3000 -d difficile -d2 normal  # niveaux de bot
+./build/tools/toupie_balance_sim -n 0 -r 3000 --sans-speciaux-2        # intérêt du coup spécial
+./build/tools/toupie_balance_sim -n 0 -r 3000 move.lance.damage=40 stadium.glace.friction=0.9
 ```
 
 **Duels, bots normaux** — taux de victoire global par type :
 
 | Stadium   | Attaque | Défense | Endurance | Équilibre | Éjections | Durée moy. |
 |-----------|---------|---------|-----------|-----------|-----------|------------|
-| Classique | 47,3 %  | 51,2 %  | 52,6 %    | 48,5 %    | 41 %      | 19 s       |
-| Béton     | 40,6 %  | 52,6 %  | 57,1 %    | 52,0 %    | 29 %      | 20 s       |
-| Terre     | 41,7 %  | 51,6 %  | 57,3 %    | 51,3 %    | 30 %      | 18 s       |
-| Glace     | 50,7 %  | 59,6 %  | 39,1 %    | 50,1 %    | 49 %      | 21 s       |
-| Sable     | 44,7 %  | 50,5 %  | 55,3 %    | 50,5 %    | 32 %      | 17 s       |
-| Volcan    | 41,0 %  | 58,8 %  | 46,6 %    | 59,2 %    | 33 %      | 18 s       |
+| Classique | 50,3 %  | 52,1 %  | 48,1 %    | 48,6 %    | 38 %      | 14 s       |
+| Béton     | 48,6 %  | 50,4 %  | 50,6 %    | 51,3 %    | 29 %      | 15 s       |
+| Terre     | 51,1 %  | 49,0 %  | 50,1 %    | 49,5 %    | 30 %      | 12 s       |
+| Glace     | 47,9 %  | 52,7 %  | 47,9 %    | 53,3 %    | 33 %      | 17 s       |
+| Sable     | 52,2 %  | 49,4 %  | 48,1 %    | 49,8 %    | 31 %      | 13 s       |
+| Volcan    | 56,3 %  | 45,8 %  | 43,3 %    | 57,4 %    | 26 %      | 12 s       |
 
-**Coups spéciaux** (duels entre boulons différents, Classique) : de 45,6 % (Distorsion,
-Givre) à 55,7 % (Lance d'acier).
+**Coups spéciaux** (duels entre boulons différents, Classique, 8 000 combats) : de 47,2 %
+(Distorsion) à 53,4 % (Siphon). **Intérêt** : un bot difficile qui sait utiliser son coup gagne
+~66 % de ses duels contre un bot difficile qui s'en prive (~56 % pour le bot normal, qui le
+lance moins bien).
 
-**Mêlées à 4** — part des victoires rapportée à une part équitable (100 %) : Attaque 81–103 %,
-Défense 116–127 %, Endurance 74–105 %, Équilibre 98–109 % selon le stadium.
+**Mêlées à 4** — part des victoires rapportée à une part équitable (100 %) : Attaque 86–100 %,
+Défense 112–123 %, Endurance 84–96 %, Équilibre 88–107 % selon le stadium.
 
-Limites connues : les écarts dépendent de la difficulté des bots (en « difficile », Attaque
-~39 % et Endurance ~62 % sur le stadium Classique ; en « facile », de 41 % à 58 %), et les
-toupies les plus spécialisées subissent des contres plus marqués.
+Limites connues : entre bots difficiles, le type Équilibre (qui alterne chasse et esquive
+selon la course à l'usure) monte à ~57 % ; entre bots faciles, qui lancent leur coup sans
+calculer, l'Endurance (peu défensive) s'effondre à ~28 %. Les toupies les plus spécialisées
+subissent des contres plus marqués.
 
 ## Le bot
 
-Le bot choisit son angle et sa force de lancement, pilote, dashe, esquive les vagues et
-utilise son coup spécial selon le type de sa toupie :
+À chaque décision, le bot analyse la partie (adversaires, course à l'usure, distance au bord)
+et choisit un **plan** selon sa toupie : *chasser* (aller au contact), *tenir* (garder le centre
+et contrer) ou *esquiver* (garder ses distances loin du bord pour gagner à l'usure). Les trois
+niveaux diffèrent par leurs réflexes et surtout par la qualité de leurs décisions :
 
-- **Attaque** : lancer puissant, va chercher le contact, dashe dès qu'il est à portée ; en
-  mêlée, il cible les proies fragiles ;
-- **Défense** : tient le centre et contre-attaque quand l'adversaire arrive ou approche du bord ;
-- **Endurance** : lancer doux, évite les chocs, ne dashe que pour éjecter ;
-- **Équilibre** : opportuniste.
+| Niveau    | Comportement |
+|-----------|--------------|
+| Facile    | débutant impulsif : dashe dès que possible, lance son coup spécial dès que l'adversaire est à portée, esquive rarement les vagues |
+| Normal    | règles de jeu correctes selon son type, coup spécial lancé quand il semble rentable |
+| Difficile | **chasseur** (attaque) qui se place côté centre de sa cible pour la pousser vers le bord ; **enclume** (défense) qui tient le centre ; **esquive** (endurance) qui fuit les attaquants et frappe en fin de partie ; équilibre qui choisit selon la course à l'usure. Il estime la valeur nette de chaque **dash** (dégâts infligés − subis − coût, éjection probable, risque de s'éjecter) et de son **coup spécial** (avec une marge de sécurité : il attend que le coût de la moitié de l'endurance devienne faible ou que l'effet soit décisif), enchaîne des combos (givre ou distorsion puis dash, onde sur une cible au bord), anticipe les déplacements, esquive 80 % des vagues et adapte force et angle de lancement au stadium et à la mêlée |
 
-Il passe à l'offensive s'il sait qu'il perdra à l'usure, évite de s'éjecter lui-même et
-n'utilise un coup que s'il est utile (Distorsion sur une cible proche du centre, Onde de choc
-sur une cible déjà écartée…). La difficulté règle son temps de réaction, sa précision et la
-part de vagues qu'il esquive (20 % / 60 % / 75 %).
+Mesures (3 000 duels, toupies au hasard, stadium Classique) : le difficile bat le normal dans
+~70 % des cas et le facile dans ~80 % ; le normal bat le facile dans ~80 % des cas. En mêlée à
+4, un bot difficile gagne ~42 % des parties contre trois bots normaux (part équitable 25 %).
 
 ## Multijoueur en réseau local
 
@@ -218,7 +228,8 @@ Depuis le menu **Multijoueur en réseau local** :
 Fonctionnement :
 
 - **L'hôte fait autorité** : il simule le combat et diffuse l'état 30 fois par seconde ; les
-  clients envoient leur visée (angle, force), leur pilotage, leurs dashs et coups spéciaux.
+  clients envoient leur visée (angle, force), leur pilotage, leurs dashs et coups spéciaux
+  (protocole v3 : une ancienne version ne peut pas rejoindre un lobby récent).
 - **Découverte des lobbys** : les hôtes diffusent une annonce UDP par seconde (port 45454).
   Comme ces annonces sont souvent bloquées (pare-feu qui n'autorise que le port TCP du jeu,
   Wi-Fi qui filtre les diffusions), le jeu sonde aussi les sous-réseaux locaux en TCP
@@ -251,7 +262,7 @@ Tests (`ctest`) :
 | Suite        | Contenu |
 |--------------|---------|
 | `tst_core`   | stats, types, catalogue, boulons, persistance JSON |
-| `tst_battle` | formules, dash, pilotage, recentrage, force de lancer, coups spéciaux et effets, règles, stadiums, mêlées, abandons, déterminisme |
+| `tst_battle` | formules, dash, pilotage, recentrage, force de lancer, coups spéciaux (une fois par partie, coût) et effets, règles, stadiums, mêlées, abandons, déterminisme, niveaux de bot ordonnés |
 | `tst_net`    | lobby (connexion, refus, déconnexion), découverte UDP et par balayage TCP, encodage de l'état, partie réseau de bout en bout |
 | `tst_gui`    | navigation, partie solo complète au clavier, atelier, lobby entre deux fenêtres avec règles de l'hôte |
 
