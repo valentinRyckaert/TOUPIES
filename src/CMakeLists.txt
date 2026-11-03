@@ -11,6 +11,8 @@ add_library(toupie_core STATIC
     core/TopRepository.cpp
     game/Vec2.h
     game/BattleConfig.h
+    game/Stadium.h
+    game/Stadium.cpp
     game/Battle.h
     game/Battle.cpp
     game/BotController.h
