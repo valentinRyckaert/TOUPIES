@@ -376,11 +376,19 @@ void ArenaWidget::paintSpinners(QPainter &p)
         }
 
         p.save();
+        double drawRadius = radius;
         const bool out = s.status != Spinner::Status::Waiting && !s.isActive();
         if (out)
             p.setOpacity(0.4);
+        if (s.status == Spinner::Status::RingOut) {
+            // Éjectée : affichée tombée au-delà du bord, plus petite.
+            const Vec2 normal = state.geometry.outwardNormal(s.position);
+            pos = toScreen(s.position + normal * (state.config.topRadius * 1.6));
+            drawRadius = radius * 0.75;
+            p.setOpacity(0.35);
+        }
         const double glow = s.isBoosted() ? s.boostTimer / state.config.dashBoostDuration : 0.0;
-        TopPainter::paint(p, s.top, pos, radius, s.angle, glow);
+        TopPainter::paint(p, s.top, pos, drawRadius, s.angle, glow);
         p.restore();
 
         // Étiquette.
@@ -389,7 +397,7 @@ void ArenaWidget::paintSpinners(QPainter &p)
         p.setFont(f);
         p.setPen(slotColor(i));
         const QString label = i == m_session->localPlayer() ? tr("VOUS") : state.names.value(i);
-        p.drawText(QRectF(pos.x() - 70, pos.y() - radius - 22, 140, 18), Qt::AlignCenter,
+        p.drawText(QRectF(pos.x() - 70, pos.y() - drawRadius - 22, 140, 18), Qt::AlignCenter,
                    p.fontMetrics().elidedText(label, Qt::ElideRight, 140));
     }
 

@@ -1,0 +1,257 @@
+#include "ui/LanMenuPage.h"
+
+#include "game/Stadium.h"
+#include "ui/StadiumPainter.h"
+
+#include <QComboBox>
+#include <QFormLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QSettings>
+#include <QTreeWidget>
+#include <QVBoxLayout>
+
+namespace toupie {
+
+namespace {
+const QString kNameSetting = QStringLiteral("lan/playerName");
+
+QString defaultPlayerName()
+{
+    const QString user = qEnvironmentVariable("USER", qEnvironmentVariable("USERNAME"));
+    return user.isEmpty() ? QStringLiteral("Joueur") : user.left(net::kMaxNameLength);
+}
+
+QString stadiumName(const QString &id)
+{
+    const auto stadium = Stadium::find(id);
+    return stadium ? stadium->name : id;
+}
+} // namespace
+
+LanMenuPage::LanMenuPage(QWidget *parent)
+    : QWidget(parent)
+{
+    auto *root = new QVBoxLayout(this);
+
+    auto *title = new QLabel(tr("Multijoueur en réseau local"), this);
+    QFont titleFont = title->font();
+    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
+    titleFont.setBold(true);
+    title->setFont(titleFont);
+    root->addWidget(title);
+
+    auto *nameForm = new QFormLayout;
+    m_nameEdit = new QLineEdit(this);
+    m_nameEdit->setMaxLength(net::kMaxNameLength);
+    m_nameEdit->setText(QSettings().value(kNameSetting, defaultPlayerName()).toString());
+    nameForm->addRow(tr("Votre pseudo"), m_nameEdit);
+    root->addLayout(nameForm);
+
+    auto *columns = new QHBoxLayout;
+    root->addLayout(columns, 1);
+
+    // --- Créer ------------------------------------------------------------------
+    auto *createBox = new QGroupBox(tr("Créer un lobby"), this);
+    auto *createLayout = new QVBoxLayout(createBox);
+    auto *createForm = new QFormLayout;
+    m_lobbyNameEdit = new QLineEdit(createBox);
+    m_lobbyNameEdit->setMaxLength(net::kMaxNameLength);
+    m_lobbyNameEdit->setPlaceholderText(tr("Lobby de %1").arg(m_nameEdit->text()));
+    createForm->addRow(tr("Nom du lobby"), m_lobbyNameEdit);
+    m_playersCombo = new QComboBox(createBox);
+    for (int n = 2; n <= 4; ++n)
+        m_playersCombo->addItem(tr("%1 joueurs").arg(n), n);
+    createForm->addRow(tr("Nombre de joueurs"), m_playersCombo);
+    m_stadiumCombo = new QComboBox(createBox);
+    for (const Stadium &stadium : Stadium::all())
+        m_stadiumCombo->addItem(stadium.name, stadium.id);
+    createForm->addRow(tr("Stadium"), m_stadiumCombo);
+    createLayout->addLayout(createForm);
+    m_stadiumPreview = new StadiumWidget(createBox);
+    m_stadiumPreview->setMinimumHeight(130);
+    createLayout->addWidget(m_stadiumPreview);
+    createLayout->addStretch();
+    m_createButton = new QPushButton(tr("Créer le lobby"), createBox);
+    m_createButton->setMinimumHeight(36);
+    createLayout->addWidget(m_createButton);
+    columns->addWidget(createBox, 1);
+
+    // --- Rejoindre --------------------------------------------------------------
+    auto *joinBox = new QGroupBox(tr("Rejoindre un lobby"), this);
+    auto *joinLayout = new QVBoxLayout(joinBox);
+    joinLayout->addWidget(new QLabel(tr("Lobbys détectés sur le réseau :"), joinBox));
+    m_lobbyList = new QTreeWidget(joinBox);
+    m_lobbyList->setHeaderLabels({tr("Lobby"), tr("Hôte"), tr("Joueurs"), tr("Stadium"),
+                                  tr("Adresse")});
+    m_lobbyList->setRootIsDecorated(false);
+    m_lobbyList->setUniformRowHeights(true);
+    m_lobbyList->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    m_lobbyList->header()->setStretchLastSection(true);
+    joinLayout->addWidget(m_lobbyList, 1);
+    m_joinSelectedButton = new QPushButton(tr("Rejoindre le lobby sélectionné"), joinBox);
+    joinLayout->addWidget(m_joinSelectedButton);
+
+    joinLayout->addWidget(new QLabel(tr("Ou par nom de lobby / adresse IP[:port] :"), joinBox));
+    auto *typedRow = new QHBoxLayout;
+    m_joinEdit = new QLineEdit(joinBox);
+    m_joinEdit->setPlaceholderText(tr("ex. « Lobby de Léa » ou 192.168.1.20:%1")
+                                       .arg(net::kDefaultTcpPort));
+    m_joinButton = new QPushButton(tr("Rejoindre"), joinBox);
+    typedRow->addWidget(m_joinEdit, 1);
+    typedRow->addWidget(m_joinButton);
+    joinLayout->addLayout(typedRow);
+    columns->addWidget(joinBox, 1);
+
+    m_status = new QLabel(this);
+    m_status->setWordWrap(true);
+    root->addWidget(m_status);
+
+    auto *bottom = new QHBoxLayout;
+    auto *backButton = new QPushButton(tr("Retour au menu"), this);
+    bottom->addWidget(backButton);
+    bottom->addStretch();
+    root->addLayout(bottom);
+
+    connect(m_nameEdit, &QLineEdit::textChanged, this, [this](const QString &text) {
+        QSettings().setValue(kNameSetting, text);
+        m_lobbyNameEdit->setPlaceholderText(tr("Lobby de %1").arg(playerName()));
+    });
+    connect(m_stadiumCombo, &QComboBox::currentIndexChanged, this, [this] {
+        if (const auto stadium = Stadium::find(m_stadiumCombo->currentData().toString()))
+            m_stadiumPreview->setStadium(*stadium);
+    });
+    connect(&m_browser, &net::LobbyBrowser::lobbiesChanged, this, &LanMenuPage::refreshLobbies);
+    connect(m_lobbyList, &QTreeWidget::itemDoubleClicked, this, &LanMenuPage::joinSelected);
+    connect(m_lobbyList, &QTreeWidget::itemSelectionChanged, this, [this] {
+        m_joinSelectedButton->setEnabled(!m_lobbyList->selectedItems().isEmpty());
+    });
+    connect(m_joinSelectedButton, &QPushButton::clicked, this, &LanMenuPage::joinSelected);
+    connect(m_joinButton, &QPushButton::clicked, this, &LanMenuPage::joinTyped);
+    connect(m_joinEdit, &QLineEdit::returnPressed, this, &LanMenuPage::joinTyped);
+    connect(m_createButton, &QPushButton::clicked, this, &LanMenuPage::requestHost);
+    connect(backButton, &QPushButton::clicked, this, &LanMenuPage::backRequested);
+
+    m_joinSelectedButton->setEnabled(false);
+}
+
+QString LanMenuPage::playerName() const
+{
+    return net::sanitizeName(m_nameEdit->text(), defaultPlayerName());
+}
+
+void LanMenuPage::activate()
+{
+    if (!m_browser.start()) {
+        m_status->setText(tr("Détection des lobbys indisponible (port UDP %1 occupé) : "
+                             "vous pouvez toujours rejoindre par adresse IP.")
+                              .arg(net::kDiscoveryPort));
+    }
+    refreshLobbies();
+}
+
+void LanMenuPage::deactivate()
+{
+    m_browser.stop();
+}
+
+void LanMenuPage::setBusy(bool busy, const QString &message)
+{
+    for (QWidget *w : {static_cast<QWidget *>(m_createButton),
+                       static_cast<QWidget *>(m_joinButton),
+                       static_cast<QWidget *>(m_lobbyList)})
+        w->setEnabled(!busy);
+    m_joinSelectedButton->setEnabled(!busy && !m_lobbyList->selectedItems().isEmpty());
+    m_status->setText(message);
+}
+
+void LanMenuPage::refreshLobbies()
+{
+    const QString selectedId = m_lobbyList->currentItem()
+                                 ? m_lobbyList->currentItem()->data(0, Qt::UserRole).toString()
+                                 : QString();
+    m_lobbyList->clear();
+    for (const net::LobbyAnnouncement &lobby : m_browser.lobbies()) {
+        const QString players = QStringLiteral("%1/%2%3")
+                                    .arg(lobby.players)
+                                    .arg(lobby.maxPlayers)
+                                    .arg(lobby.inGame ? tr(" (en partie)") : QString());
+        auto *item = new QTreeWidgetItem(
+            m_lobbyList, {lobby.name, lobby.hostName, players, stadiumName(lobby.stadiumId),
+                          QStringLiteral("%1:%2").arg(lobby.address.toString()).arg(lobby.port)});
+        item->setData(0, Qt::UserRole, lobby.lobbyId);
+        item->setData(1, Qt::UserRole, lobby.address.toString());
+        item->setData(2, Qt::UserRole, lobby.port);
+        const bool joinable = !lobby.inGame && lobby.players < lobby.maxPlayers;
+        if (!joinable) {
+            for (int c = 0; c < item->columnCount(); ++c)
+                item->setForeground(c, palette().color(QPalette::Disabled, QPalette::Text));
+        }
+        if (lobby.lobbyId == selectedId)
+            m_lobbyList->setCurrentItem(item);
+    }
+    if (m_lobbyList->topLevelItemCount() == 0) {
+        auto *item = new QTreeWidgetItem(m_lobbyList, {tr("Recherche de lobbys…")});
+        item->setFlags(Qt::NoItemFlags);
+    }
+}
+
+void LanMenuPage::joinSelected()
+{
+    QTreeWidgetItem *item = m_lobbyList->currentItem();
+    if (!item || item->data(0, Qt::UserRole).toString().isEmpty())
+        return;
+    emit joinRequested(item->data(1, Qt::UserRole).toString(),
+                       static_cast<quint16>(item->data(2, Qt::UserRole).toUInt()));
+}
+
+void LanMenuPage::joinTyped()
+{
+    const QString text = m_joinEdit->text().trimmed();
+    if (text.isEmpty())
+        return;
+
+    // 1. Un lobby découvert portant ce nom.
+    if (const auto lobby = m_browser.findByName(text)) {
+        emit joinRequested(lobby->address.toString(), lobby->port);
+        return;
+    }
+
+    // 2. Une adresse (IP ou nom de machine), avec un port optionnel.
+    QString host = text;
+    quint16 port = net::kDefaultTcpPort;
+    const qsizetype colon = text.lastIndexOf(':');
+    if (colon > 0 && text.count(':') == 1) {
+        bool ok = false;
+        const uint value = text.mid(colon + 1).toUInt(&ok);
+        if (!ok || value == 0 || value > 65535) {
+            m_status->setText(tr("Port invalide : « %1 ».").arg(text.mid(colon + 1)));
+            return;
+        }
+        host = text.left(colon);
+        port = static_cast<quint16>(value);
+    }
+    if (host.contains(' ')) {
+        m_status->setText(tr("Aucun lobby nommé « %1 » n'a été détecté sur le réseau.").arg(text));
+        return;
+    }
+    emit joinRequested(host, port);
+}
+
+void LanMenuPage::requestHost()
+{
+    net::LobbyServer::Settings settings;
+    settings.hostName = playerName();
+    settings.lobbyName = m_lobbyNameEdit->text().trimmed().isEmpty()
+                           ? tr("Lobby de %1").arg(playerName())
+                           : m_lobbyNameEdit->text().trimmed();
+    settings.maxPlayers = m_playersCombo->currentData().toInt();
+    settings.stadiumId = m_stadiumCombo->currentData().toString();
+    emit hostRequested(settings);
+}
+
+} // namespace toupie

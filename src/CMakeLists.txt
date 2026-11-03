@@ -63,10 +63,14 @@ qt_add_executable(toupie_arena
     ui/SetupPage.cpp
     ui/BattlePage.h
     ui/BattlePage.cpp
+    ui/LanMenuPage.h
+    ui/LanMenuPage.cpp
+    ui/LobbyPage.h
+    ui/LobbyPage.cpp
     ui/MainWindow.h
     ui/MainWindow.cpp
 )
-target_link_libraries(toupie_arena PRIVATE toupie_core Qt6::Widgets)
+target_link_libraries(toupie_arena PRIVATE toupie_net Qt6::Widgets)
 set_target_properties(toupie_arena PROPERTIES
     WIN32_EXECUTABLE ON
     MACOSX_BUNDLE ON

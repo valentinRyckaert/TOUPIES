@@ -21,7 +21,7 @@ MenuPage::MenuPage(QWidget *parent)
     title->setAlignment(Qt::AlignCenter);
     layout->addWidget(title);
 
-    auto *subtitle = new QLabel(tr("Assemblez votre toupie et affrontez le bot dans le stadium."),
+    auto *subtitle = new QLabel(tr("Assemblez votre toupie et affrontez le bot ou vos amis dans le stadium."),
                                 this);
     subtitle->setAlignment(Qt::AlignCenter);
     layout->addWidget(subtitle);
@@ -38,7 +38,8 @@ MenuPage::MenuPage(QWidget *parent)
         return button;
     };
 
-    addButton(tr("Jouer une partie"), &MenuPage::playRequested)->setDefault(true);
+    addButton(tr("Jouer une partie (contre le bot)"), &MenuPage::playRequested)->setDefault(true);
+    addButton(tr("Multijoueur en réseau local"), &MenuPage::lanRequested);
     addButton(tr("Assembler une toupie"), &MenuPage::builderRequested);
     addButton(tr("Quitter"), &MenuPage::quitRequested);
 
