@@ -57,9 +57,11 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
     titleFont.setBold(true);
     m_title->setFont(titleFont);
+    m_title->setObjectName(QStringLiteral("title"));
     root->addWidget(m_title);
     m_subtitle = new QLabel(this);
     m_subtitle->setWordWrap(true);
+    m_subtitle->setObjectName(QStringLiteral("muted"));
     m_subtitle->setTextInteractionFlags(Qt::TextSelectableByMouse);
     root->addWidget(m_subtitle);
 
@@ -121,6 +123,7 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     m_readyButton = new QPushButton(tr("Je suis prêt"), this);
     m_readyButton->setCheckable(true);
     m_startButton = new QPushButton(tr("Lancer la partie"), this);
+    m_startButton->setObjectName(QStringLiteral("accent"));
     m_startButton->setMinimumHeight(38);
     buttons->addWidget(leaveButton);
     buttons->addStretch();

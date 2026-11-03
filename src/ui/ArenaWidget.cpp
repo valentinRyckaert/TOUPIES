@@ -2,6 +2,7 @@
 
 #include "game/SpecialMove.h"
 #include "ui/StadiumPainter.h"
+#include "ui/Theme.h"
 #include "ui/TopPainter.h"
 
 #include <QKeyEvent>
@@ -60,8 +61,8 @@ QString statusText(Spinner::Status status)
 
 QColor ArenaWidget::slotColor(int slot)
 {
-    static const QColor colors[] = {QColor(80, 190, 255), QColor(255, 120, 90),
-                                    QColor(120, 220, 120), QColor(205, 140, 255)};
+    static const QColor colors[] = {Theme::kAccent, QColor(255, 138, 92), QColor(92, 200, 255),
+                                    QColor(213, 140, 255)};
     return colors[qBound(0, slot, 3)];
 }
 
@@ -378,9 +379,17 @@ void ArenaWidget::paintEvent(QPaintEvent *)
     p.setRenderHint(QPainter::Antialiasing);
 
     QLinearGradient background(0, 0, 0, height());
-    background.setColorAt(0.0, QColor(24, 26, 38));
-    background.setColorAt(1.0, QColor(12, 13, 20));
+    background.setColorAt(0.0, Theme::kBackground);
+    background.setColorAt(1.0, Theme::kBackgroundDeep);
     p.fillRect(rect(), background);
+    // Grille discrète façon « arène numérique ».
+    QColor grid = Theme::kAccent;
+    grid.setAlpha(10);
+    p.setPen(QPen(grid, 1.0));
+    for (int x = 0; x < width(); x += 32)
+        p.drawLine(x, 0, x, height());
+    for (int y = 0; y < height(); y += 32)
+        p.drawLine(0, y, width(), y);
 
     if (!m_session)
         return;
@@ -635,9 +644,13 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
     const QColor accent = slotColor(index);
     const Qt::Alignment align = (alignRight ? Qt::AlignRight : Qt::AlignLeft) | Qt::AlignVCenter;
 
-    p.setPen(local ? QPen(accent, 1.5) : QPen(Qt::NoPen));
-    p.setBrush(QColor(255, 255, 255, 18));
-    p.drawRoundedRect(rect, 8, 8);
+    QColor border = accent;
+    border.setAlpha(local ? 230 : 90);
+    p.setPen(QPen(border, local ? 2.0 : 1.0));
+    QColor panel = Theme::kPanel;
+    panel.setAlpha(230);
+    p.setBrush(panel);
+    p.drawRoundedRect(rect, 10, 10);
 
     const QRectF inner = rect.adjusted(10, 6, -10, -6);
     QFont f = font();

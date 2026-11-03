@@ -25,6 +25,7 @@ BattlePage::BattlePage(QWidget *parent)
     m_setupButton = new QPushButton(tr("Changer de toupies"), this);
     m_rematchButton = new QPushButton(this);
     m_specialButton = new QPushButton(tr("Coup spécial (E)"), this);
+    m_specialButton->setObjectName(QStringLiteral("accent"));
     m_score = new QLabel(this);
     bar->addWidget(m_leaveButton);
     bar->addWidget(m_setupButton);

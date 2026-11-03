@@ -95,6 +95,7 @@ RulesWidget::RulesWidget(QWidget *parent)
     auto *bottom = new QHBoxLayout;
     m_summary = new QLabel(this);
     m_summary->setWordWrap(true);
+    m_summary->setObjectName(QStringLiteral("muted"));
     m_reset = new QPushButton(tr("Réinitialiser"), this);
     bottom->addWidget(m_summary, 1);
     bottom->addWidget(m_reset);

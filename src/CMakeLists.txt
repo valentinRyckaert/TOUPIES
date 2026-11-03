@@ -53,6 +53,8 @@ target_link_libraries(toupie_net PUBLIC toupie_core Qt6::Network)
 # Application graphique
 qt_add_executable(toupie_arena
     main.cpp
+    ui/Theme.h
+    ui/Theme.cpp
     ui/TopPainter.h
     ui/TopPainter.cpp
     ui/RulesWidget.h

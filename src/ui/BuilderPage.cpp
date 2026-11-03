@@ -71,6 +71,7 @@ BuilderPage::BuilderPage(const PartCatalog &catalog, TopRepository &repository, 
     titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
     titleFont.setBold(true);
     title->setFont(titleFont);
+    title->setObjectName(QStringLiteral("title"));
     editor->addWidget(title);
 
     auto *help = new QLabel(
@@ -92,6 +93,7 @@ BuilderPage::BuilderPage(const PartCatalog &catalog, TopRepository &repository, 
     editor->addLayout(form);
     m_specialLabel = new QLabel(this);
     m_specialLabel->setWordWrap(true);
+    m_specialLabel->setObjectName(QStringLiteral("muted"));
     editor->addWidget(m_specialLabel);
 
     m_table = new QTableWidget(4, 4, this);

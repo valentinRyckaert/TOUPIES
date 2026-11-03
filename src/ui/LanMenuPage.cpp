@@ -43,6 +43,7 @@ LanMenuPage::LanMenuPage(QWidget *parent)
     titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
     titleFont.setBold(true);
     title->setFont(titleFont);
+    title->setObjectName(QStringLiteral("title"));
     root->addWidget(title);
 
     auto *nameForm = new QFormLayout;
@@ -77,6 +78,7 @@ LanMenuPage::LanMenuPage(QWidget *parent)
     createLayout->addWidget(m_stadiumPreview);
     createLayout->addStretch();
     m_createButton = new QPushButton(tr("Créer le lobby"), createBox);
+    m_createButton->setObjectName(QStringLiteral("accent"));
     m_createButton->setMinimumHeight(36);
     createLayout->addWidget(m_createButton);
     columns->addWidget(createBox, 1);
@@ -99,6 +101,7 @@ LanMenuPage::LanMenuPage(QWidget *parent)
     joinLayout->addWidget(m_lobbyList, 1);
     m_discoveryStatus = new QLabel(joinBox);
     m_discoveryStatus->setWordWrap(true);
+    m_discoveryStatus->setObjectName(QStringLiteral("hint"));
     joinLayout->addWidget(m_discoveryStatus);
     m_joinSelectedButton = new QPushButton(tr("Rejoindre le lobby sélectionné"), joinBox);
     joinLayout->addWidget(m_joinSelectedButton);

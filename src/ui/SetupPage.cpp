@@ -32,6 +32,7 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
     titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
     titleFont.setBold(true);
     title->setFont(titleFont);
+    title->setObjectName(QStringLiteral("title"));
     root->addWidget(title);
 
     auto *columns = new QHBoxLayout;
@@ -88,6 +89,7 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
     auto *buttons = new QHBoxLayout;
     auto *backButton = new QPushButton(tr("Retour au menu"), this);
     auto *fightButton = new QPushButton(tr("Combattre !"), this);
+    fightButton->setObjectName(QStringLiteral("accent"));
     fightButton->setDefault(true);
     fightButton->setMinimumHeight(40);
     buttons->addWidget(backButton);
