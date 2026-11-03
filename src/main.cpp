@@ -2,6 +2,7 @@
 #include "ui/Theme.h"
 
 #include <QApplication>
+#include <QTimer>
 
 int main(int argc, char *argv[])
 {
@@ -14,5 +15,10 @@ int main(int argc, char *argv[])
 
     toupie::MainWindow window;
     window.show();
+
+    // Vérification d'intégration (CI) : l'application démarre puis se ferme.
+    if (QCoreApplication::arguments().contains(QStringLiteral("--smoke-test")))
+        QTimer::singleShot(1500, &app, &QCoreApplication::quit);
+
     return app.exec();
 }

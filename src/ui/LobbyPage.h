@@ -43,6 +43,8 @@ public:
     void returnToLobby();
 
     bool isHost() const { return m_server != nullptr; }
+    /// Port TCP du lobby hébergé (0 si cette machine n'est pas l'hôte).
+    quint16 hostPort() const { return m_server ? m_server->port() : 0; }
     bool isActive() const { return m_server || m_client; }
     /// Session créée au lancement de la partie (la page en cède la propriété).
     std::unique_ptr<MatchSession> takeSession();

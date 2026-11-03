@@ -50,9 +50,8 @@ add_library(toupie_net STATIC
 )
 target_link_libraries(toupie_net PUBLIC toupie_core Qt6::Network)
 
-# Application graphique
-qt_add_executable(toupie_arena
-    main.cpp
+# Interface graphique (bibliothèque, pour pouvoir la tester)
+add_library(toupie_ui STATIC
     ui/Theme.h
     ui/Theme.cpp
     ui/TopPainter.h
@@ -80,8 +79,20 @@ qt_add_executable(toupie_arena
     ui/MainWindow.h
     ui/MainWindow.cpp
 )
-target_link_libraries(toupie_arena PRIVATE toupie_net Qt6::Widgets)
+target_link_libraries(toupie_ui PUBLIC toupie_net Qt6::Widgets)
+
+# Application
+qt_add_executable(toupie_arena main.cpp)
+target_link_libraries(toupie_arena PRIVATE toupie_ui)
 set_target_properties(toupie_arena PROPERTIES
     WIN32_EXECUTABLE ON
     MACOSX_BUNDLE ON
+    MACOSX_BUNDLE_BUNDLE_NAME "Toupie Arena"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "fr.toupiearena.game"
+)
+
+include(GNUInstallDirs)
+install(TARGETS toupie_arena
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    BUNDLE DESTINATION .
 )
