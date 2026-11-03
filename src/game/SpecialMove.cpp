@@ -30,7 +30,7 @@ const QList<SpecialMove> &SpecialMove::all()
         spear.description = QStringLiteral(
             "Trait fin et très rapide qui inflige de lourds dégâts à une cible. Presque aucun "
             "recul, et il faut viser juste.");
-        spear.damage = 12.0;
+        spear.damage = 10.0;
         spear.knockback = 0.2;
         spear.speed = 2.0;
         spear.range = 1.8;
@@ -44,13 +44,13 @@ const QList<SpecialMove> &SpecialMove::all()
         frost.description = QStringLiteral(
             "Vague glacée qui ralentit fortement la cible et l'empêche de piloter pendant "
             "3 secondes. Dégâts faibles.");
-        frost.damage = 5.0;
+        frost.damage = 6.0;
         frost.knockback = 0.1;
         frost.speed = 1.3;
         frost.range = 1.6;
         frost.width = 0.11;
         frost.effect = Effect::Slow;
-        frost.effectStrength = 0.6;
+        frost.effectStrength = 0.7;
         frost.effectDuration = 3.5;
         frost.color = 0x9be7ff;
         list.append(frost);
@@ -78,11 +78,11 @@ const QList<SpecialMove> &SpecialMove::all()
             "Vague lente qui téléporte la cible près du bord du stadium. Aucun dégât, et "
             "facile à esquiver de loin.");
         warp.damage = 0.0;
-        warp.speed = 1.0;
+        warp.speed = 1.15;
         warp.range = 1.6;
         warp.width = 0.1;
         warp.effect = Effect::Teleport;
-        warp.effectStrength = 0.8; // Niveau (0 = centre, 1 = bord) d'arrivée.
+        warp.effectStrength = 0.85; // Niveau (0 = centre, 1 = bord) d'arrivée.
         warp.color = 0xff7ad9;
         list.append(warp);
 
@@ -98,7 +98,7 @@ const QList<SpecialMove> &SpecialMove::all()
         siphon.range = 1.4;
         siphon.width = 0.08;
         siphon.effect = Effect::Drain;
-        siphon.effectStrength = 0.8;
+        siphon.effectStrength = 0.6;
         siphon.color = 0xff5c6c;
         list.append(siphon);
 

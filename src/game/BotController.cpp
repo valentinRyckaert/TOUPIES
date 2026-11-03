@@ -119,7 +119,7 @@ double BotController::dodgeSkill() const
     case Difficulty::Hard:
         break;
     }
-    return 0.9;
+    return 0.75;
 }
 
 void BotController::update(Battle &battle, double dt)
@@ -130,7 +130,9 @@ void BotController::update(Battle &battle, double dt)
     // Pilotage : réévalué fréquemment (esquive comprise).
     m_steerTimer -= dt;
     if (m_steerTimer <= 0.0) {
-        m_steerTimer = std::min(0.1, reactionTime() * 0.5);
+        // Même cadence pour toutes les difficultés : un pilotage trop réactif
+        // rend la fuite imparable.
+        m_steerTimer = 0.12;
         battle.setSteering(m_index, chooseSteering(battle));
     }
 
@@ -307,7 +309,7 @@ bool BotController::wantsToDashAt(const Battle &battle, int target, double *scor
     // Anticipation : en difficile, on estime où sera l'adversaire.
     if (m_difficulty == Difficulty::Hard) {
         const Vec2 predicted = other.position + other.velocity * (gap / cfg.dashSpeed);
-        gap = std::max(gap, (predicted - self.position).length() - 2.0 * cfg.topRadius);
+        gap = std::min(gap, (predicted - self.position).length() - 2.0 * cfg.topRadius);
     }
 
     const double rangeFactor = m_difficulty == Difficulty::Easy ? 1.3 : 0.85;

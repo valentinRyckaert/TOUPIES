@@ -175,11 +175,11 @@ const QList<Stadium> &Stadium::all()
             "sont violents, mais la surface râpe la pointe.");
         concrete.shape = Kind::Polygon;
         concrete.sides = 8;
-        concrete.rimHeight = 1.2;
+        concrete.rimHeight = 2.0;
         concrete.friction = 0.85;
-        concrete.speed = 1.15;
-        concrete.damage = 1.2;
-        concrete.knockback = 1.0;
+        concrete.speed = 1.05;
+        concrete.damage = 1.1;
+        concrete.knockback = 0.9;
         concrete.enduranceDrain = 1.1;
         concrete.floorCenter = 0xc4c6c9;
         concrete.floorEdge = 0x73777c;
@@ -193,10 +193,10 @@ const QList<Stadium> &Stadium::all()
             "Arène de terre battue sans rebord. Le sol meuble freine les toupies et les dashs "
             "et amortit les chocs, mais la pointe s'y enfonce et s'use.");
         dirt.hasRim = false;
-        dirt.friction = 1.15;
-        dirt.speed = 0.9;
+        dirt.friction = 1.0;
+        dirt.speed = 1.0;
         dirt.dashSpeed = 0.95;
-        dirt.damage = 1.15;
+        dirt.damage = 1.4;
         dirt.knockback = 1.0;
         dirt.enduranceDrain = 1.2;
         dirt.floorCenter = 0xc39663;
@@ -212,8 +212,8 @@ const QList<Stadium> &Stadium::all()
             "longtemps, mais le moindre choc fait glisser loin.");
         ice.shape = Kind::Ellipse;
         ice.aspect = 0.8;
-        ice.rimHeight = 1.15;
-        ice.friction = 0.8;
+        ice.rimHeight = 1.7;
+        ice.friction = 0.9;
         ice.slope = 1.0;
         ice.enduranceDrain = 0.7;
         ice.knockback = 0.85;
@@ -249,11 +249,11 @@ const QList<Stadium> &Stadium::all()
         volcano.description = QStringLiteral(
             "Petit cratère aux pentes raides, sans rebord, entouré de lave. Les chocs et les "
             "dashs y sont redoutables.");
-        volcano.size = 0.85;
+        volcano.size = 0.9;
         volcano.hasRim = false;
-        volcano.slope = 1.4;
-        volcano.damage = 1.25;
-        volcano.dashPower = 1.4;
+        volcano.slope = 2.0;
+        volcano.damage = 1.1;
+        volcano.dashPower = 1.2;
         volcano.enduranceDrain = 1.0;
         volcano.floorCenter = 0x6a4741;
         volcano.floorEdge = 0x2a1512;

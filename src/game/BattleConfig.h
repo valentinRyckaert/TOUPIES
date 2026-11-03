@@ -19,7 +19,7 @@ struct BattleConfig
     double launchSpeed = 1.0;      ///< Vitesse initiale.
     /// Vitesse radiale minimale pour franchir le rebord du stadium ; en
     /// dessous, la toupie rebondit avec ce coefficient de restitution.
-    double rimEscapeSpeed = 0.4981;
+    double rimEscapeSpeed = 0.4223;
     double rimRestitution = 0.4;
 
     // --- Mouvement -----------------------------------------------------------
@@ -29,13 +29,13 @@ struct BattleConfig
     double friction = 0.7;
     /// Propulsion tangentielle due à la rotation (la toupie se déplace dans
     /// le sens inverse de sa rotation) : base + parAttaque * attaque.
-    double orbitBase = 0.15;
-    double orbitPerAttack = 0.015;
+    double orbitBase = 0.1924;
+    double orbitPerAttack = 0.0049;
     /// Attraction constante vers le centre : sans action contraire (pilotage,
     /// chocs), les toupies finissent par se rapprocher du centre.
-    double centerPull = 0.12;
+    double centerPull = 0.1837;
     /// Pilotage aux flèches : légère accélération dans la direction voulue.
-    double steerAcceleration = 0.45;
+    double steerAcceleration = 0.3;
     /// Force de lancer : multiplicateur de launchSpeed choisi par le joueur.
     double launchPowerMin = 0.5;
     double launchPowerMax = 1.5;
@@ -49,27 +49,27 @@ struct BattleConfig
     ///   base * max(plancher, 1 - parEndurance * endurance) * (1 + drain * vitesse).
     /// Les stats ont des effets linéaires : se spécialiser n'a pas de
     /// rendement décroissant par rapport à une répartition équilibrée.
-    double passiveBase = 2.416;
-    double passivePerEndurance = 0.045;
-    double speedDrain = 0.2;
+    double passiveBase = 1.8491;
+    double passivePerEndurance = 0.05;
+    double speedDrain = 0.7327;
 
     // --- Chocs ----------------------------------------------------------------
     /// Dégâts = base * attaqueAdverse * impact * max(plancher, 1 - parDéfense * défense).
-    double damageBase = 1.0;
-    double damagePerDefense = 0.0557;
+    double damageBase = 0.4;
+    double damagePerDefense = 0.057;
     /// impact = min(maxImpact, minImpact + vitesseDeRapprochement / impactRef).
-    double minImpact = 0.741;
+    double minImpact = 0.8969;
     double impactRef = 2.0;
-    double maxImpact = 1.0;
+    double maxImpact = 1.1305;
     /// Recul = (base + parAttaque * attaqueAdverse + parMasse * défenseAdverse
     ///          + approche * vitesseRapprochement)
     ///         * max(plancher, 1 - parDéfense * défense).
     double knockbackBase = 0.12;
-    double knockbackPerAttack = 0.06;
+    double knockbackPerAttack = 0.0715;
     /// Une toupie lourde (défense élevée) repousse plus fort.
-    double knockbackPerAttackerDefense = 0.0231;
-    double knockbackApproach = 0.2115;
-    double knockbackPerDefense = 0.0298;
+    double knockbackPerAttackerDefense = 0.0418;
+    double knockbackApproach = 0.1427;
+    double knockbackPerDefense = 0.0264;
     /// Plancher des facteurs de réduction linéaires.
     double minReduction = 0.15;
     /// Masse utilisée pour séparer les toupies qui se chevauchent.
@@ -79,27 +79,27 @@ struct BattleConfig
     /// Deux toupies de même sens : surfaces de contact opposées, choc plus violent.
     double sameSpinKnockback = 1.1;
     /// Deux toupies de sens opposés : frottement, plus de perte d'endurance.
-    double oppositeSpinDamage = 1.2186;
-    double contactCooldown = 0.25;
+    double oppositeSpinDamage = 1.2014;
+    double contactCooldown = 0.2337;
     /// Bonus du type équilibre : réduction (en fraction) de la perte
     /// d'endurance, des dégâts et du recul subis.
-    double balanceStability = 0.0439;
+    double balanceStability = 0.0428;
 
     // --- Dash -------------------------------------------------------------------
-    double dashCost = 5.868;        ///< Points d'endurance consommés.
+    double dashCost = 3.5722;        ///< Points d'endurance consommés.
     double dashSpeed = 2.6;
     double dashDuration = 0.15;     ///< Distance du dash = vitesse * durée (~0,39).
     double dashCooldown = 1.8;
-    double dashAttackMultiplier = 1.2;
+    double dashAttackMultiplier = 1.1618;
     double dashBoostDuration = 0.35; ///< Durée du bonus d'attaque.
     double postDashSpeed = 0.45;
 
     // --- Coups spéciaux ------------------------------------------------------
     /// La jauge (0 à 100) se remplit avec le temps et à chaque choc ; pleine,
     /// elle permet de lancer le coup spécial du boulon.
-    double specialChargeRate = 7.0;  ///< Points par seconde.
+    double specialChargeRate = 9.138;  ///< Points par seconde.
     double specialHitCharge = 6.0;   ///< Points par choc reçu ou donné.
-    double specialDamageScale = 1.0; ///< Multiplicateur des dégâts des coups spéciaux.
+    double specialDamageScale = 0.6; ///< Multiplicateur des dégâts des coups spéciaux.
     double specialKnockbackScale = 1.0;
     bool specialsEnabled = true;
 
