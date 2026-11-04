@@ -21,6 +21,8 @@ add_library(toupie_core STATIC
     game/Battle.cpp
     game/BotController.h
     game/BotController.cpp
+    game/Tournament.h
+    game/Tournament.cpp
     session/MatchSession.h
     session/MatchSession.cpp
     session/LocalSession.h
