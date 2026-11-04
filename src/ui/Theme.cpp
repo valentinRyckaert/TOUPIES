@@ -59,6 +59,16 @@ QPushButton#menu:default {
     color: #10140d; border: 1px solid @accentDark;
 }
 QPushButton#menu:default:hover { background-color: @accentBright; }
+QPushButton#card {
+    font-size: 12pt; text-align: left; padding: 16px 22px; border-radius: 14px;
+    border: 2px solid @border; background-color: rgba(37, 42, 49, 230);
+}
+QPushButton#card:hover { border-color: @accent; color: @accentBright; background-color: #243020; }
+QToolButton#sideToggle {
+    color: @accent; font-weight: bold; padding: 6px 10px; text-align: left;
+    border: 1px solid @border; border-radius: 8px; background-color: #1b1f24;
+}
+QToolButton#sideToggle:hover { border-color: @accent; }
 
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
     background-color: #111417; color: @text; border: 1px solid @border; border-radius: 7px;

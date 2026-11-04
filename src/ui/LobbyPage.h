@@ -92,6 +92,8 @@ private:
     StadiumWidget *m_stadiumPreview = nullptr;
     RulesWidget *m_rules = nullptr;
     TournamentSettingsWidget *m_tournamentSettings = nullptr;
+    QPushButton *m_rulesButton = nullptr;
+    QPushButton *m_tournamentButton = nullptr;
     QTableWidget *m_table = nullptr;
     QList<QComboBox *> m_topCombos; ///< 1 ou 3 visibles selon le lobby.
     StatsWidget *m_topPreview = nullptr;

@@ -4,99 +4,116 @@
 #include "game/Stadium.h"
 #include "ui/RulesWidget.h"
 #include "ui/TournamentSettingsWidget.h"
+#include "ui/Widgets.h"
 
 #include <QComboBox>
+#include <QDialog>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QRadioButton>
-#include <QScrollArea>
+#include <QStackedWidget>
 #include <QVBoxLayout>
 
 namespace toupie {
+
+namespace {
+QLabel *pageTitle(const QString &text, QWidget *parent)
+{
+    auto *title = new QLabel(text, parent);
+    QFont font = title->font();
+    font.setPointSizeF(font.pointSizeF() * 1.6);
+    font.setBold(true);
+    title->setFont(font);
+    title->setObjectName(QStringLiteral("title"));
+    return title;
+}
+} // namespace
 
 TournamentSetupPage::TournamentSetupPage(TopRepository &repository, QWidget *parent)
     : QWidget(parent)
     , m_repository(repository)
 {
     auto *outer = new QVBoxLayout(this);
-    auto *title = new QLabel(tr("Tournois"), this);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
-    titleFont.setBold(true);
-    title->setFont(titleFont);
-    title->setObjectName(QStringLiteral("title"));
-    outer->addWidget(title);
+    m_steps = new QStackedWidget(this);
+    outer->addWidget(m_steps);
 
-    auto *modeRow = new QHBoxLayout;
-    m_solo = new QRadioButton(tr("Seul, contre des bots"), this);
-    m_lan = new QRadioButton(tr("En multijoueur (réseau local, 2 à 4 joueurs humains)"), this);
-    m_solo->setChecked(true);
-    modeRow->addWidget(m_solo);
-    modeRow->addWidget(m_lan);
-    modeRow->addStretch();
-    outer->addLayout(modeRow);
+    // --- Étape 1 : solo ou réseau local -----------------------------------------
+    auto *choice = new QWidget(m_steps);
+    auto *choiceLayout = new QVBoxLayout(choice);
+    choiceLayout->addWidget(pageTitle(tr("Tournois"), choice));
+    choiceLayout->addStretch();
+    auto *solo = createChoiceCard(tr("🏆  Tournoi solo"),
+                                  tr("Vous contre des bots : ligue ou élimination directe, "
+                                     "de 4 à 32 participants."),
+                                  choice);
+    auto *lan = createChoiceCard(tr("⇄  Tournoi en réseau local"),
+                                 tr("De 2 à 4 joueurs humains, chacun sur sa machine, complétés "
+                                    "par des bots."),
+                                 choice);
+    choiceLayout->addWidget(solo);
+    choiceLayout->addWidget(lan);
+    choiceLayout->addStretch();
+    auto *choiceButtons = new QHBoxLayout;
+    auto *back = new QPushButton(tr("Retour au menu"), choice);
+    choiceButtons->addWidget(back);
+    choiceButtons->addStretch();
+    choiceLayout->addLayout(choiceButtons);
+    m_steps->addWidget(choice);
 
-    // Contenu défilant : la page reste utilisable dans une petite fenêtre.
-    auto *scroll = new QScrollArea(this);
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-    auto *content = new QWidget(scroll);
-    auto *root = new QVBoxLayout(content);
-    root->setContentsMargins(0, 0, 0, 0);
-    scroll->setWidget(content);
-    outer->addWidget(scroll, 1);
+    // --- Étape 2 : tournoi solo -----------------------------------------------------
+    auto *soloPage = new QWidget(m_steps);
+    auto *soloLayout = new QVBoxLayout(soloPage);
+    soloLayout->addWidget(pageTitle(tr("Tournoi solo"), soloPage));
+    m_settings = new TournamentSettingsWidget(soloPage);
+    soloLayout->addWidget(m_settings);
 
-    m_settings = new TournamentSettingsWidget(content);
-    root->addWidget(m_settings);
-
-    m_soloBox = new QGroupBox(tr("Votre tournoi solo"), content);
-    auto *soloLayout = new QFormLayout(m_soloBox);
+    auto *playerBox = new QGroupBox(tr("Vos toupies et le stadium"), soloPage);
+    m_soloForm = new QFormLayout(playerBox);
     for (int i = 0; i < 3; ++i) {
-        auto *combo = new QComboBox(m_soloBox);
+        auto *combo = new QComboBox(playerBox);
         m_topCombos.append(combo);
-        soloLayout->addRow(tr("Toupie %1").arg(i + 1), combo);
+        m_soloForm->addRow(tr("Toupie %1").arg(i + 1), combo);
     }
-    m_stadium = new QComboBox(m_soloBox);
+    m_stadium = new QComboBox(playerBox);
     for (const Stadium &stadium : Stadium::all())
         m_stadium->addItem(stadium.name, stadium.id);
-    soloLayout->addRow(tr("Stadium"), m_stadium);
-    root->addWidget(m_soloBox);
-    m_rules = new RulesWidget(content);
-    root->addWidget(m_rules);
-    root->addStretch();
+    m_soloForm->addRow(tr("Stadium"), m_stadium);
+    auto *rulesRow = new QHBoxLayout;
+    m_rulesSummary = new QLabel(playerBox);
+    m_rulesSummary->setObjectName(QStringLiteral("muted"));
+    auto *rulesButton = new QPushButton(tr("Modifier…"), playerBox);
+    rulesRow->addWidget(m_rulesSummary, 1);
+    rulesRow->addWidget(rulesButton);
+    m_soloForm->addRow(tr("Personnalisation"), rulesRow);
+    soloLayout->addWidget(playerBox);
+    soloLayout->addStretch();
 
-    auto *lanHint = new QLabel(
-        tr("En réseau local, le stadium, la personnalisation et les toupies se choisissent dans "
-           "le lobby du tournoi ; chaque joueur humain joue sur sa machine."),
-        this);
-    lanHint->setWordWrap(true);
-    lanHint->setObjectName(QStringLiteral("hint"));
-    outer->addWidget(lanHint);
+    m_rules = new RulesWidget;
+    QDialog *rulesPopup = createPopup(this, tr("Personnalisation"), m_rules);
 
-    auto *buttons = new QHBoxLayout;
-    auto *back = new QPushButton(tr("Retour au menu"), this);
-    m_start = new QPushButton(this);
-    m_start->setObjectName(QStringLiteral("accent"));
-    m_start->setMinimumHeight(40);
-    buttons->addWidget(back);
-    buttons->addStretch();
-    buttons->addWidget(m_start);
-    outer->addLayout(buttons);
+    auto *soloButtons = new QHBoxLayout;
+    auto *previous = new QPushButton(tr("◀ Retour"), soloPage);
+    auto *start = new QPushButton(tr("Lancer le tournoi"), soloPage);
+    start->setObjectName(QStringLiteral("accent"));
+    start->setMinimumHeight(40);
+    soloButtons->addWidget(previous);
+    soloButtons->addStretch();
+    soloButtons->addWidget(start);
+    soloLayout->addLayout(soloButtons);
+    m_steps->addWidget(soloPage);
 
     connect(back, &QPushButton::clicked, this, &TournamentSetupPage::backRequested);
-    connect(m_solo, &QRadioButton::toggled, this, &TournamentSetupPage::updateMode);
+    connect(solo, &QPushButton::clicked, this, [this] { m_steps->setCurrentIndex(1); });
+    connect(lan, &QPushButton::clicked, this, &TournamentSetupPage::lanRequested);
+    connect(previous, &QPushButton::clicked, this, [this] { m_steps->setCurrentIndex(0); });
+    connect(rulesButton, &QPushButton::clicked, rulesPopup, &QDialog::open);
+    connect(m_rules, &RulesWidget::rulesChanged, this,
+            [this] { m_rulesSummary->setText(m_rules->rules().summary()); });
     connect(m_settings, &TournamentSettingsWidget::settingsChanged, this,
-            &TournamentSetupPage::updateMode);
-    connect(m_solo, &QRadioButton::toggled, lanHint, &QWidget::setHidden);
-    lanHint->hide();
-    connect(m_start, &QPushButton::clicked, this, [this] {
-        if (m_lan->isChecked()) {
-            emit lanRequested();
-            return;
-        }
+            &TournamentSetupPage::updateTops);
+    connect(start, &QPushButton::clicked, this, [this] {
         QList<Top> tops;
         const int needed = MatchSeries::topsFor(m_settings->settings().matchFormat);
         for (int i = 0; i < needed; ++i)
@@ -104,6 +121,7 @@ TournamentSetupPage::TournamentSetupPage(TopRepository &repository, QWidget *par
         emit soloRequested(settings(), tops);
     });
 
+    m_rulesSummary->setText(m_rules->rules().summary());
     refresh();
 }
 
@@ -117,6 +135,7 @@ TournamentSettings TournamentSetupPage::settings() const
 
 void TournamentSetupPage::refresh()
 {
+    m_steps->setCurrentIndex(0);
     m_tops = m_repository.allTops();
     for (int i = 0; i < m_topCombos.size(); ++i) {
         QComboBox *combo = m_topCombos.at(i);
@@ -127,22 +146,14 @@ void TournamentSetupPage::refresh()
         const int found = combo->findText(current);
         combo->setCurrentIndex(found >= 0 ? found : std::min(i, int(m_tops.size()) - 1));
     }
-    updateMode();
+    updateTops();
 }
 
-void TournamentSetupPage::updateMode()
+void TournamentSetupPage::updateTops()
 {
-    const bool solo = m_solo->isChecked();
-    m_settings->setHumans(solo ? 1 : 2);
-    m_soloBox->setVisible(solo);
-    m_rules->setVisible(solo);
     const int needed = MatchSeries::topsFor(m_settings->settings().matchFormat);
-    for (int i = 0; i < m_topCombos.size(); ++i) {
-        m_topCombos.at(i)->setVisible(i < needed);
-        if (auto *form = qobject_cast<QFormLayout *>(m_soloBox->layout()))
-            form->setRowVisible(i, i < needed);
-    }
-    m_start->setText(solo ? tr("Lancer le tournoi") : tr("Créer ou rejoindre un tournoi en réseau…"));
+    for (int i = 0; i < m_topCombos.size(); ++i)
+        m_soloForm->setRowVisible(i, i < needed);
 }
 
 } // namespace toupie

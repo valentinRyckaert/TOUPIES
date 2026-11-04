@@ -5,6 +5,9 @@
 #include "ui/RulesWidget.h"
 #include "ui/StadiumPainter.h"
 #include "ui/StatsWidget.h"
+#include "ui/Widgets.h"
+
+#include <QDialog>
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -64,11 +67,13 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
     for (const Stadium &stadium : Stadium::all())
         m_stadiumCombo->addItem(stadium.name, stadium.id);
     form->addRow(tr("Stadium"), m_stadiumCombo);
-    root->addLayout(form);
     m_stadiumPreview = new StadiumWidget(this);
-    root->addWidget(m_stadiumPreview);
-    m_rules = new RulesWidget(this);
-    root->addWidget(m_rules);
+    auto *settingsRow = new QHBoxLayout;
+    settingsRow->addLayout(form);
+    settingsRow->addWidget(m_stadiumPreview, 1);
+    root->addLayout(settingsRow);
+    m_rules = new RulesWidget;
+    QDialog *rulesPopup = createPopup(this, tr("Personnalisation"), m_rules);
     connect(m_stadiumCombo, &QComboBox::currentIndexChanged, this, [this] {
         if (const auto stadium = Stadium::find(m_stadiumCombo->currentData().toString()))
             m_stadiumPreview->setStadium(*stadium);
@@ -85,17 +90,30 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
            "chaque stadium avantage légèrement certains types."),
         this);
     rules->setWordWrap(true);
-    root->addWidget(rules);
+    rules->setMaximumWidth(560);
+    QDialog *helpPopup = createPopup(this, tr("Commandes et repères"), rules);
     root->addStretch();
 
     auto *buttons = new QHBoxLayout;
     auto *backButton = new QPushButton(tr("Retour au menu"), this);
+    auto *rulesButton = new QPushButton(tr("Personnalisation…"), this);
+    auto *helpButton = new QPushButton(tr("Commandes…"), this);
+    rulesButton->setToolTip(m_rules->rules().summary());
+    connect(m_rules, &RulesWidget::rulesChanged, rulesButton, [this, rulesButton] {
+        rulesButton->setText(m_rules->rules().isDefault() ? tr("Personnalisation…")
+                                                          : tr("Personnalisation ✱…"));
+        rulesButton->setToolTip(m_rules->rules().summary());
+    });
+    connect(rulesButton, &QPushButton::clicked, rulesPopup, &QDialog::open);
+    connect(helpButton, &QPushButton::clicked, helpPopup, &QDialog::open);
     auto *fightButton = new QPushButton(tr("Combattre !"), this);
     fightButton->setObjectName(QStringLiteral("accent"));
     fightButton->setDefault(true);
     fightButton->setMinimumHeight(40);
     buttons->addWidget(backButton);
     buttons->addStretch();
+    buttons->addWidget(helpButton);
+    buttons->addWidget(rulesButton);
     buttons->addWidget(fightButton);
     root->addLayout(buttons);
 

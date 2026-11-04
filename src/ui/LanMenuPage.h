@@ -57,6 +57,7 @@ private:
     QTreeWidget *m_lobbyList = nullptr;
     QLineEdit *m_joinEdit = nullptr;
     QPushButton *m_createButton = nullptr;
+    QPushButton *m_openCreateButton = nullptr;
     QPushButton *m_joinSelectedButton = nullptr;
     QPushButton *m_joinButton = nullptr;
     QPushButton *m_refreshButton = nullptr;

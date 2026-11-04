@@ -3,12 +3,12 @@
 #include "game/Stadium.h"
 #include "net/TournamentSession.h"
 #include "ui/Theme.h"
+#include "ui/Widgets.h"
 
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
-#include <QListWidget>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QTreeWidget>
@@ -32,11 +32,11 @@ TournamentPage::TournamentPage(QWidget *parent)
     root->addWidget(m_subtitle);
 
     auto *columns = new QHBoxLayout;
-    m_rounds = new QTreeWidget(this);
-    m_rounds->setHeaderLabels({tr("Tours et résultats")});
+    m_rounds = new QTreeWidget;
+    m_rounds->setHeaderHidden(true);
     m_rounds->setSelectionMode(QAbstractItemView::NoSelection);
     m_rounds->setFocusPolicy(Qt::NoFocus);
-    columns->addWidget(m_rounds, 1);
+    columns->addWidget(new SidePanel(tr("Tours et résultats"), m_rounds, this), 1);
 
     m_standings = new QTableWidget(0, 7, this);
     m_standings->setHorizontalHeaderLabels(
@@ -55,16 +55,6 @@ TournamentPage::TournamentPage(QWidget *parent)
     m_matchLabel = new QLabel(m_matchBox);
     m_matchLabel->setWordWrap(true);
     matchLayout->addWidget(m_matchLabel);
-    m_orderHint = new QLabel(tr("Ordre de passage de vos toupies (glissez-déposez pour le changer) "
-                                "— la 1re joue la manche 1, puis on recommence après la 3e :"),
-                             m_matchBox);
-    m_orderHint->setWordWrap(true);
-    m_orderHint->setObjectName(QStringLiteral("hint"));
-    matchLayout->addWidget(m_orderHint);
-    m_order = new QListWidget(m_matchBox);
-    m_order->setDragDropMode(QAbstractItemView::InternalMove);
-    m_order->setFixedHeight(84);
-    matchLayout->addWidget(m_order);
     m_ready = new QPushButton(tr("Prêt — jouer le match"), m_matchBox);
     m_ready->setObjectName(QStringLiteral("accent"));
     m_ready->setMinimumHeight(38);
@@ -84,9 +74,15 @@ TournamentPage::TournamentPage(QWidget *parent)
     connect(m_ready, &QPushButton::clicked, this, [this] {
         if (!m_controller)
             return;
-        QList<int> order;
-        for (int i = 0; i < m_order->count(); ++i)
-            order.append(m_order->item(i)->data(Qt::UserRole).toInt());
+        const Tournament &t = m_controller->tournament();
+        const QList<Top> tops = t.participants().value(m_controller->localParticipant()).tops;
+        QList<int> order{0};
+        if (t.settings().matchFormat == MatchFormat::Classic) {
+            const auto chosen = chooseTopOrder(this, tops);
+            if (!chosen || !m_controller)
+                return;
+            order = *chosen;
+        }
         m_controller->submitOrder(order);
     });
 }
@@ -97,7 +93,6 @@ void TournamentPage::setController(net::TournamentController *controller, bool h
         disconnect(m_controller, nullptr, this, nullptr);
     m_controller = controller;
     m_host = host;
-    m_orderKey.clear();
     if (m_controller)
         connect(m_controller, &net::TournamentController::changed, this, &TournamentPage::rebuild);
     rebuild();
@@ -202,11 +197,10 @@ void TournamentPage::rebuild()
     const int match = m_controller->localMatch();
     const bool ready = m_controller->localReady();
     const bool classic = settings.matchFormat == MatchFormat::Classic;
-    m_orderHint->setVisible(classic && match >= 0);
-    m_order->setVisible(classic && match >= 0);
     m_ready->setVisible(match >= 0);
     m_ready->setEnabled(!ready);
-    m_order->setEnabled(!ready);
+    m_ready->setText(classic ? tr("Choisir l'ordre de mes toupies et jouer…")
+                             : tr("Prêt — jouer le match"));
     if (match >= 0) {
         const TournamentMatch &m = t.rounds().at(current).at(match);
         const int opponent = m.a == local ? m.b : m.a;
@@ -214,18 +208,6 @@ void TournamentPage::rebuild()
                                           .arg(participantLabel(opponent))
                                     : tr("%1 : vous affrontez %2.")
                                           .arg(t.roundName(current), participantLabel(opponent)));
-        const QString key = QStringLiteral("%1/%2").arg(current).arg(match);
-        if (key != m_orderKey) {
-            m_orderKey = key;
-            m_order->clear();
-            const QList<Top> &tops = t.participants().at(local).tops;
-            for (int i = 0; i < tops.size(); ++i) {
-                auto *item = new QListWidgetItem(QStringLiteral("%1  [%2]").arg(
-                                                     tops.at(i).name(), toString(tops.at(i).type())),
-                                                 m_order);
-                item->setData(Qt::UserRole, i);
-            }
-        }
     } else if (t.isFinished()) {
         m_matchLabel->setText(tr("Le tournoi est terminé."));
     } else if (local < 0) {

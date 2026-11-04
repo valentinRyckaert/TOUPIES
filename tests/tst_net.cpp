@@ -444,6 +444,10 @@ void TestNet::soloTournamentPlaysAndFinishes()
         session->update(1.0 / 60.0);
     QCOMPARE(session->state().phase, MatchPhase::Finished);
     QTRY_COMPARE(director.liveOf(match)->series.rounds, 1);
+    // Manche suivante : la deuxième toupie de l'ordre choisi.
+    QTRY_COMPARE_WITH_TIMEOUT(ready.count(), 2, TournamentDirector::kPauseMs + 2000);
+    QVERIFY(session);
+    QCOMPARE(session->state().spinners[session->localPlayer()].top.name(), presets.at(0).name());
 
     director.forfeitLocal();
     QCOMPARE(over.count(), 1);

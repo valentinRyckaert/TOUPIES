@@ -209,6 +209,7 @@ void TestGui::soloTournamentOpensMatch()
     emit window.findChild<MenuPage *>()->tournamentRequested();
     auto *setup = qobject_cast<TournamentSetupPage *>(currentPage(window));
     QVERIFY(setup);
+    buttonStartingWith(setup, QStringLiteral("🏆  Tournoi solo"))->click();
     buttonStartingWith(setup, QStringLiteral("Lancer le tournoi"))->click();
     auto *hub = qobject_cast<TournamentPage *>(currentPage(window));
     QVERIFY(hub);

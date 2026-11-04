@@ -2,6 +2,9 @@
 
 #include "game/Stadium.h"
 #include "ui/StadiumPainter.h"
+#include "ui/Widgets.h"
+
+#include <QDialog>
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -46,18 +49,24 @@ LanMenuPage::LanMenuPage(QWidget *parent)
     m_title->setObjectName(QStringLiteral("title"));
     root->addWidget(m_title);
 
+    auto *topRow = new QHBoxLayout;
     auto *nameForm = new QFormLayout;
     m_nameEdit = new QLineEdit(this);
     m_nameEdit->setMaxLength(net::kMaxNameLength);
     m_nameEdit->setText(QSettings().value(kNameSetting, defaultPlayerName()).toString());
     nameForm->addRow(tr("Votre pseudo"), m_nameEdit);
-    root->addLayout(nameForm);
+    topRow->addLayout(nameForm, 1);
+    m_openCreateButton = new QPushButton(tr("＋  Créer un lobby…"), this);
+    m_openCreateButton->setObjectName(QStringLiteral("accent"));
+    m_openCreateButton->setMinimumHeight(36);
+    topRow->addWidget(m_openCreateButton);
+    root->addLayout(topRow);
 
     auto *columns = new QHBoxLayout;
     root->addLayout(columns, 1);
 
     // --- Créer ------------------------------------------------------------------
-    auto *createBox = m_createBox = new QGroupBox(tr("Créer un lobby"), this);
+    auto *createBox = m_createBox = new QGroupBox(tr("Créer un lobby"));
     auto *createLayout = new QVBoxLayout(createBox);
     auto *createForm = new QFormLayout;
     m_lobbyNameEdit = new QLineEdit(createBox);
@@ -81,7 +90,9 @@ LanMenuPage::LanMenuPage(QWidget *parent)
     m_createButton->setObjectName(QStringLiteral("accent"));
     m_createButton->setMinimumHeight(36);
     createLayout->addWidget(m_createButton);
-    columns->addWidget(createBox, 1);
+    QDialog *createPopupDialog = createPopup(this, tr("Créer un lobby"), createBox);
+    connect(m_openCreateButton, &QPushButton::clicked, createPopupDialog, &QDialog::open);
+    connect(m_createButton, &QPushButton::clicked, createPopupDialog, &QDialog::accept);
 
     // --- Rejoindre --------------------------------------------------------------
     auto *joinBox = new QGroupBox(tr("Rejoindre un lobby"), this);
@@ -166,6 +177,7 @@ void LanMenuPage::setTournament(const std::optional<TournamentSettings> &setting
     m_title->setText(settings ? tr("Tournoi en réseau local") : tr("Multijoueur en réseau local"));
     m_createBox->setTitle(settings ? tr("Créer un tournoi (lobby des joueurs humains)")
                                    : tr("Créer un lobby"));
+    m_openCreateButton->setText(settings ? tr("＋  Créer un tournoi…") : tr("＋  Créer un lobby…"));
     m_createButton->setText(settings ? tr("Créer le lobby du tournoi") : tr("Créer le lobby"));
 }
 
@@ -203,6 +215,7 @@ void LanMenuPage::deactivate()
 void LanMenuPage::setBusy(bool busy, const QString &message)
 {
     for (QWidget *w : {static_cast<QWidget *>(m_createButton),
+                       static_cast<QWidget *>(m_openCreateButton),
                        static_cast<QWidget *>(m_joinButton),
                        static_cast<QWidget *>(m_lobbyList)})
         w->setEnabled(!busy);

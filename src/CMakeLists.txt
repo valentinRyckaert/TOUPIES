@@ -58,6 +58,8 @@ target_link_libraries(toupie_net PUBLIC toupie_core Qt6::Network)
 add_library(toupie_ui STATIC
     ui/Theme.h
     ui/Theme.cpp
+    ui/Widgets.h
+    ui/Widgets.cpp
     ui/TopPainter.h
     ui/TopPainter.cpp
     ui/RulesWidget.h

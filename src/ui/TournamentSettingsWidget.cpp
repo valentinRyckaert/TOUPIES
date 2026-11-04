@@ -1,11 +1,14 @@
 #include "ui/TournamentSettingsWidget.h"
 
+#include "ui/Widgets.h"
+
 #include <QComboBox>
+#include <QDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
-#include <QSpinBox>
+#include <QPushButton>
 #include <QTableWidget>
 #include <QVBoxLayout>
 
@@ -44,33 +47,35 @@ TournamentSettingsWidget::TournamentSettingsWidget(QWidget *parent)
     m_matchHelp->setObjectName(QStringLiteral("hint"));
     form->addRow(QString(), m_matchHelp);
 
-    auto *countRow = new QHBoxLayout;
-    m_participants = new QSpinBox(this);
-    m_participants->setRange(Tournament::kMinParticipants, Tournament::kMaxParticipants);
-    m_split = new QLabel(this);
-    countRow->addWidget(m_participants);
-    countRow->addWidget(m_split, 1);
-    form->addRow(tr("Participants"), countRow);
+    m_participants = new QComboBox(this);
+    form->addRow(tr("Participants"), m_participants);
+    m_botsButton = new QPushButton(this);
+    form->addRow(tr("Bots"), m_botsButton);
+    layout->addLayout(form);
 
-    m_allBots = new QComboBox(this);
+    // Niveau de chaque bot : dans une fenêtre surgissante.
+    auto *botsContent = new QWidget;
+    auto *botsLayout = new QVBoxLayout(botsContent);
+    botsLayout->setContentsMargins(0, 0, 0, 0);
+    m_allBots = new QComboBox(botsContent);
     m_allBots->addItem(tr("Régler tous les bots…"), -1);
     for (Difficulty d : {Difficulty::Easy, Difficulty::Normal, Difficulty::Hard})
         m_allBots->addItem(tr("Tous : %1").arg(toString(d)), static_cast<int>(d));
-    form->addRow(tr("Niveau des bots"), m_allBots);
-    layout->addLayout(form);
-
-    m_bots = new QTableWidget(0, 2, this);
+    botsLayout->addWidget(m_allBots);
+    m_bots = new QTableWidget(0, 2, botsContent);
     m_bots->setHorizontalHeaderLabels({tr("Bot"), tr("Niveau")});
     m_bots->verticalHeader()->setVisible(false);
     m_bots->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_bots->setSelectionMode(QAbstractItemView::NoSelection);
     m_bots->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_bots->setFixedHeight(150);
-    layout->addWidget(m_bots);
+    m_bots->setMinimumSize(320, 260);
+    botsLayout->addWidget(m_bots);
+    m_botsPopup = createPopup(this, tr("Niveau des bots"), botsContent);
 
+    connect(m_botsButton, &QPushButton::clicked, m_botsPopup, &QDialog::open);
     connect(m_format, &QComboBox::currentIndexChanged, this, &TournamentSettingsWidget::edited);
     connect(m_match, &QComboBox::currentIndexChanged, this, &TournamentSettingsWidget::edited);
-    connect(m_participants, &QSpinBox::valueChanged, this, &TournamentSettingsWidget::edited);
+    connect(m_participants, &QComboBox::activated, this, &TournamentSettingsWidget::edited);
     connect(m_allBots, &QComboBox::activated, this, [this] {
         const int level = m_allBots->currentData().toInt();
         m_allBots->setCurrentIndex(0);
@@ -113,7 +118,7 @@ void TournamentSettingsWidget::edited()
         return;
     m_settings.format = static_cast<TournamentFormat>(m_format->currentData().toInt());
     m_settings.matchFormat = static_cast<MatchFormat>(m_match->currentData().toInt());
-    m_settings.participants = m_participants->value();
+    m_settings.participants = m_participants->currentData().toInt();
     m_settings.fitBots(m_humans);
     refresh();
     emit settingsChanged(m_settings);
@@ -124,10 +129,34 @@ void TournamentSettingsWidget::refresh()
     m_updating = true;
     m_format->setCurrentIndex(m_format->findData(static_cast<int>(m_settings.format)));
     m_match->setCurrentIndex(m_match->findData(static_cast<int>(m_settings.matchFormat)));
-    m_participants->setMinimum(std::max(Tournament::kMinParticipants, m_humans));
-    m_participants->setValue(m_settings.participants);
-    m_split->setText(tr("dont %n humain(s)", nullptr, m_humans)
-                     + tr(" et %n bot(s)", nullptr, static_cast<int>(m_settings.bots.size())));
+    // Élimination directe : tableau complet (4, 8, 16 ou 32), sans exemption.
+    const bool knockout = m_settings.format == TournamentFormat::Knockout;
+    QList<int> counts;
+    for (int n = Tournament::kMinParticipants; n <= Tournament::kMaxParticipants;
+         n = knockout ? n * 2 : n + 1) {
+        if (n >= m_humans)
+            counts.append(n);
+    }
+    if (!counts.contains(m_settings.participants)) {
+        const auto it = std::lower_bound(counts.begin(), counts.end(), m_settings.participants);
+        m_settings.participants = it == counts.end() ? counts.last() : *it;
+        m_settings.fitBots(m_humans);
+    }
+    m_participants->clear();
+    for (int n : counts)
+        m_participants->addItem(tr("%1 participants (dont %n humain(s))", nullptr, m_humans).arg(n),
+                                n);
+    m_participants->setCurrentIndex(m_participants->findData(m_settings.participants));
+    int levels[3] = {0, 0, 0};
+    for (Difficulty d : m_settings.bots)
+        ++levels[static_cast<int>(d)];
+    QStringList parts;
+    for (Difficulty d : {Difficulty::Easy, Difficulty::Normal, Difficulty::Hard}) {
+        if (levels[static_cast<int>(d)] > 0)
+            parts << QStringLiteral("%1 %2").arg(levels[static_cast<int>(d)]).arg(toString(d).toLower());
+    }
+    m_botsButton->setText(tr("%n bot(s) : %1…", nullptr, static_cast<int>(m_settings.bots.size()))
+                              .arg(parts.join(QStringLiteral(", "))));
     m_matchHelp->setText(m_settings.matchFormat == MatchFormat::Express
                              ? tr("Une toupie pour tout le tournoi ; le premier à gagner 2 manches "
                                   "remporte le match.")
@@ -146,6 +175,7 @@ void TournamentSettingsWidget::refresh()
                 if (m_updating || i >= m_settings.bots.size())
                     return;
                 m_settings.bots[i] = static_cast<Difficulty>(combo->currentData().toInt());
+                refresh();
                 emit settingsChanged(m_settings);
             });
         }
@@ -155,6 +185,7 @@ void TournamentSettingsWidget::refresh()
     for (QWidget *w : {static_cast<QWidget *>(m_format), static_cast<QWidget *>(m_match),
                        static_cast<QWidget *>(m_participants), static_cast<QWidget *>(m_allBots)})
         w->setEnabled(!m_readOnly);
+    m_botsButton->setEnabled(!m_settings.bots.isEmpty());
     m_updating = false;
 }
 

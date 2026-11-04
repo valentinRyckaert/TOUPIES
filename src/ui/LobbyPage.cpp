@@ -11,6 +11,9 @@
 #include "ui/StadiumPainter.h"
 #include "ui/StatsWidget.h"
 #include "ui/TournamentSettingsWidget.h"
+#include "ui/Widgets.h"
+
+#include <QDialog>
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -66,8 +69,10 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     m_subtitle->setTextInteractionFlags(Qt::TextSelectableByMouse);
     root->addWidget(m_subtitle);
 
-    // --- Paramètres du lobby ----------------------------------------------------
-    auto *settingsRow = new QHBoxLayout;
+    // --- Paramètres du lobby (panneau latéral rétractable) -----------------------
+    auto *settings = new QWidget;
+    auto *settingsLayout = new QVBoxLayout(settings);
+    settingsLayout->setContentsMargins(0, 0, 0, 0);
     auto *form = new QFormLayout;
     m_playersCombo = new QComboBox(this);
     for (int n = Battle::kMinPlayers; n <= Battle::kMaxPlayers; ++n)
@@ -85,14 +90,30 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     stadiumRow->addWidget(m_stadiumCombo);
     stadiumRow->addWidget(m_stadiumLabel);
     form->addRow(tr("Stadium"), stadiumRow);
-    settingsRow->addLayout(form);
+    settingsLayout->addLayout(form);
     m_stadiumPreview = new StadiumWidget(this);
-    settingsRow->addWidget(m_stadiumPreview, 1);
-    root->addLayout(settingsRow);
-    m_rules = new RulesWidget(this);
-    root->addWidget(m_rules);
-    m_tournamentSettings = new TournamentSettingsWidget(this);
-    root->addWidget(m_tournamentSettings);
+    settingsLayout->addWidget(m_stadiumPreview);
+
+    // Personnalisation et réglages du tournoi : dans des fenêtres surgissantes.
+    m_rules = new RulesWidget;
+    QDialog *rulesPopup = createPopup(this, tr("Personnalisation"), m_rules);
+    m_rulesButton = new QPushButton(settings);
+    settingsLayout->addWidget(m_rulesButton);
+    m_tournamentSettings = new TournamentSettingsWidget;
+    QDialog *tournamentPopup = createPopup(this, tr("Réglages du tournoi"), m_tournamentSettings);
+    m_tournamentButton = new QPushButton(settings);
+    settingsLayout->addWidget(m_tournamentButton);
+    settingsLayout->addStretch();
+    connect(m_rulesButton, &QPushButton::clicked, rulesPopup, &QDialog::open);
+    connect(m_tournamentButton, &QPushButton::clicked, tournamentPopup, &QDialog::open);
+
+    auto *columns = new QHBoxLayout;
+    auto *sidePanel = new SidePanel(tr("Réglages du lobby"), settings, this);
+    sidePanel->setMaximumWidth(360);
+    columns->addWidget(sidePanel);
+    auto *main = new QVBoxLayout;
+    columns->addLayout(main, 1);
+    root->addLayout(columns, 1);
 
     // --- Joueurs ----------------------------------------------------------------
     m_table = new QTableWidget(0, 4, this);
@@ -105,7 +126,7 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     m_table->setFixedHeight(m_table->horizontalHeader()->sizeHint().height()
                             + Battle::kMaxPlayers * m_table->verticalHeader()->defaultSectionSize()
                             + 4);
-    root->addWidget(m_table);
+    main->addWidget(m_table);
 
     // --- Ma toupie --------------------------------------------------------------
     auto *topBox = new QGroupBox(tr("Votre toupie (parmi vos toupies locales)"), this);
@@ -113,6 +134,8 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     auto *combos = new QHBoxLayout;
     for (int i = 0; i < 3; ++i) {
         auto *combo = new QComboBox(topBox);
+        combo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        combo->setMinimumContentsLength(10);
         m_topCombos.append(combo);
         combos->addWidget(combo);
         connect(combo, &QComboBox::currentIndexChanged, this, [this, combo] {
@@ -123,12 +146,12 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     topLayout->addLayout(combos);
     m_topPreview = new StatsWidget(topBox);
     topLayout->addWidget(m_topPreview);
-    root->addWidget(topBox);
+    main->addWidget(topBox);
 
     m_status = new QLabel(this);
     m_status->setWordWrap(true);
-    root->addWidget(m_status);
-    root->addStretch();
+    main->addWidget(m_status);
+    main->addStretch();
 
     auto *buttons = new QHBoxLayout;
     auto *leaveButton = new QPushButton(tr("Quitter le lobby"), this);
@@ -386,8 +409,15 @@ void LobbyPage::rebuild()
     m_rules->setReadOnly(!hosting);
     if (m_rules->rules() != info->rules)
         m_rules->setRules(info->rules);
-    m_tournamentSettings->setVisible(info->tournament.has_value());
+    m_rulesButton->setText(tr("Personnalisation : %1%2")
+                               .arg(info->rules.summary(), hosting ? tr(" — modifier…") : QString()));
+    m_tournamentButton->setVisible(info->tournament.has_value());
     if (info->tournament) {
+        m_tournamentButton->setText(
+            tr("%1 · %2 · %3 participants%4")
+                .arg(toString(info->tournament->format), toString(info->tournament->matchFormat))
+                .arg(info->tournament->participants)
+                .arg(hosting ? tr(" — modifier…") : tr(" — détails…")));
         m_tournamentSettings->setReadOnly(!hosting);
         m_tournamentSettings->setHumans(info->maxPlayers);
         if (m_tournamentSettings->settings() != *info->tournament)

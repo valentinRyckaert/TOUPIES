@@ -5,15 +5,17 @@
 #include <QGroupBox>
 
 class QComboBox;
+class QDialog;
 class QLabel;
-class QSpinBox;
+class QPushButton;
 class QTableWidget;
 
 namespace toupie {
 
 /// Réglages d'un tournoi : format (ligue / élimination directe), type de
-/// match (express / classique), nombre de participants et niveau de chaque
-/// bot. En lecture seule pour les clients d'un lobby.
+/// match (express / classique), nombre de participants (4, 8, 16 ou 32 en
+/// élimination directe) et niveau de chaque bot (dans une fenêtre
+/// surgissante). En lecture seule pour les clients d'un lobby.
 class TournamentSettingsWidget : public QGroupBox
 {
     Q_OBJECT
@@ -42,11 +44,12 @@ private:
     bool m_updating = false;
     QComboBox *m_format = nullptr;
     QComboBox *m_match = nullptr;
-    QSpinBox *m_participants = nullptr;
-    QLabel *m_split = nullptr;
+    QComboBox *m_participants = nullptr;
     QLabel *m_matchHelp = nullptr;
+    QPushButton *m_botsButton = nullptr;
     QComboBox *m_allBots = nullptr;
     QTableWidget *m_bots = nullptr;
+    QDialog *m_botsPopup = nullptr;
 };
 
 } // namespace toupie

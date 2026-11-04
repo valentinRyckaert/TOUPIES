@@ -6,9 +6,9 @@
 #include <QWidget>
 
 class QComboBox;
-class QGroupBox;
-class QPushButton;
-class QRadioButton;
+class QFormLayout;
+class QLabel;
+class QStackedWidget;
 
 namespace toupie {
 
@@ -16,7 +16,8 @@ class RulesWidget;
 class TopRepository;
 class TournamentSettingsWidget;
 
-/// Section « Tournois » : tournoi solo contre des bots ou en réseau local.
+/// Section « Tournois », en étapes : choix solo / réseau local, puis
+/// réglages du tournoi solo (la personnalisation s'ouvre dans une fenêtre).
 class TournamentSetupPage : public QWidget
 {
     Q_OBJECT
@@ -24,7 +25,7 @@ class TournamentSetupPage : public QWidget
 public:
     explicit TournamentSetupPage(TopRepository &repository, QWidget *parent = nullptr);
 
-    /// Recharge les toupies disponibles.
+    /// Recharge les toupies disponibles et revient au choix du mode.
     void refresh();
     TournamentSettings settings() const;
 
@@ -36,18 +37,17 @@ signals:
     void lanRequested();
 
 private:
-    void updateMode();
+    void updateTops();
 
     TopRepository &m_repository;
     QList<Top> m_tops;
-    QRadioButton *m_solo = nullptr;
-    QRadioButton *m_lan = nullptr;
+    QStackedWidget *m_steps = nullptr;
     TournamentSettingsWidget *m_settings = nullptr;
-    QGroupBox *m_soloBox = nullptr;
+    QFormLayout *m_soloForm = nullptr;
     QComboBox *m_stadium = nullptr;
     RulesWidget *m_rules = nullptr;
+    QLabel *m_rulesSummary = nullptr;
     QList<QComboBox *> m_topCombos;
-    QPushButton *m_start = nullptr;
 };
 
 } // namespace toupie
