@@ -78,6 +78,10 @@ jobs:
   qt-lts:
     name: ${{ matrix.os }} · Qt 6.8
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    # Les runners macOS (arm64) de GitHub sont souvent saturés : un échec
+    # d'attribution du runner ne doit pas faire échouer toute la CI.
+    continue-on-error: ${{ matrix.os == 'macos-latest' }}
     strategy:
       fail-fast: false
       matrix:

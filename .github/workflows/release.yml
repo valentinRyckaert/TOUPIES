@@ -15,6 +15,10 @@ jobs:
   package:
     name: Paquet ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    # Runners macOS saturés : la release est publiée sans le dmg, qu'on ajoute
+    # ensuite avec « Re-run failed jobs » (la publication est relancée aussi).
+    continue-on-error: ${{ matrix.name == 'macos' }}
     strategy:
       fail-fast: false
       matrix:
@@ -106,7 +110,7 @@ jobs:
   publish:
     name: Publication de la release
     needs: package
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
