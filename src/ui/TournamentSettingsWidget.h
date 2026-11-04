@@ -8,6 +8,7 @@ class QComboBox;
 class QDialog;
 class QLabel;
 class QPushButton;
+class QSpinBox;
 class QTableWidget;
 
 namespace toupie {
@@ -44,7 +45,9 @@ private:
     bool m_updating = false;
     QComboBox *m_format = nullptr;
     QComboBox *m_match = nullptr;
-    QComboBox *m_participants = nullptr;
+    QComboBox *m_participants = nullptr; ///< Élimination directe : 4, 8, 16 ou 32.
+    QSpinBox *m_leagueCount = nullptr;   ///< Ligue : de 4 à 32.
+    QLabel *m_split = nullptr;           ///< « dont N humains et M bots ».
     QLabel *m_matchHelp = nullptr;
     QPushButton *m_botsButton = nullptr;
     QComboBox *m_allBots = nullptr;

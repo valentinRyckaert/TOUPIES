@@ -14,7 +14,10 @@
 #include "ui/SetupPage.h"
 #include "ui/Theme.h"
 #include "ui/TournamentPage.h"
+#include "ui/TournamentSettingsWidget.h"
 #include "ui/TournamentSetupPage.h"
+
+#include <QSpinBox>
 
 #include <QApplication>
 #include <QComboBox>
@@ -53,6 +56,7 @@ private slots:
     void builderSavesTopWithBolt();
     void lanLobbyStartsMatchWithHostRules();
     void soloTournamentOpensMatch();
+    void tournamentParticipantsFollowFormat();
 };
 
 void TestGui::initTestCase()
@@ -221,6 +225,23 @@ void TestGui::soloTournamentOpensMatch()
     QCOMPARE(battle->mode(), BattlePage::Mode::Tournament);
     QVERIFY(battle->session() && battle->session()->state().series.has_value());
     QVERIFY(buttonStartingWith(battle, QStringLiteral("Abandonner")));
+}
+
+void TestGui::tournamentParticipantsFollowFormat()
+{
+    TournamentSettingsWidget widget;
+    widget.setHumans(2);
+    auto *count = widget.findChild<QSpinBox *>();
+    auto *format = widget.findChildren<QComboBox *>().first();
+    count->setValue(6); // Ligue : saisie libre.
+    QCOMPARE(widget.settings().participants, 6);
+    QCOMPARE(widget.settings().bots.size(), 4);
+    format->setCurrentIndex(format->findData(static_cast<int>(TournamentFormat::Knockout)));
+    QCOMPARE(widget.settings().participants, 8); // Tableau complet.
+    QVERIFY(count->isHidden());
+    format->setCurrentIndex(format->findData(static_cast<int>(TournamentFormat::League)));
+    QCOMPARE(count->value(), 8);
+    QVERIFY(!count->isHidden());
 }
 
 QTEST_MAIN(TestGui)

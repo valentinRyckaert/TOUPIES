@@ -9,6 +9,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QTableWidget>
 #include <QVBoxLayout>
 
@@ -47,8 +48,16 @@ TournamentSettingsWidget::TournamentSettingsWidget(QWidget *parent)
     m_matchHelp->setObjectName(QStringLiteral("hint"));
     form->addRow(QString(), m_matchHelp);
 
+    auto *countRow = new QHBoxLayout;
     m_participants = new QComboBox(this);
-    form->addRow(tr("Participants"), m_participants);
+    m_leagueCount = new QSpinBox(this);
+    m_leagueCount->setRange(Tournament::kMinParticipants, Tournament::kMaxParticipants);
+    m_leagueCount->setMinimumWidth(90);
+    m_split = new QLabel(this);
+    countRow->addWidget(m_participants);
+    countRow->addWidget(m_leagueCount);
+    countRow->addWidget(m_split, 1);
+    form->addRow(tr("Participants"), countRow);
     m_botsButton = new QPushButton(this);
     form->addRow(tr("Bots"), m_botsButton);
     layout->addLayout(form);
@@ -76,6 +85,7 @@ TournamentSettingsWidget::TournamentSettingsWidget(QWidget *parent)
     connect(m_format, &QComboBox::currentIndexChanged, this, &TournamentSettingsWidget::edited);
     connect(m_match, &QComboBox::currentIndexChanged, this, &TournamentSettingsWidget::edited);
     connect(m_participants, &QComboBox::activated, this, &TournamentSettingsWidget::edited);
+    connect(m_leagueCount, &QSpinBox::valueChanged, this, &TournamentSettingsWidget::edited);
     connect(m_allBots, &QComboBox::activated, this, [this] {
         const int level = m_allBots->currentData().toInt();
         m_allBots->setCurrentIndex(0);
@@ -116,9 +126,12 @@ void TournamentSettingsWidget::edited()
 {
     if (m_updating)
         return;
+    // Nombre lu dans le champ du format affiché jusqu'ici.
+    m_settings.participants = m_settings.format == TournamentFormat::Knockout
+                                ? m_participants->currentData().toInt()
+                                : m_leagueCount->value();
     m_settings.format = static_cast<TournamentFormat>(m_format->currentData().toInt());
     m_settings.matchFormat = static_cast<MatchFormat>(m_match->currentData().toInt());
-    m_settings.participants = m_participants->currentData().toInt();
     m_settings.fitBots(m_humans);
     refresh();
     emit settingsChanged(m_settings);
@@ -144,9 +157,14 @@ void TournamentSettingsWidget::refresh()
     }
     m_participants->clear();
     for (int n : counts)
-        m_participants->addItem(tr("%1 participants (dont %n humain(s))", nullptr, m_humans).arg(n),
-                                n);
+        m_participants->addItem(QString::number(n), n);
     m_participants->setCurrentIndex(m_participants->findData(m_settings.participants));
+    m_leagueCount->setMinimum(std::max(Tournament::kMinParticipants, m_humans));
+    m_leagueCount->setValue(m_settings.participants);
+    m_participants->setVisible(knockout);
+    m_leagueCount->setVisible(!knockout);
+    m_split->setText(tr("participants, dont %n humain(s)", nullptr, m_humans)
+                     + tr(" et %n bot(s)", nullptr, static_cast<int>(m_settings.bots.size())));
     int levels[3] = {0, 0, 0};
     for (Difficulty d : m_settings.bots)
         ++levels[static_cast<int>(d)];
@@ -183,7 +201,8 @@ void TournamentSettingsWidget::refresh()
         combo->setEnabled(!m_readOnly);
     }
     for (QWidget *w : {static_cast<QWidget *>(m_format), static_cast<QWidget *>(m_match),
-                       static_cast<QWidget *>(m_participants), static_cast<QWidget *>(m_allBots)})
+                       static_cast<QWidget *>(m_participants), static_cast<QWidget *>(m_leagueCount),
+                       static_cast<QWidget *>(m_allBots)})
         w->setEnabled(!m_readOnly);
     m_botsButton->setEnabled(!m_settings.bots.isEmpty());
     m_updating = false;
