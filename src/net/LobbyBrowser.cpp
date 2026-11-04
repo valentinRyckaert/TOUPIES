@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QJsonDocument>
 #include <QNetworkDatagram>
+#include <QNetworkInterface>
 #include <QUdpSocket>
 
 #include <algorithm>
@@ -15,19 +16,66 @@ constexpr qint64 kUdpLifetimeMs = 6000;
 /// Lobbys trouvés par balayage : conservés jusqu'au balayage suivant.
 constexpr qint64 kScanLifetimeMs = 45000;
 constexpr int kScanIntervalMs = 30000;
+constexpr int kNearScanIntervalMs = 4000;
+constexpr int kQueryIntervalMs = 2000;
+
+/// Adresses de diffusion de chaque interface (calculées une fois : l'énumération
+/// des interfaces est lente sous Windows).
+QList<QHostAddress> broadcastTargets()
+{
+    QList<QHostAddress> targets{QHostAddress(QHostAddress::Broadcast),
+                                QHostAddress(QHostAddress::LocalHost)};
+    const auto interfaces = QNetworkInterface::allInterfaces();
+    for (const QNetworkInterface &iface : interfaces) {
+        if (!(iface.flags() & QNetworkInterface::IsUp)
+            || !(iface.flags() & QNetworkInterface::CanBroadcast))
+            continue;
+        for (const QNetworkAddressEntry &entry : iface.addressEntries()) {
+            if (!entry.broadcast().isNull() && !targets.contains(entry.broadcast()))
+                targets.append(entry.broadcast());
+        }
+    }
+    return targets;
+}
 } // namespace
 
 LobbyBrowser::LobbyBrowser(quint16 discoveryPort, QObject *parent)
     : QObject(parent)
     , m_port(discoveryPort)
 {
+    qRegisterMetaType<LobbyAnnouncement>();
     m_expireTimer.setInterval(1000);
     connect(&m_expireTimer, &QTimer::timeout, this, &LobbyBrowser::expire);
     m_scanTimer.setInterval(kScanIntervalMs);
-    connect(&m_scanTimer, &QTimer::timeout, this, &LobbyBrowser::rescan);
-    connect(&m_scanner, &LobbyScanner::lobbyFound, this,
-            [this](const LobbyAnnouncement &lobby) { merge(lobby, false); });
-    connect(&m_scanner, &LobbyScanner::finished, this, &LobbyBrowser::scanFinished);
+    connect(&m_scanTimer, &QTimer::timeout, this, [this] { scan(false); });
+    m_nearTimer.setInterval(kNearScanIntervalMs);
+    connect(&m_nearTimer, &QTimer::timeout, this, [this] {
+        if (!m_scanning)
+            scan(true);
+    });
+    m_queryTimer.setInterval(kQueryIntervalMs);
+    connect(&m_queryTimer, &QTimer::timeout, this, &LobbyBrowser::sendQuery);
+
+    // Le balayage ouvre des centaines de connexions : il tourne dans son propre fil.
+    m_scanner = new LobbyScanner;
+    m_scanner->moveToThread(&m_scanThread);
+    connect(&m_scanThread, &QThread::finished, m_scanner, &QObject::deleteLater);
+    connect(m_scanner, &LobbyScanner::lobbyFound, this, [this](const LobbyAnnouncement &lobby) {
+        if (m_running)
+            merge(lobby, false);
+    });
+    connect(m_scanner, &LobbyScanner::finished, this, [this] {
+        m_scanning = false;
+        emit scanFinished();
+    });
+    m_scanThread.start();
+}
+
+LobbyBrowser::~LobbyBrowser()
+{
+    stop();
+    m_scanThread.quit();
+    m_scanThread.wait();
 }
 
 bool LobbyBrowser::start(bool scanNetwork)
@@ -45,14 +93,42 @@ bool LobbyBrowser::start(bool scanNetwork)
         delete m_socket;
         m_socket = nullptr;
     } else {
-        connect(m_socket, &QUdpSocket::readyRead, this, &LobbyBrowser::readDatagrams);
+        connect(m_socket, &QUdpSocket::readyRead, this, [this] { readDatagrams(m_socket); });
+    }
+    m_querySocket = new QUdpSocket(this);
+    if (m_querySocket->bind(QHostAddress::AnyIPv4, 0)) {
+        connect(m_querySocket, &QUdpSocket::readyRead, this,
+                [this] { readDatagrams(m_querySocket); });
+        m_queryTargets = broadcastTargets();
+        sendQuery();
+        m_queryTimer.start();
     }
 
     if (scanNetwork) {
-        rescan();
+        scan(false);
         m_scanTimer.start();
+        m_nearTimer.start();
     }
     return m_socket != nullptr;
+}
+
+void LobbyBrowser::sendQuery()
+{
+    const QByteArray query = QJsonDocument(QJsonObject{{"type", QStringLiteral("query")},
+                                                       {"app", kApplicationTag},
+                                                       {"v", kProtocolVersion}})
+                                 .toJson(QJsonDocument::Compact);
+    for (const QHostAddress &target : std::as_const(m_queryTargets))
+        m_querySocket->writeDatagram(query, target, m_port);
+}
+
+void LobbyBrowser::scan(bool nearOnly)
+{
+    if (!m_running)
+        return;
+    m_scanning = true;
+    LobbyScanner *scanner = m_scanner;
+    QMetaObject::invokeMethod(scanner, [scanner, nearOnly] { scanner->scanLocalNetworks(nearOnly); });
 }
 
 void LobbyBrowser::stop()
@@ -60,9 +136,15 @@ void LobbyBrowser::stop()
     m_running = false;
     m_expireTimer.stop();
     m_scanTimer.stop();
-    m_scanner.cancel();
+    m_nearTimer.stop();
+    m_queryTimer.stop();
+    LobbyScanner *scanner = m_scanner;
+    QMetaObject::invokeMethod(scanner, [scanner] { scanner->cancel(); });
+    m_scanning = false;
     delete m_socket;
     m_socket = nullptr;
+    delete m_querySocket;
+    m_querySocket = nullptr;
     if (!m_lobbies.isEmpty()) {
         m_lobbies.clear();
         m_fromUdp.clear();
@@ -72,8 +154,11 @@ void LobbyBrowser::stop()
 
 void LobbyBrowser::rescan()
 {
-    if (m_running)
-        m_scanner.scanLocalNetworks();
+    if (!m_running)
+        return;
+    if (m_querySocket)
+        sendQuery();
+    scan(false);
 }
 
 std::optional<LobbyAnnouncement> LobbyBrowser::findByName(const QString &name) const
@@ -85,10 +170,10 @@ std::optional<LobbyAnnouncement> LobbyBrowser::findByName(const QString &name) c
     return std::nullopt;
 }
 
-void LobbyBrowser::readDatagrams()
+void LobbyBrowser::readDatagrams(QUdpSocket *socket)
 {
-    while (m_socket && m_socket->hasPendingDatagrams()) {
-        const QNetworkDatagram datagram = m_socket->receiveDatagram(4096);
+    while (socket && socket->hasPendingDatagrams()) {
+        const QNetworkDatagram datagram = socket->receiveDatagram(4096);
         const QJsonObject o = QJsonDocument::fromJson(datagram.data()).object();
         if (o.value("app").toString() != kApplicationTag
             || o.value("v").toInt() != kProtocolVersion)

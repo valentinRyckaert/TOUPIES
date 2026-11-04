@@ -28,8 +28,9 @@ public:
     void setPorts(const QList<quint16> &ports) { m_ports = ports; }
     /// Sonde les adresses données.
     void scan(const QList<QHostAddress> &hosts);
-    /// Sonde les sous-réseaux IPv4 locaux (hors interfaces virtuelles).
-    void scanLocalNetworks();
+    /// Sonde les sous-réseaux IPv4 locaux (hors interfaces virtuelles) ;
+    /// `nearOnly` : seulement le /24 de chaque interface (passe rapide).
+    void scanLocalNetworks(bool nearOnly = false);
     void cancel();
     bool isScanning() const { return !m_queue.isEmpty() || !m_active.isEmpty(); }
 

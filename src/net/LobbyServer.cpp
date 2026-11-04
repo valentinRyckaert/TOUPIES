@@ -6,6 +6,7 @@
 
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QNetworkDatagram>
 #include <QNetworkInterface>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -75,6 +76,24 @@ bool LobbyServer::start(const Settings &settings, quint16 port, quint16 discover
     if (m_discoveryPort != 0) {
         m_udp = new QUdpSocket(this);
         m_udp->bind(QHostAddress::AnyIPv4, 0); // Socket IPv4 explicite pour les diffusions.
+        // Réponse directe aux questions des clients : passe les pare-feu qui
+        // bloquent les annonces entrantes chez le client.
+        m_queries = new QUdpSocket(this);
+        if (m_queries->bind(QHostAddress::AnyIPv4, m_discoveryPort,
+                            QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint)) {
+            connect(m_queries, &QUdpSocket::readyRead, this, [this] {
+                while (m_queries && m_queries->hasPendingDatagrams()) {
+                    const QNetworkDatagram datagram = m_queries->receiveDatagram(4096);
+                    const QJsonObject o = QJsonDocument::fromJson(datagram.data()).object();
+                    if (o.value("type").toString() == QLatin1String("query")
+                        && o.value("app").toString() == kApplicationTag && m_server)
+                        m_queries->writeDatagram(
+                            QJsonDocument(announcementJson()).toJson(QJsonDocument::Compact),
+                            datagram.senderAddress(), static_cast<quint16>(datagram.senderPort()));
+                }
+            });
+        }
+        m_announcesSinceRefresh = 0;
         announce();
         m_announceTimer.start();
     }
@@ -87,6 +106,8 @@ void LobbyServer::close(const QString &reason)
     m_announceTimer.stop();
     delete m_udp;
     m_udp = nullptr;
+    delete m_queries;
+    m_queries = nullptr;
     for (Client &client : m_clients) {
         if (client.id >= 0)
             client.channel->send({{"type", Msg::Closed}, {"reason", reason}});
@@ -411,21 +432,24 @@ void LobbyServer::announce()
     const QByteArray datagram = QJsonDocument(announcementJson()).toJson(QJsonDocument::Compact);
 
     // Diffusion générale, diffusion dirigée sur chaque interface et boucle
-    // locale (plusieurs instances sur une même machine).
-    QList<QHostAddress> targets{QHostAddress(QHostAddress::Broadcast),
-                                QHostAddress(QHostAddress::LocalHost)};
-    const auto interfaces = QNetworkInterface::allInterfaces();
-    for (const QNetworkInterface &iface : interfaces) {
-        const auto flags = iface.flags();
-        if (!(flags & QNetworkInterface::IsUp) || !(flags & QNetworkInterface::CanBroadcast)
-            || (flags & QNetworkInterface::IsLoopBack))
-            continue;
-        for (const QNetworkAddressEntry &entry : iface.addressEntries()) {
-            if (!entry.broadcast().isNull() && !targets.contains(entry.broadcast()))
-                targets.append(entry.broadcast());
+    // locale (plusieurs instances sur une même machine). L'énumération des
+    // interfaces est lente sous Windows : rafraîchie toutes les 15 annonces.
+    if (m_announcesSinceRefresh++ % 15 == 0) {
+        m_broadcastTargets = {QHostAddress(QHostAddress::Broadcast),
+                              QHostAddress(QHostAddress::LocalHost)};
+        const auto interfaces = QNetworkInterface::allInterfaces();
+        for (const QNetworkInterface &iface : interfaces) {
+            const auto flags = iface.flags();
+            if (!(flags & QNetworkInterface::IsUp) || !(flags & QNetworkInterface::CanBroadcast)
+                || (flags & QNetworkInterface::IsLoopBack))
+                continue;
+            for (const QNetworkAddressEntry &entry : iface.addressEntries()) {
+                if (!entry.broadcast().isNull() && !m_broadcastTargets.contains(entry.broadcast()))
+                    m_broadcastTargets.append(entry.broadcast());
+            }
         }
     }
-    for (const QHostAddress &target : targets)
+    for (const QHostAddress &target : std::as_const(m_broadcastTargets))
         m_udp->writeDatagram(datagram, target, m_discoveryPort);
 }
 

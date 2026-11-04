@@ -21,9 +21,20 @@ bool isVirtualInterface(const QNetworkInterface &iface)
                                       QStringLiteral("virbr"),  QStringLiteral("veth"),
                                       QStringLiteral("vmnet"),  QStringLiteral("vboxnet"),
                                       QStringLiteral("lxc"),    QStringLiteral("podman")};
+    // Noms Windows (« vEthernet (WSL) », « VirtualBox Host-Only Network »…) :
+    // ces cartes ajoutent des sous-réseaux entiers à sonder pour rien.
+    static const QStringList windowsNames{
+        QStringLiteral("vethernet"), QStringLiteral("virtualbox"), QStringLiteral("vmware"),
+        QStringLiteral("hyper-v"),   QStringLiteral("wsl"),        QStringLiteral("host-only"),
+        QStringLiteral("bluetooth"), QStringLiteral("pseudo")};
     const QString name = iface.name().toLower();
     for (const QString &prefix : prefixes) {
         if (name.startsWith(prefix))
+            return true;
+    }
+    const QString label = iface.humanReadableName().toLower();
+    for (const QString &part : windowsNames) {
+        if (label.contains(part))
             return true;
     }
     return iface.type() == QNetworkInterface::Virtual;
@@ -83,7 +94,7 @@ void LobbyScanner::localTargets(QList<QHostAddress> *nearHosts, QList<QHostAddre
     }
 }
 
-void LobbyScanner::scanLocalNetworks()
+void LobbyScanner::scanLocalNetworks(bool nearOnly)
 {
     // Proches voisins : tous les ports ; reste du sous-réseau : port principal seulement.
     QList<QHostAddress> nearHosts;
@@ -94,7 +105,7 @@ void LobbyScanner::scanLocalNetworks()
         for (quint16 port : m_ports)
             m_queue.append({host, port});
     }
-    if (!m_ports.isEmpty()) {
+    if (!m_ports.isEmpty() && !nearOnly) {
         for (const QHostAddress &host : farHosts)
             m_queue.append({host, m_ports.first()});
     }

@@ -11,7 +11,10 @@
 #include "net/Protocol.h"
 
 #include <QSignalSpy>
+#include <QJsonDocument>
+#include <QNetworkDatagram>
 #include <QTemporaryDir>
+#include <QUdpSocket>
 
 #include <cmath>
 #include <QJsonArray>
@@ -44,6 +47,7 @@ private slots:
     void gameMessagesAreRelayedDuringMatch();
     void lobbyIsDiscoveredByName();
     void lobbyIsFoundByTcpScan();
+    void hostAnswersDiscoveryQuery();
     void localScanTargetsExcludeVirtualInterfaces();
     void stateCodecRoundTrip();
     void networkMatchRunsEndToEnd();
@@ -241,6 +245,25 @@ void TestNet::lobbyIsFoundByTcpScan()
 
     // La sonde n'occupe pas de place dans le lobby.
     QCOMPARE(server.lobby().players.size(), 1);
+}
+
+void TestNet::hostAnswersDiscoveryQuery()
+{
+    // Question UDP d'un client : l'hôte répond directement à l'expéditeur.
+    constexpr quint16 kQueryPort = 45991;
+    LobbyServer server(PartCatalog::instance());
+    QVERIFY(server.start(settings(2), 0, kQueryPort));
+    QUdpSocket client;
+    QVERIFY(client.bind(QHostAddress::AnyIPv4, 0));
+    const QByteArray query = QJsonDocument(QJsonObject{{"type", "query"},
+                                                       {"app", kApplicationTag},
+                                                       {"v", kProtocolVersion}})
+                                 .toJson(QJsonDocument::Compact);
+    client.writeDatagram(query, QHostAddress(QHostAddress::LocalHost), kQueryPort);
+    QTRY_VERIFY(client.hasPendingDatagrams());
+    const QJsonObject reply = QJsonDocument::fromJson(client.receiveDatagram().data()).object();
+    QCOMPARE(reply.value("name").toString(), QStringLiteral("Salon test"));
+    QCOMPARE(reply.value("port").toInt(), int(server.port()));
 }
 
 void TestNet::localScanTargetsExcludeVirtualInterfaces()

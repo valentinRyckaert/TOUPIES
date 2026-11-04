@@ -98,6 +98,9 @@ private:
     QString m_fingerprint;
     QTcpServer *m_server = nullptr;
     QUdpSocket *m_udp = nullptr;
+    QUdpSocket *m_queries = nullptr;  ///< Questions « query » des clients (réponse directe).
+    QList<QHostAddress> m_broadcastTargets;
+    int m_announcesSinceRefresh = 0;
     quint16 m_discoveryPort = 0;
     QTimer m_announceTimer;
     QList<Client> m_clients;
