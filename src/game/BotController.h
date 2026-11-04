@@ -28,7 +28,7 @@ QString toString(Difficulty difficulty);
 /// - Tenir : garder le centre et contrer ;
 /// - Esquiver : garder ses distances en restant loin du bord, pour gagner à
 ///   l'usure.
-/// Le coup spécial (une fois par partie, coûte la moitié de l'endurance) est
+/// Le coup spécial (une fois par partie, coûte un quart de l'endurance) est
 /// lancé quand sa valeur estimée (dégâts, éjection probable, coup fatal,
 /// effet utile pour la suite) dépasse son coût réel ; en difficile, le bot
 /// enchaîne des combos (givre ou distorsion puis dash, onde sur une cible au

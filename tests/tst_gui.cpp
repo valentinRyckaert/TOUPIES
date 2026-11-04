@@ -134,7 +134,8 @@ void TestGui::soloMatchRunsToTheEnd()
                                      || battle->session()->state().spinners[0].specialUsed,
                                  2000);
         if (battle->session()->state().spinners[0].specialUsed)
-            QVERIFY(battle->session()->state().spinners[0].spin <= before * 0.5 + 1.0);
+            QVERIFY(battle->session()->state().spinners[0].spin
+                    <= before * (1.0 - battle->session()->state().config.specialCost) + 1.0);
     }
     QTRY_COMPARE_WITH_TIMEOUT(battle->session()->state().phase, MatchPhase::Finished, 12000);
 

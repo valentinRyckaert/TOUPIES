@@ -97,10 +97,14 @@ struct BattleConfig
     // --- Coups spéciaux ------------------------------------------------------
     /// Chaque toupie ne peut lancer le coup spécial de son boulon qu'une seule
     /// fois par partie ; le lancer lui coûte cette fraction de son endurance
-    /// courante.
-    double specialCost = 0.5;
+    /// courante (cher en début de partie, mais assez léger pour servir en
+    /// milieu de partie, quand son effet compte, plutôt que pour achever).
+    double specialCost = 0.25;
     double specialDamageScale = 1.0; ///< Multiplicateur des dégâts des coups spéciaux.
     double specialKnockbackScale = 1.0;
+    /// Toupie gelée (souffle de givre) : sa perte passive est multipliée par
+    /// 1 + slowWear × intensité du gel (le froid ronge la rotation).
+    double slowWear = 2.0;
     bool specialsEnabled = true;
 
     // --- Duel (deux toupies qui se percutent en plein dash) --------------------

@@ -214,7 +214,8 @@ double Battle::passiveLossPerSecond(const Spinner &s) const
 {
     const double enduranceFactor = std::max(
         m_config.minReduction, 1.0 - m_config.passivePerEndurance * s.stats.endurance);
-    return m_config.passiveBase * enduranceFactor * stability(s)
+    const double frost = s.isSlowed() ? 1.0 + m_config.slowWear * s.slowStrength : 1.0;
+    return m_config.passiveBase * enduranceFactor * stability(s) * frost
          * (1.0 + m_config.speedDrain * s.velocity.length());
 }
 

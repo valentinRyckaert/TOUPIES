@@ -816,7 +816,7 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
         if (s.specialUsed)
             label = tr("%1 — utilisé").arg(move->name);
         else if (local && state.phase == MatchPhase::Fighting)
-            label = tr("%1 : %2 (coûte ½ endurance)")
+            label = tr("%1 : %2 (coûte ¼ de l'endurance)")
                         .arg(Controls::instance().text(Action::Special), move->name);
         p.drawText(gauge, Qt::AlignCenter,
                    QFontMetrics(small).elidedText(label, Qt::ElideRight, int(gauge.width()) - 6));

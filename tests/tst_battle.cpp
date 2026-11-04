@@ -60,7 +60,7 @@ private slots:
     void launchPowerScalesSpeed();
     void steeringChangesTrajectory();
     void topsDriftTowardCenter();
-    void specialIsSingleUseAndCostsHalfEndurance();
+    void specialIsSingleUseAndCostsPartOfEndurance();
     void waveHitsTargetAndAppliesEffect_data();
     void waveHitsTargetAndAppliesEffect();
     void ringHitsEveryOpponentInRange();
@@ -454,7 +454,7 @@ void TestBattle::topsDriftTowardCenter()
     QVERIFY(battle.spinner(0).position.length() < before);
 }
 
-void TestBattle::specialIsSingleUseAndCostsHalfEndurance()
+void TestBattle::specialIsSingleUseAndCostsPartOfEndurance()
 {
     Battle battle(withBolt(attackTop(), "B2"), defenseTop(), staticConfig(), 1);
     QVERIFY(!battle.canSpecial(0)); // Pas avant le lancement.
@@ -509,9 +509,14 @@ void TestBattle::waveHitsTargetAndAppliesEffect()
         QVERIFY(target.spin < spinBefore - 0.5);
 
     switch (move.effect) {
-    case SpecialMove::Effect::Slow:
+    case SpecialMove::Effect::Slow: {
         QVERIFY(target.isSlowed());
+        // Le froid use la rotation : perte passive plus forte que sans gel.
+        Spinner thawed = target;
+        thawed.slowTimer = 0.0;
+        QVERIFY(battle.passiveLossPerSecond(target) > 2.0 * battle.passiveLossPerSecond(thawed));
         break;
+    }
     case SpecialMove::Effect::Teleport:
         QVERIFY(std::abs(battle.geometry().level(target.position) - move.effectStrength) < 0.1);
         break;

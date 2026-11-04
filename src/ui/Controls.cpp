@@ -199,7 +199,7 @@ QString Controls::helpHtml() const
                          key(Action::SteerDown)));
     html += row(tr("Dash"), key(Action::Dash));
     html += row(tr("Coup spécial"),
-                tr("%1 — une fois par partie, coûte la moitié de l'endurance du moment")
+                tr("%1 — une fois par partie, coûte un quart de l'endurance du moment")
                     .arg(key(Action::Special)));
     html += row(tr("Duel"), tr("%1 quand le curseur est dans la zone verte").arg(key(Action::Dash)));
     html += section(tr("Fin de combat et menus"));

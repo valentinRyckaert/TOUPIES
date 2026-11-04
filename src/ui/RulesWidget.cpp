@@ -73,7 +73,7 @@ RulesWidget::RulesWidget(QWidget *parent)
                           0, 250, true);
     m_specials = new QCheckBox(tr("Coups spéciaux"), this);
     m_specials->setToolTip(tr("Chaque toupie peut lancer son coup spécial une fois par partie, "
-                              "au prix de la moitié de son endurance."));
+                              "au prix du quart de son endurance du moment."));
     grid->addWidget(m_specials, 2, 3, 1, 3);
     connect(m_specials, &QCheckBox::toggled, this, &RulesWidget::emitChanged);
 

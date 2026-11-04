@@ -349,6 +349,9 @@ double BotController::specialValue(const Battle &battle) const
         double gain = damage;
         if (move->effect == SpecialMove::Effect::Drain)
             gain += damage * move->effectStrength;
+        if (move->effect == SpecialMove::Effect::Slow) // Usure due au gel.
+            gain += battle.passiveLossPerSecond(t) * cfg.slowWear * move->effectStrength
+                  * move->effectDuration;
         if (damage >= t.spin)
             gain += 40.0; // Coup fatal : la partie (ou un adversaire) est gagnée.
 
@@ -391,13 +394,13 @@ double BotController::specialValue(const Battle &battle) const
         }
         value += p * gain;
     }
-    // Difficile : ne pas parier sa moitié d'endurance sur un coup incertain.
+    // Difficile : ne pas parier son endurance sur un coup incertain.
     if (m_skill.tactics) {
         const int main = targets.isEmpty() ? -1 : targets.first();
         const double p = main >= 0 ? hitProbability(battle, *move, main) : 0.0;
         if (move->shape == SpecialMove::Shape::Wave && p < 0.6)
             return -1.0;
-        // Marge de sécurité : le coût (moitié de l'endurance) pèse moins en fin
+        // Marge de sécurité : le coût (fraction de l'endurance) pèse moins en fin
         // de partie, la patience est donc payante.
         value -= cost * 0.6;
     }

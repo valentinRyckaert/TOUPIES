@@ -52,6 +52,21 @@ bool g_secondWithoutSpecials = false;
 /// Nombre total de duels terminés (tous combats confondus).
 long g_duels = 0;
 
+/// Usage des coups spéciaux (tous combats confondus).
+struct SpecialUsage
+{
+    long launches = 0;
+    double ratioAtLaunch = 0.0;   ///< Somme de l'endurance relative du lanceur.
+    double timeAtLaunch = 0.0;    ///< Somme des instants de lancer / durée du combat.
+    long early = 0;               ///< Lancés à plus de 70 % d'endurance.
+    long hits = 0;
+    long finishers = 0;           ///< Cible éliminée dans la seconde qui suit.
+} g_usage;
+/// Lancers et combats par coup spécial (part des combats où le coup est lancé).
+std::map<QString, long> g_moveLaunches;
+std::map<QString, long> g_moveFights;
+std::map<QString, long> g_moveHits;
+
 Outcome simulate(const QList<Top> &tops, const Stadium &stadium, const BattleConfig &config,
                  Difficulty difficulty, std::uint32_t seed)
 {
@@ -78,13 +93,43 @@ Outcome simulate(const QList<Top> &tops, const Stadium &stadium, const BattleCon
         powers.append(bots.back().chooseLaunchPower(battle));
     }
     battle.launch(angles, powers);
+    std::vector<int> used(n, 0);
+    std::vector<bool> active(n, true);
+    std::vector<double> lastSpecialHit(n, -1e9);
+    QList<double> launchTimes;
     while (!battle.isFinished()) {
         for (BotController &bot : bots)
             bot.update(battle, dt);
         battle.advance(dt);
-        for (const ImpactEvent &e : battle.takeImpacts())
+        for (const ImpactEvent &e : battle.takeImpacts()) {
             g_duels += e.duelLoser != ImpactEvent::kNoDuel;
+            if (e.special && e.duelLoser == ImpactEvent::kNoDuel) {
+                ++g_usage.hits;
+                ++g_moveHits[battle.spinner(e.first).top.special()];
+                lastSpecialHit[e.second] = battle.elapsed();
+            }
+        }
+        for (int i = 0; i < n; ++i) {
+            const Spinner &s = battle.spinner(i);
+            if (s.specialUsed && !used[i]) {
+                used[i] = 1;
+                ++g_moveLaunches[s.top.special()];
+                const double ratio = s.spin / (1.0 - battle.config().specialCost) / s.maxSpin;
+                ++g_usage.launches;
+                g_usage.ratioAtLaunch += ratio;
+                g_usage.early += ratio > 0.7;
+                launchTimes.append(battle.elapsed());
+            }
+            if (active[i] && !s.isActive()) {
+                active[i] = false;
+                g_usage.finishers += battle.elapsed() - lastSpecialHit[i] <= 1.0;
+            }
+        }
     }
+    for (const Spinner &s : battle.spinners())
+        ++g_moveFights[s.top.special()];
+    for (double t : launchTimes)
+        g_usage.timeAtLaunch += t / std::max(1e-6, battle.elapsed());
 
     Outcome outcome;
     outcome.reason = battle.endReason();
@@ -199,6 +244,7 @@ std::map<QString, double BattleConfig::*> configFields()
         {"contactCooldown", &BattleConfig::contactCooldown},
         {"balanceStability", &BattleConfig::balanceStability},
         {"knockoutReward", &BattleConfig::knockoutReward},
+        {"slowWear", &BattleConfig::slowWear},
         {"knockoutWindow", &BattleConfig::knockoutWindow},
         {"dashCost", &BattleConfig::dashCost},
         {"dashSpeed", &BattleConfig::dashSpeed},
@@ -389,12 +435,23 @@ int main(int argc, char *argv[])
                                  "duels : %.2f par combat\n",
                                  100.0 * m.ringOuts / m.fights, m.duration / m.fights, worst,
                                  double(g_duels) / m.fights);
+        const double launches = std::max(1L, g_usage.launches);
+        out << QString::asprintf(
+            "Coups spéciaux : %.2f lancés par combat, endurance du lanceur %.0f %% (lancés à "
+            "plus de 70 %% : %.0f %%), lancés à %.0f %% de la durée du combat, touches : %.2f "
+            "par lancer, dont décisives (cible éliminée dans la seconde) : %.0f %%\n",
+            g_usage.launches / double(m.fights), 100.0 * g_usage.ratioAtLaunch / launches,
+            100.0 * g_usage.early / launches, 100.0 * g_usage.timeAtLaunch / launches,
+            g_usage.hits / launches, 100.0 * g_usage.finishers / std::max(1L, g_usage.hits));
         out << "\nCoups spéciaux (duels entre boulons différents)\n";
         for (const auto &[id, score] : g_specialScore) {
             const auto move = SpecialMove::find(id);
             out << "  " << qSetFieldWidth(18) << Qt::left << (move ? move->name : id)
                 << qSetFieldWidth(0)
-                << QString::asprintf("%5.1f%%\n", 100.0 * score / g_specialGames[id]);
+                << QString::asprintf("%5.1f%%   (lancé dans %3.0f %% des combats, touche %3.0f %%)\n",
+                                     100.0 * score / g_specialGames[id],
+                                     100.0 * g_moveLaunches[id] / std::max(1L, g_moveFights[id]),
+                                     100.0 * g_moveHits[id] / std::max(1L, g_moveLaunches[id]));
         }
     } else if (randomFights > 0 && players == 2) {
         // Résumé par stadium : taux de victoire global de chaque type.

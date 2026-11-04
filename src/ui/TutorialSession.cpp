@@ -88,8 +88,8 @@ QString TutorialSession::bubble() const
             .arg(key(Action::Dash));
     case Step::Special:
         return tr("Votre coup spécial (donné par le boulon) se lance avec %1. Une seule fois "
-                  "par partie : il coûte la moitié de l'endurance du moment, alors gardez-le "
-                  "pour un moment décisif. Essayez-le !")
+                  "par partie : il coûte un quart de l'endurance du moment, et son effet "
+                  "compte autant que ses dégâts : lancez-le au bon moment. Essayez-le !")
             .arg(key(Action::Special));
     case Step::Duel:
         return tr("Il fonce sur vous ! Répondez par un dash avec %1 : quand deux toupies se "
