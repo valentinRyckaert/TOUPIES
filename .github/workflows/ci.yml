@@ -122,7 +122,7 @@ jobs:
           name: toupie-arena-${{ matrix.os }}
           path: |
             build/src/toupie_arena
-            build/src/toupie_arena.exe
+            build/toupie_arena.exe
             build/src/toupie_arena.app
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 7

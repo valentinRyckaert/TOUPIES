@@ -85,7 +85,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item build/src/toupie_arena.exe dist/
+          # qt_standard_project_setup() place les exécutables à la racine du build sous Windows.
+          Copy-Item build/toupie_arena.exe dist/
           windeployqt --release --no-translations --no-opengl-sw dist/toupie_arena.exe
           ./dist/toupie_arena.exe --smoke-test | Out-Null
           Compress-Archive -Path dist/* -DestinationPath "ToupieArena-${{ github.ref_name }}-windows-x64.zip"
