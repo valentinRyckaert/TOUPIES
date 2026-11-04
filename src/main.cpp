@@ -10,6 +10,7 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("ToupieArena"));
     QApplication::setOrganizationName(QStringLiteral("ToupieArena"));
     QApplication::setApplicationDisplayName(QStringLiteral("Toupie Arena"));
+    QApplication::setApplicationVersion(QStringLiteral(TOUPIE_VERSION));
 
     toupie::Theme::apply(app);
 

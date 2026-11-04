@@ -54,8 +54,12 @@ jobs:
         uses: seanmiddleditch/gha-setup-ninja@v5
 
       - name: Compilation
+        shell: bash
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          # Version de l'application = tag (v1.2.3 -> 1.2.3), pour la recherche de mises à jour.
+          VERSION=""
+          [[ "$GITHUB_REF" == refs/tags/v* ]] && VERSION="${GITHUB_REF_NAME#v}"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${VERSION:+-DTOUPIE_VERSION=$VERSION}
           cmake --build build --parallel
 
       - name: Tests

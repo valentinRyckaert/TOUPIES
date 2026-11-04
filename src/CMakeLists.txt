@@ -51,6 +51,8 @@ add_library(toupie_net STATIC
     net/ClientSession.cpp
     net/TournamentSession.h
     net/TournamentSession.cpp
+    net/Updater.h
+    net/Updater.cpp
 )
 target_link_libraries(toupie_net PUBLIC toupie_core Qt6::Network)
 
@@ -96,6 +98,7 @@ target_link_libraries(toupie_ui PUBLIC toupie_net Qt6::Widgets)
 # Application
 qt_add_executable(toupie_arena main.cpp)
 target_link_libraries(toupie_arena PRIVATE toupie_ui)
+target_compile_definitions(toupie_arena PRIVATE TOUPIE_VERSION="${TOUPIE_VERSION}")
 set_target_properties(toupie_arena PROPERTIES
     WIN32_EXECUTABLE ON
     MACOSX_BUNDLE ON

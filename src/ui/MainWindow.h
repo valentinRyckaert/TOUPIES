@@ -49,6 +49,8 @@ private:
     void showSetup();
     void showLanMenu();
     void leaveLobby(const QString &message = {});
+    /// Recherche, téléchargement et installation d'une nouvelle version.
+    void checkForUpdates();
 
     TopRepository m_repository;
     QStackedWidget *m_stack = nullptr;

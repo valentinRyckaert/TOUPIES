@@ -23,6 +23,9 @@ if(APPLE AND TARGET WrapOpenGL::WrapOpenGL)
     endif()
 endif()
 
+# Version affichée et comparée aux releases (la CI de release la tire du tag).
+set(TOUPIE_VERSION "${PROJECT_VERSION}" CACHE STRING "Version de l'application")
+
 option(TOUPIE_WERROR "Traiter les avertissements comme des erreurs" OFF)
 
 if(MSVC)

@@ -18,6 +18,8 @@ Fonctionnalités :
   ou classiques (trois toupies, 4 points).
 - **Duels** : deux toupies qui dashent l'une vers l'autre au même moment s'affrontent dans un
   duel de timing.
+- **Mises à jour** : le jeu vérifie s'il existe une version plus récente, la télécharge,
+  remplace l'ancienne et redémarre dessus.
 - **Assembler une toupie** : un boulon (coup spécial), une roue métallique, une partie
   intermédiaire et une pointe.
 - **Six stadiums** aux formes et propriétés différentes, **sept coups spéciaux** et une
@@ -299,6 +301,22 @@ Fonctionnement :
 - **Compatibilité** : le client envoie la version du protocole et une empreinte du catalogue
   de pièces ; l'hôte refuse les versions différentes.
 
+## Mises à jour
+
+Le bouton **Mises à jour** du menu interroge la dernière release GitHub du projet et compare
+son tag à la version du jeu (la CI de release compile chaque paquet avec la version de son tag).
+Si une version plus récente existe, le jeu propose de télécharger le paquet de la plateforme,
+remplace l'ancienne version puis redémarre sur la nouvelle :
+
+| Système | Paquet | Remplacement |
+|---------|--------|--------------|
+| Linux   | AppImage | la nouvelle AppImage est téléchargée à côté de l'ancienne puis la remplace (renommage atomique) et se lance |
+| Windows | zip | un script PowerShell attend la fermeture du jeu, écrase les fichiers du dossier avec ceux du zip et relance le jeu |
+| macOS   | dmg | un script attend la fermeture du jeu, copie le nouveau `.app` depuis le dmg à côté de l'ancien, le remplace (l'ancien n'est supprimé que si la copie a réussi) et le relance |
+
+Une installation qui ne peut pas se remplacer seule (jeu compilé depuis les sources, paquet de
+distribution, dossier en lecture seule) propose d'ouvrir la page de téléchargement.
+
 ## Intégration et livraison continues
 
 - **CI** ([`ci.yml`](.github/workflows/ci.yml), à chaque push sur `main` et pull request) :
@@ -322,7 +340,7 @@ Tests (`ctest`) :
 | `tst_core`   | stats, types, catalogue, boulons, persistance JSON |
 | `tst_battle` | formules, dash, pilotage, recentrage, force de lancer, coups spéciaux (une fois par partie, coût) et effets, duels (déclenchement, raté à 1,5× les dégâts, nul, inactivité, bots), règles, stadiums, mêlées, abandons, déterminisme, niveaux de bot ordonnés |
 | `tst_tournament` | score express et classique, ordre des toupies, calendrier de ligue (chacun rencontre chacun), classement, tableau à élimination directe avec exemptions, JSON, match entre bots |
-| `tst_net`    | lobby (connexion, refus, déconnexion), découverte UDP et par balayage TCP, encodage de l'état (duel, score, bots), partie réseau de bout en bout, tournoi solo et tournoi en réseau |
+| `tst_net`    | lobby (connexion, refus, déconnexion), découverte UDP et par balayage TCP, encodage de l'état (duel, score, bots), partie réseau de bout en bout, tournoi solo et tournoi en réseau, recherche de mise à jour, remplacement et relance d'une AppImage |
 | `tst_gui`    | navigation, partie solo complète au clavier, atelier, lobby entre deux fenêtres avec règles de l'hôte, ouverture d'un match de tournoi |
 
 ## Architecture

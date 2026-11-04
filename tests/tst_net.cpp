@@ -2,6 +2,7 @@
 #include "net/ClientSession.h"
 #include "net/HostSession.h"
 #include "net/TournamentSession.h"
+#include "net/Updater.h"
 #include "net/LobbyBrowser.h"
 #include "net/MatchCodec.h"
 #include "net/LobbyClient.h"
@@ -10,6 +11,7 @@
 #include "net/Protocol.h"
 
 #include <QSignalSpy>
+#include <QTemporaryDir>
 
 #include <cmath>
 #include <QJsonArray>
@@ -48,6 +50,10 @@ private slots:
     void duelSeriesAndBotsSurviveCodec();
     void soloTournamentPlaysAndFinishes();
     void lanTournamentStartsMatchesOnClients();
+    void updateIsFoundInLatestRelease();
+#ifdef Q_OS_LINUX
+    void appImageIsReplacedAndRelaunched();
+#endif
 };
 
 void TestNet::sanitizeNames()
@@ -501,6 +507,64 @@ void TestNet::lanTournamentStartsMatchesOnClients()
     QTRY_COMPARE(clientOver.count(), 1);
     QCOMPARE(follower.localMatch(), -1);
 }
+
+void TestNet::updateIsFoundInLatestRelease()
+{
+    QVERIFY(isNewerVersion(QStringLiteral("v1.10.0"), QStringLiteral("1.9.2")));
+    QVERIFY(!isNewerVersion(QStringLiteral("v1.0.0"), QStringLiteral("1.0.0")));
+    QVERIFY(!isNewerVersion(QStringLiteral("nightly"), QStringLiteral("1.0.0")));
+
+    const QJsonObject release{
+        {"tag_name", "v1.2.0"},
+        {"html_url", "https://github.com/valentinRyckaert/TOUPIES/releases/tag/v1.2.0"},
+        {"assets",
+         QJsonArray{QJsonObject{{"name", "ToupieArena-v1.2.0-windows-x64.zip"},
+                                {"browser_download_url", "https://example.org/win.zip"}},
+                    QJsonObject{{"name", "ToupieArena-v1.2.0-linux-x86_64.AppImage"},
+                                {"browser_download_url", "https://example.org/linux.AppImage"}}}}};
+    const auto update = parseLatestRelease(release, QStringLiteral("1.0.0"),
+                                           QStringLiteral("-linux-x86_64.AppImage"));
+    QVERIFY(update.has_value());
+    QCOMPARE(update->version, QStringLiteral("1.2.0"));
+    QCOMPARE(update->package, QUrl(QStringLiteral("https://example.org/linux.AppImage")));
+    // Déjà à jour, ou aucun paquet pour cette plateforme.
+    QVERIFY(!parseLatestRelease(release, QStringLiteral("1.2.0"), QStringLiteral(".AppImage")));
+    QVERIFY(!parseLatestRelease(release, QStringLiteral("1.0.0"), QStringLiteral("-macos.dmg")));
+}
+
+#ifdef Q_OS_LINUX
+void TestNet::appImageIsReplacedAndRelaunched()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString installed = dir.filePath(QStringLiteral("ToupieArena.AppImage"));
+    QFile old(installed);
+    QVERIFY(old.open(QIODevice::WriteOnly));
+    old.write("ancienne version");
+    old.close();
+    // « Nouvelle version » : note si elle hérite de l'environnement de l'ancienne.
+    const QString package = dir.filePath(QStringLiteral("nouvelle.AppImage"));
+    QFile script(package);
+    QVERIFY(script.open(QIODevice::WriteOnly));
+    script.write("#!/bin/sh\necho \"${APPDIR:-propre}\" > \"$(dirname \"$0\")/lancee\"\n");
+    script.close();
+
+    qputenv("APPIMAGE", installed.toLocal8Bit());
+    qputenv("APPDIR", "/tmp/.mount_ancienne");
+    QVERIFY(Updater::canSelfUpdate());
+    QString error;
+    const bool ok = Updater::installAndRestart(package, &error);
+    qunsetenv("APPIMAGE");
+    qunsetenv("APPDIR");
+    QVERIFY2(ok, qPrintable(error));
+    QVERIFY(!QFile::exists(package));
+    auto launched = [&] {
+        QFile marker(dir.filePath(QStringLiteral("lancee")));
+        return marker.open(QIODevice::ReadOnly) ? marker.readAll().trimmed() : QByteArray();
+    };
+    QTRY_COMPARE(launched(), QByteArray("propre")); // Lancée, sans l'environnement de l'ancienne.
+}
+#endif
 
 QTEST_GUILESS_MAIN(TestNet)
 #include "tst_net.moc"

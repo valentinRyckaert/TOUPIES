@@ -130,6 +130,7 @@ MenuPage::MenuPage(QWidget *parent)
     addButton(tr("⇄  Multijoueur en réseau local"), &MenuPage::lanRequested);
     addButton(tr("🏆  Tournois"), &MenuPage::tournamentRequested);
     addButton(tr("⚙  Assembler une toupie"), &MenuPage::builderRequested);
+    addButton(tr("⟳  Mises à jour"), &MenuPage::updateRequested);
     addButton(tr("✕  Quitter"), &MenuPage::quitRequested);
     layout->addStretch(2);
 }

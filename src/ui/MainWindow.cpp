@@ -2,6 +2,7 @@
 
 #include "core/PartCatalog.h"
 #include "net/TournamentSession.h"
+#include "net/Updater.h"
 #include "session/LocalSession.h"
 #include "ui/BattlePage.h"
 #include "ui/BuilderPage.h"
@@ -14,7 +15,9 @@
 
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDesktopServices>
 #include <QMessageBox>
+#include <QProgressDialog>
 #include <QRandomGenerator>
 #include <QStackedWidget>
 #include <QTimer>
@@ -58,6 +61,7 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_menu, &MenuPage::builderRequested, this, &MainWindow::showBuilder);
     connect(m_menu, &MenuPage::quitRequested, this, &QWidget::close);
+    connect(m_menu, &MenuPage::updateRequested, this, &MainWindow::checkForUpdates);
     connect(m_builder, &BuilderPage::backRequested, this, &MainWindow::showMenu);
     connect(m_builder, &BuilderPage::topsChanged, m_setup, &SetupPage::refresh);
     connect(m_builder, &BuilderPage::topsChanged, m_lobby, &LobbyPage::refreshTops);
@@ -268,6 +272,78 @@ void MainWindow::showLanMenu()
     m_lanMenu->setBusy(false);
     m_lanMenu->activate();
     showPage(m_lanMenu);
+}
+
+void MainWindow::checkForUpdates()
+{
+    auto *updater = new net::Updater(this);
+    auto *progress = new QProgressDialog(tr("Recherche d'une mise à jour…"), tr("Annuler"), 0, 0,
+                                         this);
+    progress->setWindowTitle(tr("Mises à jour"));
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    // Annuler détruit l'Updater, ce qui interrompt ses requêtes.
+    connect(progress, &QProgressDialog::canceled, updater, &QObject::deleteLater);
+    connect(updater, &QObject::destroyed, progress, &QObject::deleteLater);
+    auto done = [updater, progress] {
+        progress->hide();
+        updater->deleteLater();
+    };
+    const QString current = QCoreApplication::applicationVersion();
+
+    connect(updater, &net::Updater::failed, this, [this, done](const QString &reason) {
+        done();
+        QMessageBox::warning(this, tr("Mises à jour"),
+                             tr("La mise à jour a échoué :\n%1").arg(reason));
+    });
+    connect(updater, &net::Updater::upToDate, this, [this, done, current] {
+        done();
+        QMessageBox::information(this, tr("Mises à jour"),
+                                 tr("Vous avez la dernière version (%1).").arg(current));
+    });
+    connect(updater, &net::Updater::updateAvailable, this,
+            [this, updater, progress, done, current](const net::UpdateInfo &update) {
+                progress->hide();
+                if (!net::Updater::canSelfUpdate()) {
+                    done();
+                    // Compilé depuis les sources, paquet de distribution ou dossier protégé.
+                    if (QMessageBox::question(
+                            this, tr("Mises à jour"),
+                            tr("La version %1 est disponible (vous avez la %2), mais cette "
+                               "installation ne peut pas se mettre à jour seule.\nOuvrir la page "
+                               "de téléchargement ?")
+                                .arg(update.version, current))
+                        == QMessageBox::Yes)
+                        QDesktopServices::openUrl(update.page);
+                    return;
+                }
+                if (QMessageBox::question(this, tr("Mises à jour"),
+                                          tr("La version %1 est disponible (vous avez la %2).\n"
+                                             "La télécharger et l'installer ? Le jeu redémarrera "
+                                             "sur la nouvelle version.")
+                                              .arg(update.version, current))
+                    != QMessageBox::Yes) {
+                    done();
+                    return;
+                }
+                progress->setLabelText(tr("Téléchargement de la version %1…").arg(update.version));
+                progress->show();
+                updater->download(update);
+            });
+    connect(updater, &net::Updater::progress, progress, [progress](qint64 received, qint64 total) {
+        progress->setMaximum(static_cast<int>(std::max<qint64>(0, total / 1024)));
+        progress->setValue(static_cast<int>(received / 1024));
+    });
+    connect(updater, &net::Updater::downloaded, this, [this, done](const QString &package) {
+        done();
+        QString error;
+        if (net::Updater::installAndRestart(package, &error))
+            close(); // La nouvelle version prend le relais.
+        else
+            QMessageBox::warning(this, tr("Mises à jour"),
+                                 tr("L'installation a échoué :\n%1").arg(error));
+    });
+    updater->check();
 }
 
 void MainWindow::leaveLobby(const QString &message)
