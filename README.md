@@ -136,7 +136,8 @@ adversaires jusqu'à sa portée. La défense de la cible réduit dégâts et rec
 
 ### Personnalisation
 
-Dans la préparation du combat (solo) et dans le lobby (réglée par l'hôte, visible par tous) :
+Bouton « Personnalisation… » de la préparation du combat (solo), du tournoi solo et du panneau
+de réglages du lobby (réglée par l'hôte, visible par tous) :
 vitesse, rebonds après un choc, usure, dégâts, puissance des dashs, pilotage (0 = désactivé),
 coups spéciaux (activés ou non), endurance max et temps maximal (aucun par défaut).
 
@@ -237,10 +238,10 @@ Le bouton **Tournois** du menu ouvre la section des tournois : on y choisit de j
 contre des bots** ou **en multijoueur** (réseau local), puis :
 
 - **Format** : **ligue** (chacun rencontre chacun une fois, avec une exemption par journée si le
-  nombre de participants est impair) ou **élimination directe** (tableau tiré au sort ; si le
-  nombre de participants n'est pas une puissance de 2, certains passent le premier tour).
-- **Participants** : de 4 à 32, dont 1 joueur humain en solo ou 2 à 4 en réseau ; les autres sont
-  des bots dont on règle le **niveau un par un** (ou tous d'un coup).
+  nombre de participants est impair) ou **élimination directe** (tableau complet tiré au sort).
+- **Participants** : de 4 à 32 en ligue, 4, 8, 16 ou 32 en élimination directe ; dont 1 joueur
+  humain en solo ou 2 à 4 en réseau. Les autres sont des bots dont on règle le **niveau un par
+  un** (ou tous d'un coup) dans la fenêtre « Bots ».
 - **Type de match**, le même pour tout le tournoi :
   - **Express** : une toupie pour tout le tournoi ; le premier à gagner **2 manches** remporte le
     match (une manche nulle ne compte pas) ;
@@ -254,7 +255,9 @@ contre des bots** ou **en multijoueur** (réseau local), puis :
 - Le stadium et la personnalisation sont communs à tout le tournoi.
 
 Le tableau de bord du tournoi montre les tours et les résultats, le classement (ligue) et
-votre prochain match : choisissez l'ordre de vos toupies (classique) puis **Prêt**. Les manches
+votre prochain match (les tours se replient dans un panneau latéral). En express, **Prêt** lance
+le match ; en classique, une fenêtre permet de ranger ses toupies (Monter / Descendre) avant de
+valider. Les manches
 s'enchaînent automatiquement, le score du match est affiché pendant la manche et à la fin de
 chacune. « Abandonner le match » le donne à l'adversaire. Les matchs entre bots sont simulés
 instantanément.
