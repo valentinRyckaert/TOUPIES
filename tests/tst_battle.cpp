@@ -70,6 +70,7 @@ private slots:
     void duelDrawAfterFinalStreak();
     void idleDuellistLoses();
     void harderBotsWinDuels();
+    void finalEliminationKeepsWinnerEndurance();
 };
 
 void TestBattle::enduranceReducesPassiveLoss()
@@ -655,6 +656,26 @@ void TestBattle::harderBotsWinDuels()
     }
     qInfo("Duels gagnés par le bot difficile contre le facile : %d/%d", hardWins, kDuels);
     QVERIFY(hardWins > kDuels * 0.7);
+}
+
+void TestBattle::finalEliminationKeepsWinnerEndurance()
+{
+    // Un dash éjecte l'adversaire : la récompense de mêlée ne s'applique pas
+    // à l'élimination qui termine le combat.
+    BattleConfig config = staticConfig();
+    config.startOffset = 0.3;
+    Battle battle({attackTop(), enduranceTop()}, *Stadium::find(QStringLiteral("terre")), config, 1);
+    battle.launch(0.0, M_PI);
+    battle.advance(0.01);
+    QVERIFY(battle.requestDash(0));
+    double spin = battle.spinner(0).spin;
+    for (int i = 0; i < 60 * 10 && !battle.isFinished(); ++i) {
+        spin = battle.spinner(0).spin;
+        battle.advance(1.0 / 60.0);
+    }
+    QVERIFY(battle.isFinished());
+    QCOMPARE(battle.winner(), 0);
+    QVERIFY(battle.spinner(0).spin <= spin);
 }
 
 namespace {

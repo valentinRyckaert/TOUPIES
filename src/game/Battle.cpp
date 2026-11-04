@@ -317,8 +317,11 @@ void Battle::eliminate(int index, Spinner::Status status)
     if (inDuel(index))
         m_duel.active = false; // Abandon pendant un duel.
 
-    // Mêlée : la toupie qui a provoqué l'élimination récupère de l'endurance.
-    if (status != Spinner::Status::Forfeit && s.lastHitBy >= 0
+    // Mêlée : la toupie qui a provoqué l'élimination récupère de l'endurance,
+    // seulement si le combat continue (pas sur l'élimination finale).
+    const auto active = std::count_if(m_spinners.begin(), m_spinners.end(),
+                                      [](const Spinner &t) { return t.isActive(); });
+    if (active >= 2 && status != Spinner::Status::Forfeit && s.lastHitBy >= 0
         && m_elapsed - s.lastHitTime <= m_config.knockoutWindow) {
         Spinner &striker = m_spinners[s.lastHitBy];
         if (striker.isActive())

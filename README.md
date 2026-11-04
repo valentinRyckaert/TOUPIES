@@ -111,7 +111,7 @@ partent à égale distance du centre, dans la direction et avec la force choisie
   n'y a **pas de limite de temps** ; si une limite est choisie, la toupie qui a le plus
   d'endurance à la fin gagne.
 - **Mêlée (3-4 toupies)** : éliminer un adversaire frappé dans les 4 dernières secondes rend
-  35 points d'endurance.
+  35 points d'endurance (sauf pour l'élimination qui termine le combat).
 
 ### Coups spéciaux
 
