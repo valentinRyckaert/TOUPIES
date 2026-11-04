@@ -979,8 +979,7 @@ void ArenaWidget::paintTutorial(QPainter &p)
 {
     auto *tutorial = qobject_cast<TutorialSession *>(m_session.data());
     const MatchState &state = m_session->state();
-    if (!tutorial || tutorial->bubble().isEmpty() || state.phase == MatchPhase::Countdown
-        || state.phase == MatchPhase::Finished)
+    if (!tutorial || tutorial->bubble().isEmpty() || state.phase == MatchPhase::Countdown)
         return;
 
     // Bulle au-dessus de la toupie désignée (ou au centre), avec une pointe.
@@ -994,7 +993,8 @@ void ArenaWidget::paintTutorial(QPainter &p)
     const double footer = tutorial->isPaused() ? 22.0 : 0.0;
     const QSizeF size(bubbleWidth, textRect.height() + 28 + footer);
     const int target = tutorial->bubbleTarget();
-    QPointF anchor = center();
+    // Sans toupie désignée (dernière bulle) : sous le bandeau de victoire.
+    QPointF anchor = center() + QPointF(0, height() * 0.2);
     if (target >= 0 && target < state.playerCount()) {
         const Spinner &s = state.spinners[target];
         anchor = toScreen(s.status == Spinner::Status::Waiting ? state.startPositions.value(target)

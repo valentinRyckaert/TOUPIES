@@ -178,6 +178,9 @@ public:
     bool requestSpecial(int index);
     const std::vector<Projectile> &projectiles() const { return m_projectiles; }
 
+    /// Ajoute une vitesse à une toupie en jeu (scénarios du tutoriel).
+    void applyImpulse(int index, Vec2 velocity);
+
     /// Abandon (joueur déconnecté) : la toupie est éliminée.
     void forfeit(int index);
 

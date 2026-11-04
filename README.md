@@ -67,11 +67,15 @@ principal) : chaque action accepte deux entrées, touche du clavier ou bouton de
 
 Le bouton **Tutoriel** du menu lance un combat scénarisé contre une toupie d'entraînement dont la
 trajectoire est prévue à l'avance (lancer fixe, puis approche lente vers vous). Une bulle présente
-chaque action : visée, force, lancer, pilotage, dash, coup spécial et duel (la toupie
-d'entraînement répond à votre dash au même instant). Pendant le combat, chaque bulle **met le jeu
-en pause** jusqu'à ce que vous appuyiez sur la touche présentée, qui exécute l'action ; les autres
-touches sont ignorées. Les bulles affichent les touches configurées dans les paramètres. À la fin,
-la toupie d'entraînement se défend (bot facile) et vous pouvez finir le combat librement.
+chaque action : visée (à la souris en cliquant, ou au clavier), force, lancer, pilotage, dash,
+coup spécial et duel (la toupie d'entraînement répond à votre dash au même instant). Pendant le
+combat, chaque bulle **met le jeu en pause** jusqu'à ce que vous appuyiez sur la touche présentée,
+qui exécute l'action ; les autres touches sont ignorées. Les bulles affichent les touches
+configurées dans les paramètres.
+
+Le duel est guidé : une bulle l'explique dès qu'il commence, et chaque appui hors de la zone verte
+ouvre une bulle qui explique l'erreur sans la compter. Vous gagnez donc toujours le duel ; la toupie
+d'entraînement est alors éjectée du stadium et le tutoriel se termine sur votre victoire.
 
 ## Règles
 
@@ -358,7 +362,7 @@ Tests (`ctest`) :
 | `tst_battle` | formules, dash, pilotage, recentrage, force de lancer, coups spéciaux (une fois par partie, coût) et effets, duels (déclenchement, raté à 1,5× les dégâts, nul, inactivité, bots), règles, stadiums, mêlées, abandons, déterminisme, niveaux de bot ordonnés |
 | `tst_tournament` | score express et classique, ordre des toupies, calendrier de ligue (chacun rencontre chacun), classement, tableau à élimination directe avec exemptions, JSON, match entre bots |
 | `tst_net`    | lobby (connexion, refus, déconnexion), découverte UDP et par balayage TCP, encodage de l'état (duel, score, bots), partie réseau de bout en bout, tournoi solo et tournoi en réseau, recherche de mise à jour, remplacement et relance d'une AppImage |
-| `tst_gui`    | navigation, partie solo complète au clavier, atelier, lobby entre deux fenêtres avec règles de l'hôte, ouverture d'un match de tournoi, touches configurables (sauvegarde, touche reprise à une autre action, touche réassignée utilisée en combat), tutoriel joué en entier au clavier (pauses, touches ignorées, duel) |
+| `tst_gui`    | navigation, partie solo complète au clavier, atelier, lobby entre deux fenêtres avec règles de l'hôte, ouverture d'un match de tournoi, touches configurables (sauvegarde, touche reprise à une autre action, touche réassignée utilisée en combat), tutoriel joué en entier (clic pour la visée, pauses, touches ignorées, raté de duel non compté, victoire par éjection) |
 
 ## Architecture
 

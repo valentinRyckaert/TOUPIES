@@ -164,6 +164,12 @@ bool Battle::requestDash(int index, int targetIndex)
     return true;
 }
 
+void Battle::applyImpulse(int index, Vec2 velocity)
+{
+    if (index >= 0 && index < playerCount() && m_spinners[index].isActive() && !inDuel(index))
+        m_spinners[index].velocity += velocity;
+}
+
 void Battle::forfeit(int index)
 {
     if (index < 0 || index >= playerCount() || m_phase == Phase::Finished)

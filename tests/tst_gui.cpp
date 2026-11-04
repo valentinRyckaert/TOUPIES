@@ -315,10 +315,12 @@ void TestGui::tutorialWalksThroughEveryAction()
         QVERIFY(!tutorial->bubble().isEmpty());
     };
 
-    // Visée : seules les touches présentées font avancer.
-    QTest::keyClick(arena, Qt::Key_Return);
+    // Visée : seules les touches présentées font avancer ; un clic valide la visée
+    // sans lancer la toupie.
+    QTest::keyClick(arena, Qt::Key_E);
+    QCOMPARE(tutorial->step(), Step::Aim);
+    QTest::mouseClick(arena, Qt::LeftButton, {}, arena->rect().center());
     QCOMPARE(tutorial->state().phase, MatchPhase::Aiming);
-    QTest::keyClick(arena, Qt::Key_Left);
     QCOMPARE(tutorial->step(), Step::Power);
     QTest::keyClick(arena, Qt::Key_Up);
     QCOMPARE(tutorial->step(), Step::Launch);
@@ -346,10 +348,36 @@ void TestGui::tutorialWalksThroughEveryAction()
     waitPause(Step::Duel);
     QTest::keyClick(arena, Qt::Key_Space);
     QCOMPARE(tutorial->step(), Step::AfterDuel);
-    waitPause(Step::Done);
-    QTest::keyClick(arena, Qt::Key_Return);
-    QCOMPARE(tutorial->step(), Step::Free);
-    QVERIFY(tutorial->bubble().isEmpty());
+
+    // Duel guidé : explication, puis un raté n'est pas compté.
+    waitPause(Step::DuelIntro);
+    QVERIFY(tutorial->state().duel.active);
+    QTest::keyClick(arena, Qt::Key_Space);
+    QCOMPARE(tutorial->step(), Step::DuelPlay);
+    auto cursorInGreen = [&] {
+        const DuelSide &side = tutorial->state().duel.sides[tutorial->state().duel.sideOf(0)];
+        return std::abs(side.cursor) <= side.zone * 0.5;
+    };
+    QTRY_VERIFY(!cursorInGreen());
+    QTest::keyClick(arena, Qt::Key_Space); // Dans le rouge.
+    QCOMPARE(tutorial->step(), Step::DuelMiss);
+    QVERIFY(tutorial->isPaused());
+    QVERIFY(tutorial->state().duel.active); // Le raté ne fait pas perdre le duel.
+    QTest::keyClick(arena, Qt::Key_Space);
+    QCOMPARE(tutorial->step(), Step::DuelPlay);
+    for (int i = 0; i < 3; ++i) {
+        QTRY_VERIFY(tutorial->step() != Step::DuelPlay || cursorInGreen());
+        if (tutorial->step() == Step::DuelPlay)
+            QTest::keyClick(arena, Qt::Key_Space);
+        QTest::qWait(150);
+    }
+
+    // Duel gagné : la toupie d'entraînement est éjectée, le joueur gagne.
+    QTRY_COMPARE_WITH_TIMEOUT(tutorial->state().phase, MatchPhase::Finished, 5000);
+    QCOMPARE(tutorial->state().winner, 0);
+    QVERIFY(tutorial->state().endReason == Battle::EndReason::RingOut);
+    QCOMPARE(tutorial->step(), Step::Done);
+    QVERIFY(!tutorial->bubble().isEmpty());
 }
 
 QTEST_MAIN(TestGui)

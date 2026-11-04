@@ -2,16 +2,25 @@
 
 #include "core/PartCatalog.h"
 
+#include <cmath>
+
 namespace toupie {
 
 namespace {
-constexpr std::uint32_t kSeed = 7;          ///< Combat identique à chaque essai.
-constexpr double kApproach = 0.6;           ///< Pilotage de la toupie d'entraînement.
+constexpr std::uint32_t kSeed = 7;  ///< Combat identique à chaque essai.
+constexpr double kApproach = 0.6;   ///< Pilotage de la toupie d'entraînement.
+constexpr int kDuelHits = 3;        ///< Réussites du joueur avant le raté adverse.
+constexpr double kEjection = 3.0;   ///< Vitesse imprimée au perdant du duel.
 
 bool isSteering(Action a)
 {
     return a == Action::SteerLeft || a == Action::SteerRight || a == Action::SteerUp
         || a == Action::SteerDown;
+}
+
+bool validates(Action a)
+{
+    return a == Action::Dash || a == Action::Launch; // Clic gauche par défaut.
 }
 } // namespace
 
@@ -19,13 +28,14 @@ TutorialSession::TutorialSession(QObject *parent)
     : MatchSession(parent)
 {
     const QList<Top> presets = PartCatalog::instance().presets();
+    BattleConfig config;
+    config.duelTimeout = 1e9; // Le joueur prend son temps : pas de défaite par inactivité.
     m_battle = std::make_unique<Battle>(QList<Top>{presets.at(0), presets.at(1)},
-                                        Stadium::classic(), BattleConfig{}, kSeed);
+                                        Stadium::classic(), config, kSeed);
     initFromBattle(*m_battle, {tr("Vous"), tr("Toupie d'entraînement")});
     // La toupie d'entraînement part toujours droit vers le centre, doucement.
     m_angles[1] = (-m_battle->startPosition(1)).angle();
     m_state.aimed[1] = true;
-    m_bot = std::make_unique<BotController>(1, Difficulty::Easy, kSeed);
 }
 
 TutorialSession::~TutorialSession() = default;
@@ -49,15 +59,18 @@ QString TutorialSession::bubble() const
     switch (m_step) {
     case Step::Aim:
         return tr("Bienvenue dans le tutoriel !\nVotre toupie est à gauche. Visez avec la souris "
-                  "ou avec %1 et %2 : essayez maintenant.")
+                  "puis cliquez, ou visez avec %1 et %2.")
             .arg(key(Action::SteerLeft), key(Action::SteerRight));
     case Step::Power:
-        return tr("La longueur de la flèche donne la force du lancer : éloignez le curseur ou "
-                  "appuyez sur %1 / %2.")
+        return tr("La longueur de la flèche donne la force du lancer : éloignez ou rapprochez "
+                  "le curseur puis cliquez, ou appuyez sur %1 / %2.")
             .arg(key(Action::SteerUp), key(Action::SteerDown));
     case Step::Launch:
         return tr("Parfait. Lancez votre toupie avec %1 (ou %2).")
-            .arg(key(Action::Launch), key(Action::Dash));
+            .arg(key(Action::Dash), key(Action::Launch));
+    case Step::Done:
+        return tr("Bravo ! Duel gagné et toupie adverse éjectée : vous connaissez toutes les "
+                  "actions. Appuyez sur Échap pour revenir au menu.");
     default:
         break;
     }
@@ -79,15 +92,20 @@ QString TutorialSession::bubble() const
                   "pour un moment décisif. Essayez-le !")
             .arg(key(Action::Special));
     case Step::Duel:
-        return tr("Il fonce sur vous ! Répondez par un dash (%1) : deux dashs qui se percutent "
-                  "déclenchent un duel. Appuyez ensuite sur %1 quand le curseur est dans la "
-                  "zone verte ; le premier qui rate subit 1,5× les dégâts du dash adverse.")
+        return tr("Il fonce sur vous ! Répondez par un dash avec %1 : quand deux toupies se "
+                  "percutent en plein dash, elles s'affrontent en duel.")
             .arg(key(Action::Dash));
-    case Step::Done:
-        return tr("Bravo, vous connaissez toutes les actions !\nLa toupie d'entraînement va "
-                  "maintenant se défendre : appuyez sur %1 pour finir le combat librement, ou "
-                  "sur Échap pour quitter.")
-            .arg(key(Action::Launch));
+    case Step::DuelIntro:
+        return tr("Duel ! Les toupies restent bloquées l'une contre l'autre. En bas de l'écran, "
+                  "un curseur blanc parcourt votre barre : appuyez sur %1 quand il est dans la "
+                  "zone verte. La zone rétrécit à chaque réussite ; le premier qui rate subit "
+                  "1,5× les dégâts du dash adverse.\nAppuyez sur %1 pour commencer.")
+            .arg(key(Action::Dash));
+    case Step::DuelMiss:
+        return tr("Raté : le curseur était dans le rouge. Attendez qu'il passe au centre, dans "
+                  "la zone verte, avant d'appuyer. Pour cette fois, l'erreur ne compte pas !\n"
+                  "Appuyez sur %1 pour reprendre.")
+            .arg(key(Action::Dash));
     default:
         return {};
     }
@@ -101,7 +119,6 @@ int TutorialSession::bubbleTarget() const
     case Step::Duel:
         return 1;
     case Step::Done:
-    case Step::Free:
         return -1;
     default:
         return 0;
@@ -114,26 +131,38 @@ bool TutorialSession::handleAction(Action action)
         return true;
     switch (m_step) {
     case Step::Aim:
-        if (action != Action::SteerLeft && action != Action::SteerRight)
-            return false;
-        next(Step::Power);
-        return true;
+        // Valider la visée (clic) ou viser au clavier : étape suivante, sans lancer.
+        if (action == Action::SteerLeft || action == Action::SteerRight) {
+            next(Step::Power);
+            return true;
+        }
+        if (validates(action))
+            next(Step::Power);
+        return false;
     case Step::Power:
-        if (action == Action::SteerUp || action == Action::SteerDown)
+        if (action == Action::SteerUp || action == Action::SteerDown || validates(action))
             next(Step::Launch);
         return isSteering(action);
     case Step::Launch:
-        return isSteering(action) || action == Action::Launch || action == Action::Dash;
-    case Step::Free:
-        return true;
+        return isSteering(action) || validates(action);
+    case Step::Done:
+        return false;
     default:
         break;
     }
 
     if (!m_paused) {
-        // Entre deux bulles : pilotage libre, chaque action attend son tour.
-        return isSteering(action)
-            || (action == Action::Dash && m_step >= Step::Special && m_step != Step::Duel);
+        if (m_step == Step::DuelPlay && action == Action::Dash) {
+            // Duel guidé : un appui hors de la zone verte n'est pas compté.
+            const DuelSide &side = m_state.duel.sides[std::max(0, m_state.duel.sideOf(0))];
+            if (std::abs(side.cursor) <= side.zone)
+                return true;
+            m_step = Step::DuelMiss;
+            pause();
+            return false;
+        }
+        // Entre deux bulles : pilotage libre ; le dash attend son tour.
+        return isSteering(action) || (action == Action::Dash && m_step == Step::Special);
     }
     switch (m_step) {
     case Step::Steer:
@@ -157,11 +186,12 @@ bool TutorialSession::handleAction(Action action)
         m_battle->requestDash(1, 0); // Le dash du joueur part au même instant.
         next(Step::AfterDuel);
         return true;
-    case Step::Done:
-        if (action != Action::Launch)
-            return false;
-        next(Step::Free);
-        return true;
+    case Step::DuelIntro:
+    case Step::DuelMiss:
+        // Reprise du duel : cet appui ne compte pas comme un appui de duel.
+        if (action == Action::Dash)
+            next(Step::DuelPlay);
+        return false;
     default:
         return false;
     }
@@ -181,8 +211,16 @@ void TutorialSession::submitAim(double angle, double power)
 
 void TutorialSession::requestDash()
 {
-    if (m_state.phase == MatchPhase::Fighting && !m_paused)
-        m_battle->requestDash(0);
+    if (m_state.phase != MatchPhase::Fighting || m_paused)
+        return;
+    m_battle->requestDash(0);
+    if (m_step == Step::DuelPlay && ++m_duelHits >= kDuelHits && m_battle->duel().active) {
+        // Le joueur gagne toujours : la toupie d'entraînement rate, puis est éjectée.
+        m_battle->duelPress(1, 1.0);
+        const Vec2 away = (m_battle->spinner(1).position - m_battle->spinner(0).position).normalized();
+        m_battle->applyImpulse(1, away * kEjection);
+        next(Step::Ejection);
+    }
 }
 
 void TutorialSession::requestSpecial()
@@ -218,8 +256,6 @@ void TutorialSession::update(double dt)
         return; // Bulle affichée : le jeu attend la touche présentée.
 
     m_stepTimer += dt;
-    const bool duel = m_battle->duel().active;
-    m_duelStarted = m_duelStarted || duel;
     switch (m_step) {
     case Step::Steer:
         if (m_stepTimer > 1.0)
@@ -238,11 +274,14 @@ void TutorialSession::update(double dt)
             pause();
         break;
     case Step::AfterDuel:
-        // Fin du duel (ou dashs qui se sont manqués) : dernière bulle.
-        if ((m_duelStarted && !duel && m_stepTimer > 2.0) || (!m_duelStarted && m_stepTimer > 4.0)) {
-            m_step = Step::Done;
+        if (m_battle->duel().active) {
+            m_step = Step::DuelIntro;
             pause();
+            syncFromBattle(*m_battle); // Barres de duel visibles pendant l'explication.
+            return;
         }
+        if (m_stepTimer > 2.0)
+            next(Step::Duel); // Dashs manqués : on recommence.
         break;
     default:
         break;
@@ -250,17 +289,19 @@ void TutorialSession::update(double dt)
     if (m_paused)
         return;
 
-    if (m_step == Step::Free || duel) {
-        m_bot->update(*m_battle, dt);
-    } else {
+    if (m_step < Step::AfterDuel) {
         // Trajectoire prévue : la toupie d'entraînement se rapproche lentement du joueur.
         const Vec2 toward = m_battle->spinner(0).position - m_battle->spinner(1).position;
         m_battle->setSteering(1, toward.normalized() * kApproach);
+    } else {
+        m_battle->setSteering(1, {});
     }
     m_battle->advance(dt);
     syncFromBattle(*m_battle);
-    if (m_battle->isFinished())
+    if (m_battle->isFinished()) {
+        m_step = Step::Done;
         setPhase(MatchPhase::Finished);
+    }
 }
 
 } // namespace toupie

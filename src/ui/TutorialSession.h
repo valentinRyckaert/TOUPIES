@@ -1,6 +1,5 @@
 #pragma once
 
-#include "game/BotController.h"
 #include "session/MatchSession.h"
 #include "ui/Controls.h"
 
@@ -12,12 +11,21 @@ namespace toupie {
 /// trajectoire est prévue à l'avance (lancer fixe, puis approche lente vers
 /// le joueur). À chaque étape, une bulle met le jeu en pause et présente une
 /// action ; seule la touche présentée reprend la partie (en l'exécutant).
+/// Le duel est guidé : un raté du joueur n'est pas compté (une bulle explique
+/// l'erreur), il gagne toujours et la toupie d'entraînement est éjectée.
 class TutorialSession : public MatchSession
 {
     Q_OBJECT
 
 public:
-    enum class Step { Aim, Power, Launch, Steer, Dash, Special, Duel, AfterDuel, Done, Free };
+    enum class Step {
+        Aim, Power, Launch, Steer, Dash, Special,
+        Duel,      ///< Attente du moment où les deux toupies peuvent dasher.
+        AfterDuel, ///< Les deux dashs sont partis.
+        DuelIntro, DuelPlay, DuelMiss,
+        Ejection,  ///< Duel gagné : la toupie d'entraînement sort du stadium.
+        Done
+    };
 
     explicit TutorialSession(QObject *parent = nullptr);
     ~TutorialSession() override;
@@ -44,10 +52,9 @@ private:
     double distance() const;
 
     std::unique_ptr<Battle> m_battle;
-    std::unique_ptr<BotController> m_bot; ///< Appuis en duel, puis combat libre à la fin.
+    int m_duelHits = 0;
     Step m_step = Step::Aim;
     bool m_paused = true;
-    bool m_duelStarted = false;
     double m_stepTimer = 0.0;
     double m_angles[2] = {0.0, 0.0};
     double m_powers[2] = {1.0, 0.7};
