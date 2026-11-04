@@ -4,6 +4,30 @@ Toutes les évolutions notables de Toupie Arena. Le format suit
 [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet respecte le
 [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Modifications
+
+- **Coups spéciaux** : ils ne coûtent plus que le quart de l'endurance du moment (au lieu de la
+  moitié), et sont rééquilibrés pour que leurs effets comptent plus que leurs dégâts. Ils sont
+  désormais lancés en milieu de partie plutôt que pour achever l'adversaire.
+  - Lance d'acier : 24 dégâts (au lieu de 42), un peu plus lente ;
+  - Souffle de givre : 18,5 dégâts, et la toupie gelée s'use trois fois plus vite ;
+  - Vortex : 17 dégâts, aspiration plus forte ;
+  - Distorsion : 23 dégâts, la cible repart vers l'extérieur (risque d'éjection) ;
+  - Siphon : 12 dégâts, rend 60 % de l'endurance volée ;
+  - Séisme : 18 dégâts, désarme 6 secondes ;
+  - Onde de choc : 12,5 dégâts.
+- **Recherche des lobbys en réseau local** plus rapide : les hôtes répondent directement aux
+  questions des clients (ce qui passe le pare-feu de Windows), et le réseau local est sondé
+  toutes les 4 s au lieu de 30.
+
+### Corrections
+
+- Le menu de recherche des lobbys ne ralentit plus le jeu (sous Windows notamment) : le
+  balayage du réseau tourne dans un fil séparé et ignore les cartes réseau virtuelles
+  (Hyper-V/WSL, VirtualBox, VMware…).
+
 ## [1.1.0] — 2026-11-04
 
 ### Ajouts
@@ -62,5 +86,6 @@ Première version publique.
 - **Atelier** pour assembler et enregistrer ses toupies.
 - **Paquets** Linux (AppImage), Windows (zip) et macOS (dmg) publiés par la CI.
 
+[Non publié]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/valentinRyckaert/TOUPIES/releases/tag/v1.0.0

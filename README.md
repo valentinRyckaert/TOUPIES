@@ -59,7 +59,7 @@ principal) : chaque action accepte deux entrées, touche du clavier ou bouton de
 | Visée  | souris : direction, et **force** selon la distance du curseur (flèche plus ou moins longue) ; ou `←` `→` pour la direction et `↑` `↓` pour la force ; clic ou `Entrée` pour lancer |
 | Combat | **flèches** (ou `Z` `Q` `S` `D`) maintenues : pilotage, légère correction de trajectoire |
 |        | `Espace` ou clic : dash ; pendant un **duel**, appui quand le curseur est dans le vert |
-|        | `E` ou bouton « Coup spécial » : coup spécial (une fois par partie, coûte la moitié de l'endurance) |
+|        | `E` ou bouton « Coup spécial » : coup spécial (une fois par partie, coûte le quart de l'endurance) |
 | Fin    | `R` : revanche (solo) ou retour au lobby (hôte) |
 | Partout| `Échap` : retour au menu / quitter le lobby |
 
@@ -139,9 +139,11 @@ partent à égale distance du centre, dans la direction et avec la force choisie
 ### Coups spéciaux
 
 Chaque toupie peut lancer le coup spécial de son boulon **une seule fois par partie**, et ce
-lancer lui coûte **la moitié de son endurance du moment** : à 100 d'endurance on en perd 50,
-à 20 on n'en perd que 10. Lancer son coup dès le début est donc rarement payant ; il vaut
-mieux le garder pour un moment décisif (cible au bord, adversaire affaibli, fin de partie).
+lancer lui coûte **le quart de son endurance du moment** : à 100 d'endurance on en perd 25, à
+40 on n'en perd que 10. Le lancer dès le début reste coûteux, mais il est rentable en milieu
+de partie, quand son **effet** compte : geler une toupie qui fuit, téléporter un adversaire
+près du bord, le désarmer avant qu'il ne dashe… Les dégâts sont volontairement modérés, pour
+que le coup ne serve pas qu'à achever un adversaire en fin de combat.
 
 Le coup part sous forme d'une **vague** qui file vers l'adversaire le plus proche (sans le
 suivre : on peut l'esquiver en pilotant) ou d'un **anneau** qui s'élargit et touche tous les
@@ -150,12 +152,12 @@ adversaires jusqu'à sa portée. La défense de la cible réduit dégâts et rec
 | Boulon    | Coup             | Forme  | Point fort | Contrepartie |
 |-----------|------------------|--------|------------|--------------|
 | Tempête   | Onde de choc     | anneau | gros recul : éjecte une cible déjà au bord | portée courte |
-| Perçant   | Lance d'acier    | vague  | très lourds dégâts | presque aucun recul, esquivable de loin |
-| Polaire   | Souffle de givre | vague  | ralentit et bloque le pilotage 3 s | dégâts moyens |
-| Abysse    | Vortex           | anneau | aspire tout le monde vers le centre | dégâts modérés |
-| Spectral  | Distorsion       | vague  | blesse et téléporte la cible près du bord | lente, facile à esquiver |
-| Vampire   | Siphon           | vague  | rend toute l'endurance volée | dégâts moyens, peu de recul |
-| Tellurique| Séisme           | anneau | blesse et bloque dash + coup spécial 4,5 s | portée très courte |
+| Perçant   | Lance d'acier    | vague  | les plus lourds dégâts (24) | aucun effet, presque aucun recul, esquivable de loin |
+| Polaire   | Souffle de givre | vague  | 3 s gelée : ralentie, sans pilotage, et usée trois fois plus vite | dégâts moyens |
+| Abysse    | Vortex           | anneau | aspire violemment tout le monde vers le centre | dégâts modérés |
+| Spectral  | Distorsion       | vague  | téléporte la cible près du bord, lancée vers l'extérieur (risque d'éjection) | lente, facile à esquiver |
+| Vampire   | Siphon           | vague  | rend 60 % de l'endurance volée | dégâts modérés, peu de recul |
+| Tellurique| Séisme           | anneau | blesse et bloque dash + coup spécial 6 s | portée très courte |
 
 ### Personnalisation
 
@@ -221,10 +223,20 @@ tirées au hasard parmi toutes les combinaisons :
 | Sable     | 53,4 %  | 46,5 %  | 49,3 %    | 51,1 %    | 27 %      | 16 s       |
 | Volcan    | 54,8 %  | 46,9 %  | 43,6 %    | 58,0 %    | 23 %      | 15 s       |
 
-**Coups spéciaux** (duels entre boulons différents, Classique, 8 000 combats) : de 47,2 %
-(Distorsion) à 53,4 % (Siphon). **Intérêt** : un bot difficile qui sait utiliser son coup gagne
-~66 % de ses duels contre un bot difficile qui s'en prive (~56 % pour le bot normal, qui le
-lance moins bien).
+**Coups spéciaux** — le simulateur mesure aussi quand ils sont lancés et s'ils servent surtout
+à achever (« coup de grâce » : cible éliminée dans la seconde qui suit la touche) :
+
+| Réglage | Endurance du lanceur au lancer | Moment du lancer (part du combat) | Coups de grâce | Intérêt (bot difficile) |
+|---------|--------------------------------|-----------------------------------|----------------|-------------------------|
+| Avant : coût ½, dégâts forts | 22 % | 95 % | 45 % | 67 % |
+| Maintenant : coût ¼, dégâts modérés, effets renforcés | 42 % | 69 % | 8 % | 65 % |
+
+(Intérêt : victoires d'un bot qui utilise son coup contre le même bot qui s'en prive.) Avec un
+coût de ½, le coup ne coûtait presque plus rien en fin de partie et servait surtout à achever ;
+au quart, il est lancé en milieu de partie, quand ses effets ont le temps de compter (les
+éjections entre bots difficiles passent de 1 % à 9 %). Taux de victoire par coup : de 37 %
+(Séisme) à 54 % entre bots normaux, de 39 % (Distorsion) à 65 % (Lance) entre bots
+difficiles, qui gagnent à l'usure et profitent donc surtout des dégâts.
 
 **Mêlées à 4** — part des victoires rapportée à une part équitable (100 %) : Attaque 86–100 %,
 Défense 112–123 %, Endurance 84–96 %, Équilibre 88–107 % selon le stadium.
@@ -311,11 +323,14 @@ Fonctionnement :
   la latence). En tournoi, l'hôte diffuse l'état du tournoi et n'envoie l'état d'un combat
   qu'à ses participants (protocole v4 : une ancienne version ne peut pas rejoindre un lobby
   récent).
-- **Découverte des lobbys** : les hôtes diffusent une annonce UDP par seconde (port 45454).
-  Comme ces annonces sont souvent bloquées (pare-feu qui n'autorise que le port TCP du jeu,
-  Wi-Fi qui filtre les diffusions), le jeu sonde aussi les sous-réseaux locaux en TCP
-  (le /24 de la machine puis jusqu'à un /20, en quelques secondes, toutes les 30 s ou avec
-  « Actualiser »). Un lobby joignable par IP est donc aussi listé.
+- **Découverte des lobbys** : les hôtes diffusent une annonce UDP par seconde (port 45454), et
+  les clients diffusent une question toutes les 2 s à laquelle les hôtes répondent directement :
+  une réponse passe souvent un pare-feu qui bloque les annonces entrantes (celui de Windows en
+  réseau « public » notamment). En secours, le jeu sonde les sous-réseaux locaux en TCP, dans
+  un fil séparé pour ne jamais ralentir l'interface : le /24 de la machine toutes les 4 s, le
+  reste du sous-réseau (jusqu'à un /20) toutes les 30 s ou avec « Actualiser ». Les cartes
+  réseau virtuelles (Docker, Hyper-V/WSL, VirtualBox, VMware…) sont ignorées. Un lobby
+  joignable par IP est donc aussi listé.
 - **Ports** : TCP 45455 (ou le suivant libre jusqu'à 45464) pour le lobby, UDP 45454 pour les
   annonces. Avec firewalld par exemple :
   `sudo firewall-cmd --permanent --add-port=45455/tcp --add-port=45454/udp && sudo firewall-cmd --reload`.
