@@ -13,6 +13,11 @@ Fonctionnalités :
 - **Multijoueur en réseau local** (2 à 4 joueurs) : créez un lobby ou rejoignez-en un depuis
   la liste des lobbys détectés, par son nom ou par adresse IP ; chacun choisit sa toupie parmi
   ses propres toupies.
+- **Tournois** (4 à 32 participants) : ligue ou élimination directe, en solo contre des bots ou
+  en réseau local avec 2 à 4 joueurs humains, matchs express (une toupie, 2 manches gagnantes)
+  ou classiques (trois toupies, 4 points).
+- **Duels** : deux toupies qui dashent l'une vers l'autre au même moment s'affrontent dans un
+  duel de timing.
 - **Assembler une toupie** : un boulon (coup spécial), une roue métallique, une partie
   intermédiaire et une pointe.
 - **Six stadiums** aux formes et propriétés différentes, **sept coups spéciaux** et une
@@ -44,7 +49,7 @@ Les toupies assemblées sont enregistrées en JSON dans le dossier de données d
 |--------|--------|
 | Visée  | souris : direction, et **force** selon la distance du curseur (flèche plus ou moins longue) ; ou `←` `→` pour la direction et `↑` `↓` pour la force ; clic ou `Entrée` pour lancer |
 | Combat | **flèches** (ou `Z` `Q` `S` `D`) maintenues : pilotage, légère correction de trajectoire |
-|        | `Espace` ou clic : dash |
+|        | `Espace` ou clic : dash ; pendant un **duel**, appui quand le curseur est dans le vert |
 |        | `E` ou bouton « Coup spécial » : coup spécial (une fois par partie, coûte la moitié de l'endurance) |
 | Fin    | `R` : revanche (solo) ou retour au lobby (hôte) |
 | Partout| `Échap` : retour au menu / quitter le lobby |
@@ -91,6 +96,15 @@ partent à égale distance du centre, dans la direction et avec la force choisie
   et recule d'autant moins que sa défense est élevée.
 - **Dash** : ruée courte vers l'adversaire le plus proche, avec un bonus d'attaque, contre un
   peu d'endurance.
+- **Duel** : si deux toupies se percutent **en plein dash toutes les deux**, elles restent au
+  contact (elles tremblent et des étincelles jaillissent du point de friction) et chaque
+  joueur voit apparaître une barre rouge avec une zone verte au centre et un curseur qui fait
+  des allers-retours (la sienne en bas de l'écran, celle de l'adversaire juste au-dessus, en
+  plus petit). Il faut appuyer (`Espace` ou clic) quand le curseur est dans le vert ; la zone
+  rétrécit à chaque réussite jusqu'à une taille minimale et le curseur accélère un peu. Le
+  premier qui rate (ou qui n'appuie pas pendant 3 s) perd le duel et subit **1,5× les dégâts**
+  du dash adverse, avec le recul correspondant. Si les deux réussissent **3 appuis d'affilée à
+  la taille minimale**, c'est un nul : les toupies se repoussent sans dégâts.
 - **Rebord** : une toupie qui atteint lentement un rebord rebondit ; trop vite, elle le
   franchit. Sans rebord, rien ne la retient.
 - **Défaite** : éjectée ou à court d'endurance. La dernière toupie en jeu gagne. Par défaut il
@@ -176,12 +190,12 @@ tirées au hasard parmi toutes les combinaisons :
 
 | Stadium   | Attaque | Défense | Endurance | Équilibre | Éjections | Durée moy. |
 |-----------|---------|---------|-----------|-----------|-----------|------------|
-| Classique | 50,3 %  | 52,1 %  | 48,1 %    | 48,6 %    | 38 %      | 14 s       |
-| Béton     | 48,6 %  | 50,4 %  | 50,6 %    | 51,3 %    | 29 %      | 15 s       |
-| Terre     | 51,1 %  | 49,0 %  | 50,1 %    | 49,5 %    | 30 %      | 12 s       |
-| Glace     | 47,9 %  | 52,7 %  | 47,9 %    | 53,3 %    | 33 %      | 17 s       |
-| Sable     | 52,2 %  | 49,4 %  | 48,1 %    | 49,8 %    | 31 %      | 13 s       |
-| Volcan    | 56,3 %  | 45,8 %  | 43,3 %    | 57,4 %    | 26 %      | 12 s       |
+| Classique | 51,5 %  | 49,4 %  | 48,2 %    | 51,4 %    | 35 %      | 18 s       |
+| Béton     | 50,4 %  | 49,0 %  | 50,0 %    | 51,1 %    | 28 %      | 18 s       |
+| Terre     | 51,4 %  | 48,7 %  | 49,7 %    | 50,1 %    | 29 %      | 15 s       |
+| Glace     | 50,7 %  | 50,6 %  | 47,8 %    | 51,6 %    | 33 %      | 21 s       |
+| Sable     | 53,4 %  | 46,5 %  | 49,3 %    | 51,1 %    | 27 %      | 16 s       |
+| Volcan    | 54,8 %  | 46,9 %  | 43,6 %    | 58,0 %    | 23 %      | 15 s       |
 
 **Coups spéciaux** (duels entre boulons différents, Classique, 8 000 combats) : de 47,2 %
 (Distorsion) à 53,4 % (Siphon). **Intérêt** : un bot difficile qui sait utiliser son coup gagne
@@ -207,11 +221,49 @@ niveaux diffèrent par leurs réflexes et surtout par la qualité de leurs déci
 |-----------|--------------|
 | Facile    | débutant impulsif : dashe dès que possible, lance son coup spécial dès que l'adversaire est à portée, esquive rarement les vagues |
 | Normal    | règles de jeu correctes selon son type, coup spécial lancé quand il semble rentable |
-| Difficile | **chasseur** (attaque) qui se place côté centre de sa cible pour la pousser vers le bord ; **enclume** (défense) qui tient le centre ; **esquive** (endurance) qui fuit les attaquants et frappe en fin de partie ; équilibre qui choisit selon la course à l'usure. Il estime la valeur nette de chaque **dash** (dégâts infligés − subis − coût, éjection probable, risque de s'éjecter) et de son **coup spécial** (avec une marge de sécurité : il attend que le coût de la moitié de l'endurance devienne faible ou que l'effet soit décisif), enchaîne des combos (givre ou distorsion puis dash, onde sur une cible au bord), anticipe les déplacements, esquive 80 % des vagues et adapte force et angle de lancement au stadium et à la mêlée |
+| Difficile | **chasseur** (attaque) qui se place côté centre de sa cible pour la pousser vers le bord ; **enclume** (défense) qui tient le centre ; **esquive** (endurance) qui fuit les attaquants et frappe en fin de partie ; équilibre qui choisit selon la course à l'usure. Il estime la valeur nette de chaque **dash** (dégâts infligés − subis − coût, éjection probable, risque de s'éjecter) et de son **coup spécial** (avec une marge de sécurité : il attend que le coût de la moitié de l'endurance devienne faible ou que l'effet soit décisif), enchaîne des combos (givre ou distorsion puis dash, onde sur une cible au bord), anticipe les déplacements, esquive 80 % des vagues et adapte force et angle de lancement au stadium et à la mêlée. Il **contre-dashe** par réflexe quand un adversaire fonce sur lui, pour provoquer un duel |
 
-Mesures (3 000 duels, toupies au hasard, stadium Classique) : le difficile bat le normal dans
-~70 % des cas et le facile dans ~80 % ; le normal bat le facile dans ~80 % des cas. En mêlée à
-4, un bot difficile gagne ~42 % des parties contre trois bots normaux (part équitable 25 %).
+En **duel**, chaque bot appuie quand son curseur passe au centre de la zone verte, avec une
+erreur de timing selon son niveau (écart-type de 75 ms en facile, 45 ms en normal, 25 ms en
+difficile) : plus la zone rétrécit et plus le curseur accélère, plus les bots faibles ratent.
+
+Mesures (3 000 combats, toupies au hasard, stadium Classique) : le difficile bat le normal dans
+~75-80 % des cas et le facile dans ~97 % ; le normal bat le facile dans ~80 % des cas. En mêlée
+à 4, un bot difficile gagne ~49 % des parties contre trois bots normaux (part équitable 25 %).
+
+## Tournois
+
+Le bouton **Tournois** du menu ouvre la section des tournois : on y choisit de jouer **seul
+contre des bots** ou **en multijoueur** (réseau local), puis :
+
+- **Format** : **ligue** (chacun rencontre chacun une fois, avec une exemption par journée si le
+  nombre de participants est impair) ou **élimination directe** (tableau tiré au sort ; si le
+  nombre de participants n'est pas une puissance de 2, certains passent le premier tour).
+- **Participants** : de 4 à 32, dont 1 joueur humain en solo ou 2 à 4 en réseau ; les autres sont
+  des bots dont on règle le **niveau un par un** (ou tous d'un coup).
+- **Type de match**, le même pour tout le tournoi :
+  - **Express** : une toupie pour tout le tournoi ; le premier à gagner **2 manches** remporte le
+    match (une manche nulle ne compte pas) ;
+  - **Classique** : trois toupies pour le tournoi ; avant chaque match, chaque joueur choisit
+    l'**ordre** dans lequel il les jouera (sans voir celui de l'adversaire ; après la 3e on
+    reprend la 1re). Le premier à **4 points** gagne : arrêter la toupie adverse rapporte
+    **1 point**, l'éjecter **2 points**.
+- **Classement de la ligue** : chaque joueur ajoute ce qu'il a gagné dans le match, vainqueur
+  comme perdant. En express ce sont les manches (A bat B 2-1 : A marque 2 points, B 1 point), en
+  classique les points du match. Départage : victoires, puis différence.
+- Le stadium et la personnalisation sont communs à tout le tournoi.
+
+Le tableau de bord du tournoi montre les tours et les résultats, le classement (ligue) et
+votre prochain match : choisissez l'ordre de vos toupies (classique) puis **Prêt**. Les manches
+s'enchaînent automatiquement, le score du match est affiché pendant la manche et à la fin de
+chacune. « Abandonner le match » le donne à l'adversaire. Les matchs entre bots sont simulés
+instantanément.
+
+**En réseau local**, l'hôte crée un lobby de tournoi (les réglages du tournoi sont modifiables
+dans le lobby) ; chaque joueur humain y choisit sa ou ses toupies parmi les siennes. Les matchs
+humains d'un même tour se jouent **en parallèle** (l'hôte les simule tous) ; un joueur qui
+attend voit le tournoi avancer. Un joueur qui se déconnecte est remplacé par un bot normal pour
+la suite du tournoi. À la fin, l'hôte ramène tout le monde au lobby.
 
 ## Multijoueur en réseau local
 
@@ -228,8 +280,11 @@ Depuis le menu **Multijoueur en réseau local** :
 Fonctionnement :
 
 - **L'hôte fait autorité** : il simule le combat et diffuse l'état 30 fois par seconde ; les
-  clients envoient leur visée (angle, force), leur pilotage, leurs dashs et coups spéciaux
-  (protocole v3 : une ancienne version ne peut pas rejoindre un lobby récent).
+  clients envoient leur visée (angle, force), leur pilotage, leurs dashs, coups spéciaux et
+  appuis en duel (avec la position du curseur qu'ils voyaient, pour ne pas être pénalisés par
+  la latence). En tournoi, l'hôte diffuse l'état du tournoi et n'envoie l'état d'un combat
+  qu'à ses participants (protocole v4 : une ancienne version ne peut pas rejoindre un lobby
+  récent).
 - **Découverte des lobbys** : les hôtes diffusent une annonce UDP par seconde (port 45454).
   Comme ces annonces sont souvent bloquées (pare-feu qui n'autorise que le port TCP du jeu,
   Wi-Fi qui filtre les diffusions), le jeu sonde aussi les sous-réseaux locaux en TCP
@@ -262,22 +317,24 @@ Tests (`ctest`) :
 | Suite        | Contenu |
 |--------------|---------|
 | `tst_core`   | stats, types, catalogue, boulons, persistance JSON |
-| `tst_battle` | formules, dash, pilotage, recentrage, force de lancer, coups spéciaux (une fois par partie, coût) et effets, règles, stadiums, mêlées, abandons, déterminisme, niveaux de bot ordonnés |
-| `tst_net`    | lobby (connexion, refus, déconnexion), découverte UDP et par balayage TCP, encodage de l'état, partie réseau de bout en bout |
-| `tst_gui`    | navigation, partie solo complète au clavier, atelier, lobby entre deux fenêtres avec règles de l'hôte |
+| `tst_battle` | formules, dash, pilotage, recentrage, force de lancer, coups spéciaux (une fois par partie, coût) et effets, duels (déclenchement, raté à 1,5× les dégâts, nul, inactivité, bots), règles, stadiums, mêlées, abandons, déterminisme, niveaux de bot ordonnés |
+| `tst_tournament` | score express et classique, ordre des toupies, calendrier de ligue (chacun rencontre chacun), classement, tableau à élimination directe avec exemptions, JSON, match entre bots |
+| `tst_net`    | lobby (connexion, refus, déconnexion), découverte UDP et par balayage TCP, encodage de l'état (duel, score, bots), partie réseau de bout en bout, tournoi solo et tournoi en réseau |
+| `tst_gui`    | navigation, partie solo complète au clavier, atelier, lobby entre deux fenêtres avec règles de l'hôte, ouverture d'un match de tournoi |
 
 ## Architecture
 
 ```
 src/
   core/     modèle : Stats, Part (dont boulons), Top, PartCatalog, TopRepository
-  game/     moteur déterministe : Battle, BattleConfig, Stadium, SpecialMove, MatchRules,
-            BotController
+  game/     moteur déterministe : Battle (dont duels), BattleConfig, Stadium, SpecialMove,
+            MatchRules, BotController, Tournament (ligue, élimination, score des matchs)
   session/  MatchSession (état affiché + actions du joueur local), LocalSession (solo)
   net/      réseau local : Protocol, LobbyServer, LobbyClient, LobbyBrowser + LobbyScanner
-            (découverte), HostSession / ClientSession, MatchCodec
+            (découverte), HostSession / ClientSession, MatchCodec, TournamentSession
+            (directeur du tournoi en solo ou chez l'hôte, suivi chez les clients)
   ui/       interface (bibliothèque toupie_ui) : MainWindow et pages, ArenaWidget,
-            RulesWidget, StadiumPainter, StatsWidget, TopPainter, Theme
+            RulesWidget, TournamentSettingsWidget, StadiumPainter, StatsWidget, TopPainter, Theme
   main.cpp  exécutable toupie_arena
 tests/      Qt Test : modèle, moteur, réseau, interface
 tools/      simulateur d'équilibrage
