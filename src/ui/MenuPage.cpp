@@ -130,8 +130,21 @@ MenuPage::MenuPage(QWidget *parent)
     addButton(tr("⇄  Multijoueur en réseau local"), &MenuPage::lanRequested);
     addButton(tr("🏆  Tournois"), &MenuPage::tournamentRequested);
     addButton(tr("⚙  Assembler une toupie"), &MenuPage::builderRequested);
-    addButton(tr("⟳  Mises à jour"), &MenuPage::updateRequested);
     addButton(tr("✕  Quitter"), &MenuPage::quitRequested);
+
+    // Rangée secondaire : paramètres, aide et mises à jour.
+    auto *extras = new QHBoxLayout;
+    extras->addStretch();
+    for (auto [text, signal] : {std::pair{tr("⚙  Paramètres"), &MenuPage::settingsRequested},
+                                std::pair{tr("?  Aide"), &MenuPage::helpRequested},
+                                std::pair{tr("⟳  Mises à jour"), &MenuPage::updateRequested}}) {
+        auto *button = new QPushButton(text, this);
+        button->setCursor(Qt::PointingHandCursor);
+        connect(button, &QPushButton::clicked, this, signal);
+        extras->addWidget(button);
+    }
+    extras->addStretch();
+    layout->addLayout(extras);
     layout->addStretch(2);
 }
 

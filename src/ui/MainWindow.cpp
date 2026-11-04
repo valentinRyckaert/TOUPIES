@@ -7,8 +7,10 @@
 #include "ui/BattlePage.h"
 #include "ui/BuilderPage.h"
 #include "ui/LanMenuPage.h"
+#include "ui/HelpPage.h"
 #include "ui/LobbyPage.h"
 #include "ui/MenuPage.h"
+#include "ui/SettingsPage.h"
 #include "ui/SetupPage.h"
 #include "ui/TournamentPage.h"
 #include "ui/TournamentSetupPage.h"
@@ -42,11 +44,14 @@ MainWindow::MainWindow(QWidget *parent)
     m_lobby = new LobbyPage(m_repository, m_stack);
     m_tournamentSetup = new TournamentSetupPage(m_repository, m_stack);
     m_tournamentPage = new TournamentPage(m_stack);
+    m_settingsPage = new SettingsPage(m_stack);
+    m_helpPage = new HelpPage(m_stack);
     for (QWidget *page : {static_cast<QWidget *>(m_menu), static_cast<QWidget *>(m_builder),
                           static_cast<QWidget *>(m_setup), static_cast<QWidget *>(m_battle),
                           static_cast<QWidget *>(m_lanMenu), static_cast<QWidget *>(m_lobby),
                           static_cast<QWidget *>(m_tournamentSetup),
-                          static_cast<QWidget *>(m_tournamentPage)})
+                          static_cast<QWidget *>(m_tournamentPage),
+                          static_cast<QWidget *>(m_settingsPage), static_cast<QWidget *>(m_helpPage)})
         m_stack->addWidget(page);
     setCentralWidget(m_stack);
 
@@ -62,6 +67,19 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_menu, &MenuPage::builderRequested, this, &MainWindow::showBuilder);
     connect(m_menu, &MenuPage::quitRequested, this, &QWidget::close);
     connect(m_menu, &MenuPage::updateRequested, this, &MainWindow::checkForUpdates);
+    auto showSettings = [this] {
+        m_settingsPage->refresh();
+        showPage(m_settingsPage);
+    };
+    auto showHelp = [this] {
+        m_helpPage->refresh();
+        showPage(m_helpPage);
+    };
+    connect(m_menu, &MenuPage::settingsRequested, this, showSettings);
+    connect(m_menu, &MenuPage::helpRequested, this, showHelp);
+    connect(m_helpPage, &HelpPage::settingsRequested, this, showSettings);
+    connect(m_settingsPage, &SettingsPage::backRequested, this, &MainWindow::showMenu);
+    connect(m_helpPage, &HelpPage::backRequested, this, &MainWindow::showMenu);
     connect(m_builder, &BuilderPage::backRequested, this, &MainWindow::showMenu);
     connect(m_builder, &BuilderPage::topsChanged, m_setup, &SetupPage::refresh);
     connect(m_builder, &BuilderPage::topsChanged, m_lobby, &LobbyPage::refreshTops);

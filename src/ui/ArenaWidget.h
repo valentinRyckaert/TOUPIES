@@ -19,8 +19,8 @@ namespace toupie {
 ///
 /// L'arène affiche l'état d'une MatchSession (solo, hôte ou client réseau)
 /// et lui transmet les actions du joueur local.
-/// Contrôles : souris ou ← → pour viser, clic / Entrée pour lancer,
-/// clic / Espace pour dasher pendant le combat, R pour demander une revanche.
+/// Les touches et boutons de souris viennent de Controls (page Paramètres) ;
+/// la souris vise toujours pendant la phase de visée.
 class ArenaWidget : public QWidget
 {
     Q_OBJECT
@@ -47,6 +47,7 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void keyReleaseEvent(QKeyEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
@@ -76,6 +77,9 @@ public:
     void trySpecial();
 private:
     void updateSteering();
+    /// Applique les actions associées à une entrée (touche ou bouton de
+    /// souris, voir Controls) ; false si l'entrée n'est associée à rien.
+    bool pressInput(int code, bool autoRepeat);
     /// Force de lancer correspondant à une longueur de flèche (unités du monde).
     double powerForLength(double length) const;
     double lengthForPower(double power) const;

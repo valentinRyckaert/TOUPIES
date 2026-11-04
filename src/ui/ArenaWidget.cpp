@@ -1,6 +1,7 @@
 #include "ui/ArenaWidget.h"
 
 #include "game/SpecialMove.h"
+#include "ui/Controls.h"
 #include "ui/StadiumPainter.h"
 #include "ui/Theme.h"
 #include "ui/TopPainter.h"
@@ -250,15 +251,18 @@ void ArenaWidget::updateSteering()
 {
     if (!m_session)
         return;
+    const Controls &controls = Controls::instance();
     Vec2 steer;
-    if (m_steerKeys.contains(Qt::Key_Left) || m_steerKeys.contains(Qt::Key_Q))
-        steer.x -= 1.0;
-    if (m_steerKeys.contains(Qt::Key_Right) || m_steerKeys.contains(Qt::Key_D))
-        steer.x += 1.0;
-    if (m_steerKeys.contains(Qt::Key_Up) || m_steerKeys.contains(Qt::Key_Z))
-        steer.y -= 1.0;
-    if (m_steerKeys.contains(Qt::Key_Down) || m_steerKeys.contains(Qt::Key_S))
-        steer.y += 1.0;
+    for (int code : std::as_const(m_steerKeys)) {
+        if (controls.triggers(code, Action::SteerLeft))
+            steer.x -= 1.0;
+        if (controls.triggers(code, Action::SteerRight))
+            steer.x += 1.0;
+        if (controls.triggers(code, Action::SteerUp))
+            steer.y -= 1.0;
+        if (controls.triggers(code, Action::SteerDown))
+            steer.y += 1.0;
+    }
     m_session->setSteering(steer.normalized());
 }
 
@@ -290,76 +294,81 @@ void ArenaWidget::mouseMoveEvent(QMouseEvent *event)
 void ArenaWidget::mousePressEvent(QMouseEvent *event)
 {
     setFocus();
-    if (!m_session)
-        return;
-    const MatchPhase phase = m_session->state().phase;
-    if (phase == MatchPhase::Aiming && event->button() == Qt::LeftButton) {
+    const int code = Controls::mouseCode(event->button());
+    const Controls &controls = Controls::instance();
+    // Lancer à la souris : on vise d'abord là où se trouve le curseur.
+    if (m_session && m_session->state().phase == MatchPhase::Aiming
+        && (controls.triggers(code, Action::Dash) || controls.triggers(code, Action::Launch)))
         mouseMoveEvent(event);
-        confirmLaunch();
-    } else if (phase == MatchPhase::Fighting) {
-        tryDash();
+    pressInput(code, false);
+}
+
+void ArenaWidget::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (m_steerKeys.remove(Controls::mouseCode(event->button())))
+        updateSteering();
+}
+
+bool ArenaWidget::pressInput(int code, bool autoRepeat)
+{
+    const QList<Action> actions = Controls::instance().actionsFor(code);
+    if (actions.isEmpty())
+        return false;
+    const MatchPhase phase = m_session ? m_session->state().phase : MatchPhase::Finished;
+    const bool aiming = phase == MatchPhase::Aiming && m_session && !m_session->localHasAimed();
+    const bool steering = actions.contains(Action::SteerLeft) || actions.contains(Action::SteerRight)
+                       || actions.contains(Action::SteerUp) || actions.contains(Action::SteerDown);
+    if (steering && !aiming) {
+        // Pendant le combat : pilotage tant que l'entrée est maintenue.
+        if (!autoRepeat) {
+            m_steerKeys.insert(code);
+            updateSteering();
+        }
+        return true;
     }
+    const BattleConfig *cfg = m_session ? &m_session->state().config : nullptr;
+    for (Action action : actions) {
+        switch (action) {
+        case Action::SteerLeft:
+            m_aimAngle -= kAimStep;
+            break;
+        case Action::SteerRight:
+            m_aimAngle += kAimStep;
+            break;
+        case Action::SteerUp:
+            if (cfg)
+                m_aimPower = std::min(cfg->launchPowerMax, m_aimPower + kPowerStep);
+            break;
+        case Action::SteerDown:
+            if (cfg)
+                m_aimPower = std::max(cfg->launchPowerMin, m_aimPower - kPowerStep);
+            break;
+        case Action::Special:
+            trySpecial();
+            break;
+        case Action::Launch:
+            confirmLaunch();
+            break;
+        case Action::Dash:
+            if (phase == MatchPhase::Aiming)
+                confirmLaunch();
+            else
+                tryDash();
+            break;
+        case Action::Rematch:
+            if (phase == MatchPhase::Finished)
+                emit rematchRequested();
+            break;
+        }
+    }
+    update();
+    return true;
 }
 
 void ArenaWidget::keyPressEvent(QKeyEvent *event)
 {
-    const MatchPhase phase = m_session ? m_session->state().phase : MatchPhase::Finished;
-    const bool aiming = phase == MatchPhase::Aiming && m_session && !m_session->localHasAimed();
-    const int key = event->key();
-    const bool steeringKey = key == Qt::Key_Left || key == Qt::Key_Right || key == Qt::Key_Up
-                          || key == Qt::Key_Down || key == Qt::Key_Z || key == Qt::Key_Q
-                          || key == Qt::Key_S || key == Qt::Key_D;
-    if (steeringKey && !aiming) {
-        // Pendant le combat : pilotage tant que la touche est enfoncée.
-        if (!event->isAutoRepeat()) {
-            m_steerKeys.insert(key);
-            updateSteering();
-        }
-        return;
-    }
-    const BattleConfig *cfg = m_session ? &m_session->state().config : nullptr;
-    switch (key) {
-    case Qt::Key_Left:
-    case Qt::Key_Q:
-        m_aimAngle -= kAimStep;
-        break;
-    case Qt::Key_Right:
-    case Qt::Key_D:
-        m_aimAngle += kAimStep;
-        break;
-    case Qt::Key_Up:
-    case Qt::Key_Z:
-        if (cfg)
-            m_aimPower = std::min(cfg->launchPowerMax, m_aimPower + kPowerStep);
-        break;
-    case Qt::Key_Down:
-    case Qt::Key_S:
-        if (cfg)
-            m_aimPower = std::max(cfg->launchPowerMin, m_aimPower - kPowerStep);
-        break;
-    case Qt::Key_E:
-    case Qt::Key_Shift:
-        trySpecial();
-        break;
-    case Qt::Key_Return:
-    case Qt::Key_Enter:
-        confirmLaunch();
-        break;
-    case Qt::Key_Space:
-        if (phase == MatchPhase::Aiming)
-            confirmLaunch();
-        else
-            tryDash();
-        break;
-    case Qt::Key_R:
-        if (phase == MatchPhase::Finished)
-            emit rematchRequested();
-        break;
-    default:
+    if (!pressInput(event->key(), event->isAutoRepeat()))
         QWidget::keyPressEvent(event);
-        return;
-    }
-    update();
 }
 
 void ArenaWidget::keyReleaseEvent(QKeyEvent *event)
@@ -799,7 +808,8 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
         if (s.specialUsed)
             label = tr("%1 — utilisé").arg(move->name);
         else if (local && state.phase == MatchPhase::Fighting)
-            label = tr("E : %1 (coûte ½ endurance)").arg(move->name);
+            label = tr("%1 : %2 (coûte ½ endurance)")
+                        .arg(Controls::instance().text(Action::Special), move->name);
         p.drawText(gauge, Qt::AlignCenter,
                    QFontMetrics(small).elidedText(label, Qt::ElideRight, int(gauge.width()) - 6));
         p.setFont(f);
@@ -835,7 +845,8 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
         text = tr("Dash impossible");
         color = QColor(170, 90, 90);
     } else {
-        text = local ? tr("Dash prêt (Espace / clic) · Flèches : piloter") : tr("Dash prêt");
+        text = local ? tr("Dash prêt (%1)").arg(Controls::instance().text(Action::Dash))
+                     : tr("Dash prêt");
         color = QColor(120, 230, 150);
     }
     p.setPen(color);
@@ -867,7 +878,13 @@ void ArenaWidget::paintOverlay(QPainter &p)
             const int ready = static_cast<int>(std::count(state.aimed.begin(), state.aimed.end(), true));
             hint = tr("En attente des autres joueurs (%1/%2)").arg(ready).arg(state.playerCount());
         } else {
-            hint = tr("Direction : souris ou ← →  ·  Force : distance ou ↑ ↓  ·  Lancer : clic / Entrée");
+            const Controls &c = Controls::instance();
+            hint = tr("Direction : souris ou %1 %2  ·  Force : distance ou %3 %4  ·  Lancer : %5")
+                       .arg(Controls::codeText(c.binding(Action::SteerLeft, 0)),
+                            Controls::codeText(c.binding(Action::SteerRight, 0)),
+                            Controls::codeText(c.binding(Action::SteerUp, 0)),
+                            Controls::codeText(c.binding(Action::SteerDown, 0)),
+                            c.text(Action::Dash));
         }
         QFont f = font();
         f.setBold(true);
@@ -994,7 +1011,8 @@ void ArenaWidget::paintDuelBar(QPainter &p, const QRectF &rect, int spinner, con
     p.setBrush(QColor(0, 0, 0, 150));
     p.drawRoundedRect(label.adjusted(30, 0, -30, 0), 6, 6);
     p.setPen(slotColor(spinner));
-    QString text = local ? tr("DUEL ! Espace / clic quand le curseur est dans le vert")
+    QString text = local ? tr("DUEL ! %1 quand le curseur est dans le vert")
+                               .arg(Controls::instance().text(Action::Dash))
                          : tr("Duel — %1").arg(state.names.value(spinner));
     if (side.done)
         text = local ? tr("Série réussie ! En attente de l'adversaire…")

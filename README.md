@@ -18,6 +18,8 @@ Fonctionnalités :
   ou classiques (trois toupies, 4 points).
 - **Duels** : deux toupies qui dashent l'une vers l'autre au même moment s'affrontent dans un
   duel de timing.
+- **Paramètres et aide** : touches du clavier et boutons de la souris configurables, et page
+  d'aide qui récapitule les commandes.
 - **Mises à jour** : le jeu vérifie s'il existe une version plus récente, la télécharge,
   remplace l'ancienne et redémarre dessus.
 - **Assembler une toupie** : un boulon (coup spécial), une roue métallique, une partie
@@ -46,6 +48,10 @@ Les toupies assemblées sont enregistrées en JSON dans le dossier de données d
 (`~/.local/share/ToupieArena/ToupieArena/tops.json` sous Linux).
 
 ## Commandes
+
+Touches par défaut ci-dessous. Toutes (sauf `Échap`) se changent dans **Paramètres** (menu
+principal) : chaque action accepte deux entrées, touche du clavier ou bouton de la souris. La page
+**Aide** récapitule les commandes avec les touches actuellement configurées.
 
 | Phase  | Action |
 |--------|--------|
@@ -341,7 +347,7 @@ Tests (`ctest`) :
 | `tst_battle` | formules, dash, pilotage, recentrage, force de lancer, coups spéciaux (une fois par partie, coût) et effets, duels (déclenchement, raté à 1,5× les dégâts, nul, inactivité, bots), règles, stadiums, mêlées, abandons, déterminisme, niveaux de bot ordonnés |
 | `tst_tournament` | score express et classique, ordre des toupies, calendrier de ligue (chacun rencontre chacun), classement, tableau à élimination directe avec exemptions, JSON, match entre bots |
 | `tst_net`    | lobby (connexion, refus, déconnexion), découverte UDP et par balayage TCP, encodage de l'état (duel, score, bots), partie réseau de bout en bout, tournoi solo et tournoi en réseau, recherche de mise à jour, remplacement et relance d'une AppImage |
-| `tst_gui`    | navigation, partie solo complète au clavier, atelier, lobby entre deux fenêtres avec règles de l'hôte, ouverture d'un match de tournoi |
+| `tst_gui`    | navigation, partie solo complète au clavier, atelier, lobby entre deux fenêtres avec règles de l'hôte, ouverture d'un match de tournoi, touches configurables (sauvegarde, touche reprise à une autre action, touche réassignée utilisée en combat) |
 
 ## Architecture
 
@@ -355,7 +361,8 @@ src/
             (découverte), HostSession / ClientSession, MatchCodec, TournamentSession
             (directeur du tournoi en solo ou chez l'hôte, suivi chez les clients)
   ui/       interface (bibliothèque toupie_ui) : MainWindow et pages, ArenaWidget,
-            RulesWidget, TournamentSettingsWidget, StadiumPainter, StatsWidget, TopPainter, Theme
+            RulesWidget, TournamentSettingsWidget, Controls (touches), StadiumPainter, StatsWidget,
+            TopPainter, Theme
   main.cpp  exécutable toupie_arena
 tests/      Qt Test : modèle, moteur, réseau, interface
 tools/      simulateur d'équilibrage

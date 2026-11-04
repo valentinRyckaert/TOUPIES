@@ -4,6 +4,7 @@
 #include "game/Stadium.h"
 #include "ui/RulesWidget.h"
 #include "ui/StadiumPainter.h"
+#include "ui/Controls.h"
 #include "ui/StatsWidget.h"
 #include "ui/Widgets.h"
 
@@ -79,16 +80,7 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
             m_stadiumPreview->setStadium(*stadium);
     });
 
-    auto *rules = new QLabel(
-        tr("<b>Commandes</b> — Visez à la souris (la distance règle la force) ou avec "
-           "← → / ↑ ↓, lancez d'un clic ou avec Entrée. En combat : <b>flèches</b> pour piloter "
-           "légèrement, <b>Espace</b> ou clic pour dasher, <b>E</b> pour le coup spécial : une "
-           "seule fois par partie, il coûte la moitié de votre endurance du moment, mieux vaut "
-           "donc le garder pour un moment décisif. Une toupie éjectée ou à court d'endurance "
-           "perd.<br>"
-           "<b>Repères</b> — Attaque bat Endurance, Endurance bat Défense, Défense bat Attaque ; "
-           "chaque stadium avantage légèrement certains types."),
-        this);
+    auto *rules = new QLabel(this);
     rules->setWordWrap(true);
     rules->setMaximumWidth(560);
     QDialog *helpPopup = createPopup(this, tr("Commandes et repères"), rules);
@@ -105,7 +97,14 @@ SetupPage::SetupPage(TopRepository &repository, QWidget *parent)
         rulesButton->setToolTip(m_rules->rules().summary());
     });
     connect(rulesButton, &QPushButton::clicked, rulesPopup, &QDialog::open);
-    connect(helpButton, &QPushButton::clicked, helpPopup, &QDialog::open);
+    connect(helpButton, &QPushButton::clicked, helpPopup, [this, rules, helpPopup] {
+        // Touches actuelles (page Paramètres) et repères de jeu.
+        rules->setText(Controls::instance().helpHtml()
+                       + tr("<p><b>Repères</b> — Une toupie éjectée ou à court d'endurance perd. "
+                            "Attaque bat Endurance, Endurance bat Défense, Défense bat Attaque ; "
+                            "chaque stadium avantage légèrement certains types.</p>"));
+        helpPopup->open();
+    });
     auto *fightButton = new QPushButton(tr("Combattre !"), this);
     fightButton->setObjectName(QStringLiteral("accent"));
     fightButton->setDefault(true);

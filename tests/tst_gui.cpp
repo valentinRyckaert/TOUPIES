@@ -6,6 +6,9 @@
 #include "ui/ArenaWidget.h"
 #include "ui/BattlePage.h"
 #include "ui/BuilderPage.h"
+#include "ui/Controls.h"
+#include "ui/HelpPage.h"
+#include "ui/SettingsPage.h"
 #include "ui/LanMenuPage.h"
 #include "ui/LobbyPage.h"
 #include "ui/MainWindow.h"
@@ -57,6 +60,8 @@ private slots:
     void lanLobbyStartsMatchWithHostRules();
     void soloTournamentOpensMatch();
     void tournamentParticipantsFollowFormat();
+    void controlsAreRebindableAndSaved();
+    void reboundKeyIsUsedInBattle();
 };
 
 void TestGui::initTestCase()
@@ -66,6 +71,7 @@ void TestGui::initTestCase()
     QCoreApplication::setOrganizationName(QStringLiteral("ToupieArenaTests"));
     QCoreApplication::setApplicationName(QStringLiteral("ToupieArenaTests"));
     QFile::remove(TopRepository::defaultFilePath());
+    Controls::instance().reset(); // Touches par défaut, quoi qu'ait laissé un essai précédent.
     Theme::apply(*qApp);
 }
 
@@ -242,6 +248,51 @@ void TestGui::tournamentParticipantsFollowFormat()
     format->setCurrentIndex(format->findData(static_cast<int>(TournamentFormat::League)));
     QCOMPARE(count->value(), 8);
     QVERIFY(!count->isHidden());
+}
+
+void TestGui::controlsAreRebindableAndSaved()
+{
+    Controls &controls = Controls::instance();
+    QVERIFY(controls.triggers(Qt::Key_Space, Action::Dash));
+    QVERIFY(controls.triggers(Controls::mouseCode(Qt::LeftButton), Action::Dash));
+    // Une touche déjà utilisée est retirée de l'action précédente.
+    const auto previous = controls.bind(Action::Special, 1, Qt::Key_Space);
+    QVERIFY(previous && *previous == Action::Dash);
+    QVERIFY(!controls.triggers(Qt::Key_Space, Action::Dash));
+    QVERIFY(controls.triggers(Qt::Key_Space, Action::Special));
+    QVERIFY(!controls.bind(Action::Dash, 0, Controls::mouseCode(Qt::RightButton)));
+    QVERIFY(!controls.bind(Action::Dash, 1, Qt::Key_Escape)); // Réservée.
+    QCOMPARE(controls.binding(Action::Dash, 1), Controls::mouseCode(Qt::LeftButton));
+
+    const Controls reloaded; // Relu depuis les réglages.
+    QCOMPARE(reloaded.binding(Action::Special, 1), int(Qt::Key_Space));
+    QCOMPARE(reloaded.binding(Action::Dash, 0), Controls::mouseCode(Qt::RightButton));
+    QVERIFY(reloaded.helpHtml().contains(QStringLiteral("Clic droit")));
+    controls.reset();
+    QVERIFY(controls.triggers(Qt::Key_Space, Action::Dash));
+}
+
+void TestGui::reboundKeyIsUsedInBattle()
+{
+    Controls::instance().bind(Action::Launch, 0, Qt::Key_L);
+    MainWindow window;
+    window.show();
+    emit window.findChild<MenuPage *>()->helpRequested();
+    QVERIFY(qobject_cast<HelpPage *>(currentPage(window)));
+    emit window.findChild<MenuPage *>()->settingsRequested();
+    QVERIFY(qobject_cast<SettingsPage *>(currentPage(window)));
+
+    const QList<Top> presets = PartCatalog::instance().presets();
+    emit window.findChild<SetupPage *>()->fightRequested(presets.at(0), presets.at(1),
+                                                         Difficulty::Easy, QString(), {});
+    auto *battle = window.findChild<BattlePage *>();
+    auto *arena = window.findChild<ArenaWidget *>();
+    arena->setFocus();
+    QTest::keyClick(arena, Qt::Key_Return); // Ancienne touche : plus associée au lancer.
+    QCOMPARE(battle->session()->state().phase, MatchPhase::Aiming);
+    QTest::keyClick(arena, Qt::Key_L);
+    QCOMPARE(battle->session()->state().phase, MatchPhase::Countdown);
+    Controls::instance().reset();
 }
 
 QTEST_MAIN(TestGui)

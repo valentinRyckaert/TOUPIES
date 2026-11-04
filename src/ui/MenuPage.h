@@ -18,6 +18,8 @@ signals:
     void tournamentRequested();
     void builderRequested();
     void updateRequested();
+    void settingsRequested();
+    void helpRequested();
     void quitRequested();
 };
 

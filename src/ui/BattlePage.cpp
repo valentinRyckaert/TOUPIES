@@ -1,6 +1,7 @@
 #include "ui/BattlePage.h"
 
 #include "ui/ArenaWidget.h"
+#include "ui/Controls.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -100,6 +101,7 @@ void BattlePage::updateButtons()
 {
     const bool finished = m_session && m_session->state().phase == MatchPhase::Finished;
     m_setupButton->setVisible(m_mode == Mode::Solo);
+    m_specialButton->setText(tr("Coup spécial (%1)").arg(Controls::instance().text(Action::Special)));
     m_specialButton->setVisible(m_session && m_session->state().config.specialsEnabled);
     m_specialButton->setEnabled(m_session && m_session->state().phase == MatchPhase::Fighting
                                 && !m_session->state().spinners[m_session->localPlayer()].specialUsed);
@@ -107,7 +109,7 @@ void BattlePage::updateButtons()
     switch (m_mode) {
     case Mode::Solo:
         m_leaveButton->setText(tr("Menu (Échap)"));
-        m_rematchButton->setText(tr("Revanche (R)"));
+        m_rematchButton->setText(tr("Revanche (%1)").arg(Controls::instance().text(Action::Rematch)));
         m_rematchButton->setVisible(true);
         m_rematchButton->setEnabled(finished);
         m_score->setText(tr("Victoires %1  ·  Défaites %2  ·  Nuls %3")
@@ -117,7 +119,8 @@ void BattlePage::updateButtons()
         break;
     case Mode::LanHost:
         m_leaveButton->setText(tr("Fermer le lobby"));
-        m_rematchButton->setText(tr("Retour au lobby (R)"));
+        m_rematchButton->setText(
+            tr("Retour au lobby (%1)").arg(Controls::instance().text(Action::Rematch)));
         m_rematchButton->setVisible(true);
         m_rematchButton->setEnabled(finished);
         m_score->setText(finished ? tr("Combat terminé") : tr("Partie en réseau local (hôte)"));
