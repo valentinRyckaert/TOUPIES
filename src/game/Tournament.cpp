@@ -432,6 +432,25 @@ QList<int> randomOrder(int count, std::uint32_t seed)
     return order;
 }
 
+QList<Participant> addBots(QList<Participant> humans, const TournamentSettings &settings,
+                           const QList<Top> &pool, std::uint32_t seed)
+{
+    std::mt19937 rng(seed);
+    const int tops = MatchSeries::topsFor(settings.matchFormat);
+    for (int i = 0; i < settings.bots.size(); ++i) {
+        Participant bot;
+        bot.name = QStringLiteral("Bot %1").arg(i + 1);
+        bot.level = settings.bots.at(i);
+        for (int k : randomOrder(static_cast<int>(pool.size()), static_cast<std::uint32_t>(rng())))
+            if (bot.tops.size() < tops)
+                bot.tops.append(pool.at(k));
+        while (!pool.isEmpty() && bot.tops.size() < tops)
+            bot.tops.append(pool.first()); // Moins de toupies que nécessaire.
+        humans.append(bot);
+    }
+    return humans;
+}
+
 MatchSeries playBotMatch(const Participant &a, const Participant &b, MatchFormat format,
                          const Stadium &stadium, const MatchRules &rules, std::uint32_t seed)
 {

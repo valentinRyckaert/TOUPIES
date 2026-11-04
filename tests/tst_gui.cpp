@@ -13,6 +13,8 @@
 #include "ui/RulesWidget.h"
 #include "ui/SetupPage.h"
 #include "ui/Theme.h"
+#include "ui/TournamentPage.h"
+#include "ui/TournamentSetupPage.h"
 
 #include <QApplication>
 #include <QComboBox>
@@ -50,6 +52,7 @@ private slots:
     void soloMatchRunsToTheEnd();
     void builderSavesTopWithBolt();
     void lanLobbyStartsMatchWithHostRules();
+    void soloTournamentOpensMatch();
 };
 
 void TestGui::initTestCase()
@@ -158,7 +161,7 @@ void TestGui::lanLobbyStartsMatchWithHostRules()
 
     emit host.findChild<MenuPage *>()->lanRequested();
     net::LobbyServer::Settings settings{QStringLiteral("CI"), QStringLiteral("Hôte"), 2,
-                                        QStringLiteral("sable")};
+                                        QStringLiteral("sable"), std::nullopt};
     emit host.findChild<LanMenuPage *>()->hostRequested(settings);
     auto *hostLobby = host.findChild<LobbyPage *>();
     QCOMPARE(currentPage(host), hostLobby);
@@ -197,6 +200,26 @@ void TestGui::lanLobbyStartsMatchWithHostRules()
     QTest::keyClick(host.findChild<ArenaWidget *>(), Qt::Key_Return);
     QTest::keyClick(guest.findChild<ArenaWidget *>(), Qt::Key_Return);
     QTRY_COMPARE_WITH_TIMEOUT(guestBattle->session()->state().phase, MatchPhase::Fighting, 6000);
+}
+
+void TestGui::soloTournamentOpensMatch()
+{
+    MainWindow window;
+    window.show();
+    emit window.findChild<MenuPage *>()->tournamentRequested();
+    auto *setup = qobject_cast<TournamentSetupPage *>(currentPage(window));
+    QVERIFY(setup);
+    buttonStartingWith(setup, QStringLiteral("Lancer le tournoi"))->click();
+    auto *hub = qobject_cast<TournamentPage *>(currentPage(window));
+    QVERIFY(hub);
+
+    // Prêt : la première manche du match du joueur s'ouvre dans l'arène.
+    buttonStartingWith(hub, QStringLiteral("Prêt"))->click();
+    auto *battle = qobject_cast<BattlePage *>(currentPage(window));
+    QVERIFY(battle);
+    QCOMPARE(battle->mode(), BattlePage::Mode::Tournament);
+    QVERIFY(battle->session() && battle->session()->state().series.has_value());
+    QVERIFY(buttonStartingWith(battle, QStringLiteral("Abandonner")));
 }
 
 QTEST_MAIN(TestGui)

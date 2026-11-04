@@ -49,6 +49,7 @@ QList<ImpactEvent> MatchSession::syncFromBattle(Battle &battle)
     m_state.endReason = battle.endReason();
     m_state.ranking = battle.ranking();
     m_state.projectiles = battle.projectiles();
+    m_state.duel = battle.duel();
     const QList<ImpactEvent> impacts = battle.takeImpacts();
     m_impacts.append(impacts);
     return impacts;

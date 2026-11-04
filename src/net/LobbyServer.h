@@ -31,6 +31,7 @@ public:
         QString hostName;
         int maxPlayers = 2;
         QString stadiumId;
+        std::optional<TournamentSettings> tournament; ///< Lobby de tournoi.
     };
 
     static constexpr int kHostId = 0;
@@ -49,8 +50,10 @@ public:
     QString errorString() const { return m_error; }
     const LobbyInfo &lobby() const { return m_lobby; }
 
-    void setHostTop(const Top &top);
+    void setHostTops(const QList<Top> &tops);
     void setMaxPlayers(int maxPlayers);
+    /// Lobby de tournoi uniquement.
+    void setTournamentSettings(TournamentSettings settings);
     void setStadium(const QString &stadiumId);
     void setRules(const MatchRules &rules);
 
@@ -58,6 +61,8 @@ public:
     bool canStart() const;
     /// Lance la partie : diffuse le message de départ et le renvoie.
     QJsonObject startMatch(quint32 seed);
+    /// Lance le tournoi (le directeur du tournoi prend ensuite le relais).
+    void startTournament();
     /// Fin de partie : retour de tous les joueurs au lobby.
     void returnToLobby();
 
@@ -66,7 +71,8 @@ public:
 
 signals:
     void lobbyChanged();
-    /// Message de jeu (visée, dash) reçu d'un client pendant une partie.
+    /// Message de jeu (visée, dash, duel, ordre des toupies…) reçu d'un
+    /// client pendant une partie.
     void gameMessage(int playerId, const QJsonObject &message);
     void playerLeft(int playerId);
 

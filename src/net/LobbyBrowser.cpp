@@ -103,6 +103,7 @@ void LobbyBrowser::readDatagrams()
         lobby.players = o.value("players").toInt();
         lobby.maxPlayers = o.value("max").toInt();
         lobby.inGame = o.value("inGame").toBool();
+        lobby.tournament = o.value("tournament").toBool();
         bool ok = false;
         const quint32 ipv4 = datagram.senderAddress().toIPv4Address(&ok);
         lobby.address = ok ? QHostAddress(ipv4) : datagram.senderAddress();

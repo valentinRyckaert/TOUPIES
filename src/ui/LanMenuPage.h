@@ -6,6 +6,7 @@
 #include <QWidget>
 
 class QComboBox;
+class QGroupBox;
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -29,6 +30,8 @@ public:
     void activate();
     void deactivate();
     void setBusy(bool busy, const QString &message = {});
+    /// Mode tournoi : le lobby créé est un lobby de tournoi avec ces réglages.
+    void setTournament(const std::optional<TournamentSettings> &settings);
 
 signals:
     void hostRequested(const toupie::net::LobbyServer::Settings &settings);
@@ -43,6 +46,9 @@ private:
     void requestHost();
 
     net::LobbyBrowser m_browser;
+    std::optional<TournamentSettings> m_tournament;
+    QLabel *m_title = nullptr;
+    QGroupBox *m_createBox = nullptr;
     QLineEdit *m_nameEdit = nullptr;
     QLineEdit *m_lobbyNameEdit = nullptr;
     QComboBox *m_playersCombo = nullptr;

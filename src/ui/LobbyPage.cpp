@@ -10,6 +10,7 @@
 #include "ui/RulesWidget.h"
 #include "ui/StadiumPainter.h"
 #include "ui/StatsWidget.h"
+#include "ui/TournamentSettingsWidget.h"
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -90,6 +91,8 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     root->addLayout(settingsRow);
     m_rules = new RulesWidget(this);
     root->addWidget(m_rules);
+    m_tournamentSettings = new TournamentSettingsWidget(this);
+    root->addWidget(m_tournamentSettings);
 
     // --- Joueurs ----------------------------------------------------------------
     m_table = new QTableWidget(0, 4, this);
@@ -107,8 +110,17 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     // --- Ma toupie --------------------------------------------------------------
     auto *topBox = new QGroupBox(tr("Votre toupie (parmi vos toupies locales)"), this);
     auto *topLayout = new QVBoxLayout(topBox);
-    m_topCombo = new QComboBox(topBox);
-    topLayout->addWidget(m_topCombo);
+    auto *combos = new QHBoxLayout;
+    for (int i = 0; i < 3; ++i) {
+        auto *combo = new QComboBox(topBox);
+        m_topCombos.append(combo);
+        combos->addWidget(combo);
+        connect(combo, &QComboBox::currentIndexChanged, this, [this, combo] {
+            m_topPreview->setTop(m_tops.value(combo->currentIndex()));
+            sendSelectedTops();
+        });
+    }
+    topLayout->addLayout(combos);
     m_topPreview = new StatsWidget(topBox);
     topLayout->addWidget(m_topPreview);
     root->addWidget(topBox);
@@ -132,13 +144,22 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
     root->addLayout(buttons);
 
     connect(leaveButton, &QPushButton::clicked, this, &LobbyPage::leaveRequested);
-    connect(m_topCombo, &QComboBox::currentIndexChanged, this, &LobbyPage::sendSelectedTop);
     connect(m_readyButton, &QPushButton::toggled, this, [this](bool ready) {
         m_readyButton->setText(ready ? tr("Prêt ✓") : tr("Je suis prêt"));
         if (m_client)
             m_client->setReady(ready);
     });
-    connect(m_startButton, &QPushButton::clicked, this, &LobbyPage::startMatch);
+    connect(m_startButton, &QPushButton::clicked, this, [this] {
+        if (const net::LobbyInfo *info = lobby(); info && info->tournament)
+            startTournament();
+        else
+            startMatch();
+    });
+    connect(m_tournamentSettings, &TournamentSettingsWidget::settingsChanged, this,
+            [this](const TournamentSettings &settings) {
+                if (m_server)
+                    m_server->setTournamentSettings(settings);
+            });
     connect(m_playersCombo, &QComboBox::activated, this, [this] {
         if (m_server)
             m_server->setMaxPlayers(m_playersCombo->currentData().toInt());
@@ -159,6 +180,7 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
 LobbyPage::~LobbyPage()
 {
     m_session.reset();
+    m_tournament.reset();
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +199,7 @@ bool LobbyPage::host(const net::LobbyServer::Settings &settings, QString *error)
     }
     connect(m_server.get(), &net::LobbyServer::lobbyChanged, this, &LobbyPage::onLobbyChanged);
     m_wasInGame = false;
-    sendSelectedTop();
+    sendSelectedTops();
     rebuild();
     return true;
 }
@@ -190,7 +212,7 @@ void LobbyPage::join(const QString &hostAddress, quint16 port, const QString &pl
     connect(client, &net::LobbyClient::joined, this, [this] {
         m_wasInGame = false;
         m_readyButton->setChecked(false);
-        sendSelectedTop();
+        sendSelectedTops();
         rebuild();
         emit joined();
     });
@@ -200,17 +222,27 @@ void LobbyPage::join(const QString &hostAddress, quint16 port, const QString &pl
     });
     connect(client, &net::LobbyClient::connectionLost, this, [this](const QString &reason) {
         m_session.reset();
+        m_tournament.reset();
         disposeLater(m_client);
         emit connectionLost(reason);
     });
     connect(client, &net::LobbyClient::lobbyChanged, this, &LobbyPage::onLobbyChanged);
     connect(client, &net::LobbyClient::matchStarted, this, &LobbyPage::onClientMatchStarted);
+    connect(client, &net::LobbyClient::gameMessage, this, [this](const QJsonObject &message) {
+        if (message.value("type").toString() != net::Msg::Tournament || m_tournament || !m_client)
+            return;
+        auto follower = std::make_unique<net::TournamentFollower>(m_client.get());
+        follower->apply(message);
+        m_tournament = std::move(follower);
+        emit tournamentStarted();
+    });
     client->connectToHost(hostAddress, port, playerName);
 }
 
 void LobbyPage::leave()
 {
     m_session.reset();
+    m_tournament.reset();
     if (m_server) {
         disconnect(m_server.get(), nullptr, this, nullptr);
         m_server->close(tr("L'hôte a fermé le lobby."));
@@ -226,6 +258,7 @@ void LobbyPage::leave()
 
 void LobbyPage::returnToLobby()
 {
+    m_tournament.reset();
     if (m_server)
         m_server->returnToLobby();
 }
@@ -257,29 +290,36 @@ int LobbyPage::localPlayerId() const
 
 void LobbyPage::refreshTops()
 {
-    const QString current = m_topCombo->currentText();
     m_tops = m_repository.allTops();
-    {
-        const QSignalBlocker blocker(m_topCombo);
-        m_topCombo->clear();
+    for (int i = 0; i < m_topCombos.size(); ++i) {
+        QComboBox *combo = m_topCombos.at(i);
+        const QString current = combo->currentText();
+        const QSignalBlocker blocker(combo);
+        combo->clear();
         for (const Top &top : m_tops)
-            m_topCombo->addItem(QStringLiteral("%1  [%2]").arg(top.name(), toString(top.type())));
-        m_topCombo->setCurrentIndex(qMax(0, m_topCombo->findText(current)));
+            combo->addItem(QStringLiteral("%1  [%2]").arg(top.name(), toString(top.type())));
+        const int found = combo->findText(current);
+        combo->setCurrentIndex(found >= 0 ? found : std::min(i, int(m_tops.size()) - 1));
     }
-    sendSelectedTop();
+    m_topPreview->setTop(m_tops.value(m_topCombos.first()->currentIndex()));
+    sendSelectedTops();
 }
 
-void LobbyPage::sendSelectedTop()
+void LobbyPage::sendSelectedTops()
 {
-    const int index = m_topCombo->currentIndex();
-    if (index < 0 || index >= m_tops.size())
-        return;
-    const Top &top = m_tops.at(index);
-    m_topPreview->setTop(top);
+    const net::LobbyInfo *info = lobby();
+    const int needed = info ? info->topsNeeded() : 1;
+    QList<Top> tops;
+    for (int i = 0; i < needed; ++i) {
+        const int index = m_topCombos.at(i)->currentIndex();
+        if (index < 0 || index >= m_tops.size())
+            return;
+        tops.append(m_tops.at(index));
+    }
     if (m_server) {
-        m_server->setHostTop(top);
+        m_server->setHostTops(tops);
     } else if (m_client && m_client->isJoined()) {
-        m_client->selectTop(top);
+        m_client->selectTops(tops);
         // Changer de toupie annule le statut « prêt » (côté hôte aussi).
         const QSignalBlocker blocker(m_readyButton);
         m_readyButton->setChecked(false);
@@ -292,9 +332,15 @@ void LobbyPage::onLobbyChanged()
     const net::LobbyInfo *info = lobby();
     if (!info)
         return;
-    if (m_client && m_wasInGame && !info->inGame)
+    if (m_client && m_wasInGame && !info->inGame) {
+        m_tournament.reset();
         emit returnedToLobby();
+    }
     m_wasInGame = info->inGame;
+    // Le nombre de toupies demandé a changé (type de match du tournoi).
+    const net::LobbyPlayer *me = info->player(localPlayerId());
+    if (me && me->tops.size() != info->topsNeeded() && !info->inGame)
+        sendSelectedTops();
     rebuild();
 }
 
@@ -340,6 +386,16 @@ void LobbyPage::rebuild()
     m_rules->setReadOnly(!hosting);
     if (m_rules->rules() != info->rules)
         m_rules->setRules(info->rules);
+    m_tournamentSettings->setVisible(info->tournament.has_value());
+    if (info->tournament) {
+        m_tournamentSettings->setReadOnly(!hosting);
+        m_tournamentSettings->setHumans(info->maxPlayers);
+        if (m_tournamentSettings->settings() != *info->tournament)
+            m_tournamentSettings->setSettings(*info->tournament);
+    }
+    const int needed = info->topsNeeded();
+    for (int i = 0; i < m_topCombos.size(); ++i)
+        m_topCombos.at(i)->setVisible(i < needed);
 
     // Tableau des places.
     m_table->setRowCount(info->maxPlayers);
@@ -353,8 +409,14 @@ void LobbyPage::rebuild()
                 name += tr(" (hôte)");
             if (p.id == localPlayerId())
                 name += tr(" — vous");
-            cells << name << (p.top ? p.top->name() : tr("—"))
-                  << (p.top ? toString(p.top->type()) : QString())
+            QStringList topNames;
+            QStringList types;
+            for (const Top &top : p.tops) {
+                topNames << top.name();
+                types << toString(top.type());
+            }
+            cells << name << (topNames.isEmpty() ? tr("—") : topNames.join(QStringLiteral(", ")))
+                  << types.join(QStringLiteral(", "))
                   << (p.host ? tr("Hôte") : p.ready ? tr("Prêt") : tr("Pas prêt"));
             color = ArenaWidget::slotColor(row);
         } else {
@@ -380,6 +442,7 @@ void LobbyPage::rebuild()
         }
     }
     m_startButton->setEnabled(hosting && m_server->canStart());
+    m_startButton->setText(info->tournament ? tr("Lancer le tournoi") : tr("Lancer la partie"));
 
     const int count = static_cast<int>(info->players.size());
     QString status;
@@ -413,8 +476,30 @@ void LobbyPage::startMatch()
     emit matchStarted();
 }
 
+void LobbyPage::startTournament()
+{
+    if (!m_server || !m_server->canStart() || !m_server->lobby().tournament)
+        return;
+    const net::LobbyInfo &info = m_server->lobby();
+    TournamentSettings settings = *info.tournament;
+    settings.stadiumId = info.stadiumId;
+    settings.rules = info.rules;
+    QList<Participant> humans;
+    for (const net::LobbyPlayer &p : info.players)
+        humans.append({p.name, p.id, Difficulty::Normal, p.tops.mid(0, info.topsNeeded())});
+    auto *rng = QRandomGenerator::global();
+    Tournament tournament(settings, addBots(humans, settings, m_tops, rng->generate()),
+                          rng->generate());
+    m_server->startTournament();
+    m_tournament = std::make_unique<net::TournamentDirector>(m_server.get(), std::move(tournament),
+                                                             rng->generate());
+    emit tournamentStarted();
+}
+
 void LobbyPage::onClientMatchStarted(const QJsonObject &start)
 {
+    if (start.contains("match"))
+        return; // Manche de tournoi : gérée par le suivi du tournoi.
     const auto setup = net::parseStart(start, PartCatalog::instance());
     if (!setup || !m_client)
         return;

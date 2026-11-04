@@ -53,7 +53,7 @@ BattlePage::BattlePage(QWidget *parent)
     connect(refresh, &QTimer::timeout, this, &BattlePage::updateButtons);
     refresh->start(200);
     connect(m_arena, &ArenaWidget::rematchRequested, this, [this] {
-        if (m_mode != Mode::LanClient)
+        if (m_mode == Mode::Solo || m_mode == Mode::LanHost)
             emit rematchRequested();
     });
 }
@@ -127,6 +127,16 @@ void BattlePage::updateButtons()
         m_rematchButton->setVisible(false);
         m_score->setText(finished ? tr("En attente de l'hôte pour revenir au lobby…")
                                   : tr("Partie en réseau local"));
+        break;
+    case Mode::Tournament:
+        m_leaveButton->setText(tr("Abandonner le match"));
+        m_rematchButton->setVisible(false);
+        if (m_session && m_session->state().series) {
+            const MatchSeries &series = *m_session->state().series;
+            m_score->setText(series.format == MatchFormat::Classic
+                                 ? tr("Match de tournoi · premier à 4 points")
+                                 : tr("Match de tournoi · premier à 2 manches"));
+        }
         break;
     }
 }

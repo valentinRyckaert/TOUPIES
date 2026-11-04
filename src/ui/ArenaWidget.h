@@ -59,6 +59,13 @@ private:
         double intensity = 0.0;
         QColor color;          ///< Invalide : étincelle de choc classique.
     };
+    /// Étincelle projetée par le frottement d'un duel.
+    struct Ember
+    {
+        QPointF position; // Coordonnées du monde.
+        QPointF velocity;
+        double age = 0.0;
+    };
 
     void tick();
     void resetVisuals();
@@ -85,6 +92,9 @@ private:
     void paintHud(QPainter &p);
     void paintSpinnerHud(QPainter &p, int index, const QRectF &rect);
     void paintOverlay(QPainter &p);
+    void paintDuel(QPainter &p);
+    void paintDuelBar(QPainter &p, const QRectF &rect, int spinner, const DuelSide &side,
+                      bool local);
 
     QPointer<MatchSession> m_session;
     MatchPhase m_lastPhase = MatchPhase::Aiming;
@@ -95,6 +105,10 @@ private:
 
     std::vector<QList<QPointF>> m_trails;
     QList<Spark> m_sparks;
+    QList<Ember> m_embers;
+    QString m_duelResult;      ///< Bandeau de fin de duel.
+    QColor m_duelResultColor;
+    double m_duelResultTimer = 0.0;
     QPixmap m_stadiumCache;
     QString m_stadiumCacheKey;
 

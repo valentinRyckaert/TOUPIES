@@ -25,6 +25,9 @@ std::optional<MatchSetup> parseStart(const QJsonObject &start, const PartCatalog
     setup.stadium = Stadium::find(start.value("stadium").toString()).value_or(Stadium::classic());
     setup.seed = static_cast<quint32>(start.value("seed").toInteger());
     setup.rules = MatchRules::fromJson(start.value("rules").toObject());
+    setup.match = start.value("match").toInt(-1);
+    if (start.contains("series"))
+        setup.series = MatchSeries::fromJson(start.value("series").toObject());
     for (const QJsonValue &value : start.value("players").toArray()) {
         const QJsonObject o = value.toObject();
         const auto top = Top::fromJson(o.value("top").toObject(), catalog);
@@ -33,10 +36,32 @@ std::optional<MatchSetup> parseStart(const QJsonObject &start, const PartCatalog
         setup.playerIds.append(o.value("id").toInt(-1));
         setup.names.append(o.value("name").toString());
         setup.tops.append(*top);
+        setup.botLevels.append(std::clamp(o.value("bot").toInt(-1), -1, 2));
     }
     if (setup.tops.size() < Battle::kMinPlayers || setup.tops.size() > Battle::kMaxPlayers)
         return std::nullopt;
     return setup;
+}
+
+QJsonObject encodeStart(const MatchSetup &setup)
+{
+    QJsonArray players;
+    for (int i = 0; i < setup.tops.size(); ++i) {
+        players.append(QJsonObject{{"id", setup.playerIds.value(i, -1)},
+                                   {"name", setup.names.value(i)},
+                                   {"top", setup.tops.at(i).toJson()},
+                                   {"bot", setup.botLevels.value(i, -1)}});
+    }
+    QJsonObject start{{"type", Msg::Start},
+                      {"stadium", setup.stadium.id},
+                      {"seed", static_cast<qint64>(setup.seed)},
+                      {"rules", setup.rules.toJson()},
+                      {"players", players}};
+    if (setup.match >= 0)
+        start.insert("match", setup.match);
+    if (setup.series)
+        start.insert("series", setup.series->toJson());
+    return start;
 }
 
 QJsonObject encodeState(const MatchState &state, const QList<ImpactEvent> &impacts)
@@ -65,7 +90,17 @@ QJsonObject encodeState(const MatchState &state, const QList<ImpactEvent> &impac
     QJsonArray hits;
     for (const ImpactEvent &impact : impacts)
         hits.append(QJsonArray{r(impact.point.x), r(impact.point.y), r(impact.intensity),
-                               impact.special ? static_cast<qint64>(impact.color | 0x1000000u) : 0});
+                               impact.special ? static_cast<qint64>(impact.color | 0x1000000u) : 0,
+                               impact.duelLoser});
+    QJsonArray duel;
+    if (state.duel.active) {
+        const Duel &d = state.duel;
+        duel = {d.first, d.second, r(d.point.x), r(d.point.y), r(d.normal.x), r(d.normal.y),
+                r(d.approach)};
+        for (const DuelSide &side : d.sides)
+            duel.append(QJsonArray{r(side.cursor), side.direction, r(side.speed), r(side.zone),
+                                   side.streak, side.done ? 1 : 0, r(side.idle)});
+    }
 
     return {
         {"type", Msg::State},
@@ -79,6 +114,7 @@ QJsonObject encodeState(const MatchState &state, const QList<ImpactEvent> &impac
         {"s", spinners},
         {"p", projectiles},
         {"imp", hits},
+        {"d", duel},
     };
 }
 
@@ -144,6 +180,30 @@ bool decodeState(const QJsonObject &message, MatchState &state, QList<ImpactEven
     for (const QJsonValue &v : message.value("rank").toArray())
         state.ranking.append(v.toInt());
 
+    const QJsonArray duel = message.value("d").toArray();
+    state.duel = Duel{};
+    if (duel.size() >= 9) {
+        Duel &d = state.duel;
+        d.first = duel.at(0).toInt();
+        d.second = duel.at(1).toInt();
+        d.active = d.first >= 0 && d.second >= 0 && d.first < state.playerCount()
+                && d.second < state.playerCount();
+        d.point = {duel.at(2).toDouble(), duel.at(3).toDouble()};
+        d.normal = {duel.at(4).toDouble(), duel.at(5).toDouble()};
+        d.approach = duel.at(6).toDouble();
+        for (int k = 0; k < 2; ++k) {
+            const QJsonArray a = duel.at(7 + k).toArray();
+            DuelSide &side = d.sides[k];
+            side.cursor = a.at(0).toDouble();
+            side.direction = a.at(1).toDouble() < 0.0 ? -1.0 : 1.0;
+            side.speed = a.at(2).toDouble();
+            side.zone = a.at(3).toDouble();
+            side.streak = a.at(4).toInt();
+            side.done = a.at(5).toInt() != 0;
+            side.idle = a.at(6).toDouble();
+        }
+    }
+
     if (impacts) {
         for (const QJsonValue &v : message.value("imp").toArray()) {
             const QJsonArray a = v.toArray();
@@ -152,6 +212,7 @@ bool decodeState(const QJsonObject &message, MatchState &state, QList<ImpactEven
             impact.intensity = a.at(2).toDouble();
             impact.special = a.size() > 3 && a.at(3).toInteger() != 0;
             impact.color = static_cast<unsigned>(a.at(3).toInteger()) & 0xFFFFFFu;
+            impact.duelLoser = a.at(4).toInt(ImpactEvent::kNoDuel);
             impacts->append(impact);
         }
     }

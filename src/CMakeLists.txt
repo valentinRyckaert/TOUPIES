@@ -49,6 +49,8 @@ add_library(toupie_net STATIC
     net/HostSession.cpp
     net/ClientSession.h
     net/ClientSession.cpp
+    net/TournamentSession.h
+    net/TournamentSession.cpp
 )
 target_link_libraries(toupie_net PUBLIC toupie_core Qt6::Network)
 
@@ -78,6 +80,12 @@ add_library(toupie_ui STATIC
     ui/LanMenuPage.cpp
     ui/LobbyPage.h
     ui/LobbyPage.cpp
+    ui/TournamentSettingsWidget.h
+    ui/TournamentSettingsWidget.cpp
+    ui/TournamentSetupPage.h
+    ui/TournamentSetupPage.cpp
+    ui/TournamentPage.h
+    ui/TournamentPage.cpp
     ui/MainWindow.h
     ui/MainWindow.cpp
 )

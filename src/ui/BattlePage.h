@@ -19,7 +19,7 @@ class BattlePage : public QWidget
     Q_OBJECT
 
 public:
-    enum class Mode { Solo, LanHost, LanClient };
+    enum class Mode { Solo, LanHost, LanClient, Tournament };
 
     explicit BattlePage(QWidget *parent = nullptr);
     ~BattlePage() override;
@@ -33,7 +33,7 @@ public:
     Mode mode() const { return m_mode; }
 
 signals:
-    /// Solo : retour au menu ; réseau : quitter le lobby.
+    /// Solo : retour au menu ; réseau : quitter le lobby ; tournoi : abandonner le match.
     void leaveRequested();
     /// Solo : changer de toupies.
     void setupRequested();

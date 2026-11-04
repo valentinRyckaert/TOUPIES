@@ -15,6 +15,7 @@ public:
 signals:
     void playRequested();
     void lanRequested();
+    void tournamentRequested();
     void builderRequested();
     void quitRequested();
 };

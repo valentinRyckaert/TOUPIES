@@ -1,6 +1,7 @@
 #include "core/PartCatalog.h"
 #include "net/ClientSession.h"
 #include "net/HostSession.h"
+#include "net/TournamentSession.h"
 #include "net/LobbyBrowser.h"
 #include "net/MatchCodec.h"
 #include "net/LobbyClient.h"
@@ -23,7 +24,7 @@ constexpr quint16 kTestDiscoveryPort = 45987;
 LobbyServer::Settings settings(int maxPlayers = 2)
 {
     return {QStringLiteral("Salon test"), QStringLiteral("Hôte"), maxPlayers,
-            QStringLiteral("glace")};
+            QStringLiteral("glace"), std::nullopt};
 }
 } // namespace
 
@@ -44,6 +45,9 @@ private slots:
     void localScanTargetsExcludeVirtualInterfaces();
     void stateCodecRoundTrip();
     void networkMatchRunsEndToEnd();
+    void duelSeriesAndBotsSurviveCodec();
+    void soloTournamentPlaysAndFinishes();
+    void lanTournamentStartsMatchesOnClients();
 };
 
 void TestNet::sanitizeNames()
@@ -62,8 +66,8 @@ void TestNet::lobbyJsonRoundTrip()
     lobby.name = QStringLiteral("Salon");
     lobby.maxPlayers = 3;
     lobby.stadiumId = QStringLiteral("terre");
-    LobbyPlayer host{0, QStringLiteral("Hôte"), catalog.presets().first(), true, true};
-    LobbyPlayer guest{1, QStringLiteral("Invité"), std::nullopt, false, false};
+    LobbyPlayer host{0, QStringLiteral("Hôte"), {catalog.presets().first()}, true, true};
+    LobbyPlayer guest{1, QStringLiteral("Invité"), {}, false, false};
     lobby.players = {host, guest};
 
     const LobbyInfo copy = lobbyFromJson(toJson(lobby), catalog);
@@ -71,9 +75,9 @@ void TestNet::lobbyJsonRoundTrip()
     QCOMPARE(copy.maxPlayers, 3);
     QCOMPARE(copy.stadiumId, lobby.stadiumId);
     QCOMPARE(copy.players.size(), 2);
-    QVERIFY(copy.players[0].top.has_value());
-    QCOMPARE(copy.players[0].top->name(), host.top->name());
-    QVERIFY(!copy.players[1].top.has_value());
+    QCOMPARE(copy.players[0].tops.size(), 1);
+    QCOMPARE(copy.players[0].tops.first().name(), host.tops.first().name());
+    QVERIFY(copy.players[1].tops.isEmpty());
     QVERIFY(copy.players[0].host);
 }
 
@@ -90,13 +94,13 @@ void TestNet::clientJoinsChoosesTopAndStarts()
     QTRY_COMPARE(client.lobby().players.size(), 2);
     QCOMPARE(client.lobby().stadiumId, QStringLiteral("glace"));
 
-    server.setHostTop(catalog.presets().at(0));
+    server.setHostTops({catalog.presets().at(0)});
     QVERIFY(!server.canStart()); // Le client n'a pas encore choisi.
-    client.selectTop(catalog.presets().at(2));
+    client.selectTops({catalog.presets().at(2)});
     client.setReady(true);
     QTRY_VERIFY(server.canStart());
     QCOMPARE(server.lobby().players.at(1).name, QStringLiteral("Alice"));
-    QCOMPARE(server.lobby().players.at(1).top->name(), catalog.presets().at(2).name());
+    QCOMPARE(server.lobby().players.at(1).tops.first().name(), catalog.presets().at(2).name());
 
     const QJsonObject start = server.startMatch(42);
     QCOMPARE(start.value("players").toArray().size(), 2);
@@ -183,8 +187,8 @@ void TestNet::gameMessagesAreRelayedDuringMatch()
     QTest::qWait(100);
     QCOMPARE(relayed.count(), 0);
 
-    server.setHostTop(catalog.presets().at(0));
-    client.selectTop(catalog.presets().at(1));
+    server.setHostTops({catalog.presets().at(0)});
+    client.selectTops({catalog.presets().at(1)});
     client.setReady(true);
     QTRY_VERIFY(server.canStart());
     server.startMatch(1);
@@ -293,8 +297,8 @@ void TestNet::networkMatchRunsEndToEnd()
     QSignalSpy started(client, &LobbyClient::matchStarted);
     client->connectToHost(QStringLiteral("127.0.0.1"), server.port(), QStringLiteral("Alice"));
     QTRY_VERIFY(client->isJoined());
-    server.setHostTop(catalog.presets().at(1));
-    client->selectTop(catalog.presets().at(3));
+    server.setHostTops({catalog.presets().at(1)});
+    client->selectTops({catalog.presets().at(3)});
     client->setReady(true);
     QTRY_VERIFY(server.canStart());
 
@@ -344,6 +348,154 @@ void TestNet::networkMatchRunsEndToEnd()
         QCOMPARE(host.state().winner, 0);
         QVERIFY(host.state().endReason == Battle::EndReason::Forfeit);
     }
+}
+
+void TestNet::duelSeriesAndBotsSurviveCodec()
+{
+    const PartCatalog &catalog = PartCatalog::instance();
+    MatchState source;
+    source.spinners = std::vector<Spinner>(2);
+    source.aimed = {true, true};
+    source.duel.active = true;
+    source.duel.first = 0;
+    source.duel.second = 1;
+    source.duel.point = {0.1, 0.2};
+    source.duel.sides[1].cursor = -0.4;
+    source.duel.sides[1].direction = -1.0;
+    source.duel.sides[1].zone = 0.2;
+    source.duel.sides[1].streak = 2;
+    ImpactEvent end;
+    end.duelLoser = 1;
+
+    MatchState target;
+    target.spinners = std::vector<Spinner>(2);
+    target.aimed = {false, false};
+    QList<ImpactEvent> impacts;
+    QVERIFY(decodeState(encodeState(source, {end}), target, &impacts));
+    QVERIFY(target.duel.active);
+    QCOMPARE(target.duel.sideOf(1), 1);
+    QCOMPARE(target.duel.sides[1].cursor, -0.4);
+    QCOMPARE(target.duel.sides[1].direction, -1.0);
+    QCOMPARE(target.duel.sides[1].streak, 2);
+    QCOMPARE(impacts.first().duelLoser, 1);
+    source.duel.active = false;
+    QVERIFY(decodeState(encodeState(source, {}), target, nullptr));
+    QVERIFY(!target.duel.active);
+
+    MatchSetup setup;
+    setup.stadium = Stadium::classic();
+    setup.playerIds = {4, -1};
+    setup.names = {QStringLiteral("Léa"), QStringLiteral("Bot 1")};
+    setup.tops = {catalog.presets().at(0), catalog.presets().at(1)};
+    setup.botLevels = {-1, static_cast<int>(Difficulty::Hard)};
+    setup.match = 3;
+    setup.series = MatchSeries{};
+    setup.series->score = {1, 0};
+    const auto parsed = parseStart(encodeStart(setup), catalog);
+    QVERIFY(parsed.has_value());
+    QCOMPARE(parsed->playerIds, setup.playerIds);
+    QCOMPARE(parsed->botLevels, setup.botLevels);
+    QCOMPARE(parsed->match, 3);
+    QVERIFY(parsed->series.has_value());
+    QCOMPARE(parsed->series->score[0], 1);
+}
+
+namespace {
+Tournament smallTournament(const QList<Participant> &humans, MatchFormat format)
+{
+    TournamentSettings s;
+    s.format = TournamentFormat::Knockout;
+    s.matchFormat = format;
+    s.participants = 4;
+    s.fitBots(static_cast<int>(humans.size()));
+    return Tournament(s, addBots(humans, s, PartCatalog::instance().presets(), 1), 2);
+}
+} // namespace
+
+void TestNet::soloTournamentPlaysAndFinishes()
+{
+    const QList<Top> presets = PartCatalog::instance().presets();
+    TournamentDirector director(
+        nullptr,
+        smallTournament({{QStringLiteral("Vous"), 0, Difficulty::Normal,
+                          {presets.at(0), presets.at(1), presets.at(2)}}},
+                        MatchFormat::Classic),
+        3);
+    QSignalSpy ready(&director, &TournamentController::sessionReady);
+    QSignalSpy over(&director, &TournamentController::localMatchOver);
+    const int match = director.localMatch();
+    QVERIFY(match >= 0);
+    QVERIFY(!director.localReady());
+
+    // Comme l'interface : la session est récupérée pendant le signal.
+    std::unique_ptr<MatchSession> session;
+    connect(&director, &TournamentController::sessionReady, this,
+            [&] { session = director.takeSession(); });
+    director.submitOrder({2, 0, 1});
+    QCOMPARE(ready.count(), 1);
+    QVERIFY(session);
+    QVERIFY(session->state().series.has_value());
+    // La première manche se joue avec la toupie choisie en premier.
+    QCOMPARE(session->state().spinners[session->localPlayer()].top.name(), presets.at(2).name());
+
+    // Le bot joue la manche jusqu'au bout (le joueur ne fait rien).
+    session->submitAim(0.0, 1.0);
+    for (int i = 0; i < 60 * 300 && session->state().phase != MatchPhase::Finished; ++i)
+        session->update(1.0 / 60.0);
+    QCOMPARE(session->state().phase, MatchPhase::Finished);
+    QTRY_COMPARE(director.liveOf(match)->series.rounds, 1);
+
+    director.forfeitLocal();
+    QCOMPARE(over.count(), 1);
+    QTRY_VERIFY(director.tournament().isFinished());
+    QVERIFY(director.tournament().champion() != director.localParticipant());
+}
+
+void TestNet::lanTournamentStartsMatchesOnClients()
+{
+    const PartCatalog &catalog = PartCatalog::instance();
+    LobbyServer server(catalog);
+    LobbyServer::Settings lobby = settings();
+    lobby.tournament = TournamentSettings{};
+    lobby.tournament->participants = 4;
+    QVERIFY(server.start(lobby, 0, 0));
+    QCOMPARE(server.lobby().tournament->bots.size(), 2);
+    LobbyClient client(catalog);
+    client.connectToHost(QStringLiteral("127.0.0.1"), server.port(), QStringLiteral("Alice"));
+    QTRY_VERIFY(client.isJoined());
+    server.setHostTops({catalog.presets().at(0)});
+    client.selectTops({catalog.presets().at(1)});
+    client.setReady(true);
+    QTRY_VERIFY(server.canStart());
+
+    TournamentFollower follower(&client);
+    QSignalSpy clientChanged(&follower, &TournamentController::changed);
+    QSignalSpy clientReady(&follower, &TournamentController::sessionReady);
+    QSignalSpy clientOver(&follower, &TournamentController::localMatchOver);
+
+    const LobbyInfo &info = server.lobby();
+    QList<Participant> humans;
+    for (const LobbyPlayer &p : info.players)
+        humans.append({p.name, p.id, Difficulty::Normal, p.tops});
+    server.startTournament();
+    TournamentDirector director(&server, smallTournament(humans, MatchFormat::Express), 9);
+    QSignalSpy hostReady(&director, &TournamentController::sessionReady);
+
+    QTRY_VERIFY(clientChanged.count() > 0);
+    QCOMPARE(follower.tournament().participants().size(), 4);
+    QVERIFY(follower.localParticipant() >= 0);
+    QVERIFY(follower.localMatch() >= 0);
+
+    director.submitOrder({0});
+    follower.submitOrder({0});
+    QTRY_COMPARE(clientReady.count(), 1);
+    QCOMPARE(hostReady.count(), 1);
+    std::unique_ptr<MatchSession> clientSession = follower.takeSession(); // Non pris : conservé.
+    QVERIFY(clientSession && clientSession->state().series.has_value());
+
+    follower.forfeitLocal();
+    QTRY_COMPARE(clientOver.count(), 1);
+    QCOMPARE(follower.localMatch(), -1);
 }
 
 QTEST_GUILESS_MAIN(TestNet)

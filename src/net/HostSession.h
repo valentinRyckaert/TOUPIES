@@ -1,5 +1,6 @@
 #pragma once
 
+#include "game/BotController.h"
 #include "net/MatchCodec.h"
 #include "session/MatchSession.h"
 
@@ -12,7 +13,9 @@ namespace toupie::net {
 class LobbyServer;
 
 /// Combat en réseau côté hôte : l'hôte simule le combat (il fait autorité),
-/// applique les visées et dashs reçus des clients et leur diffuse l'état.
+/// applique les visées et dashs reçus des clients et diffuse l'état à ses
+/// participants. Les places sans joueur (playerId -1) sont tenues par des
+/// bots. Sans serveur (`server` nul), c'est un combat local.
 class HostSession : public MatchSession
 {
     Q_OBJECT
@@ -40,6 +43,7 @@ private:
     QList<double> m_angles;
     QList<double> m_powers;
     QList<ImpactEvent> m_pendingImpacts;
+    std::vector<BotController> m_bots;
     double m_aimTimer = 0.0;
     double m_sendTimer = 0.0;
 };

@@ -38,13 +38,13 @@ LanMenuPage::LanMenuPage(QWidget *parent)
 {
     auto *root = new QVBoxLayout(this);
 
-    auto *title = new QLabel(tr("Multijoueur en réseau local"), this);
-    QFont titleFont = title->font();
+    m_title = new QLabel(tr("Multijoueur en réseau local"), this);
+    QFont titleFont = m_title->font();
     titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
     titleFont.setBold(true);
-    title->setFont(titleFont);
-    title->setObjectName(QStringLiteral("title"));
-    root->addWidget(title);
+    m_title->setFont(titleFont);
+    m_title->setObjectName(QStringLiteral("title"));
+    root->addWidget(m_title);
 
     auto *nameForm = new QFormLayout;
     m_nameEdit = new QLineEdit(this);
@@ -57,7 +57,7 @@ LanMenuPage::LanMenuPage(QWidget *parent)
     root->addLayout(columns, 1);
 
     // --- Créer ------------------------------------------------------------------
-    auto *createBox = new QGroupBox(tr("Créer un lobby"), this);
+    auto *createBox = m_createBox = new QGroupBox(tr("Créer un lobby"), this);
     auto *createLayout = new QVBoxLayout(createBox);
     auto *createForm = new QFormLayout;
     m_lobbyNameEdit = new QLineEdit(createBox);
@@ -160,6 +160,15 @@ QString LanMenuPage::playerName() const
     return net::sanitizeName(m_nameEdit->text(), defaultPlayerName());
 }
 
+void LanMenuPage::setTournament(const std::optional<TournamentSettings> &settings)
+{
+    m_tournament = settings;
+    m_title->setText(settings ? tr("Tournoi en réseau local") : tr("Multijoueur en réseau local"));
+    m_createBox->setTitle(settings ? tr("Créer un tournoi (lobby des joueurs humains)")
+                                   : tr("Créer un lobby"));
+    m_createButton->setText(settings ? tr("Créer le lobby du tournoi") : tr("Créer le lobby"));
+}
+
 void LanMenuPage::activate()
 {
     m_udpAvailable = m_browser.start();
@@ -213,7 +222,8 @@ void LanMenuPage::refreshLobbies()
                                     .arg(lobby.maxPlayers)
                                     .arg(lobby.inGame ? tr(" (en partie)") : QString());
         auto *item = new QTreeWidgetItem(
-            m_lobbyList, {lobby.name, lobby.hostName, players, stadiumName(lobby.stadiumId),
+            m_lobbyList, {lobby.tournament ? tr("🏆 %1 (tournoi)").arg(lobby.name) : lobby.name,
+                          lobby.hostName, players, stadiumName(lobby.stadiumId),
                           QStringLiteral("%1:%2").arg(lobby.address.toString()).arg(lobby.port)});
         item->setData(0, Qt::UserRole, lobby.lobbyId);
         item->setData(1, Qt::UserRole, lobby.address.toString());
@@ -286,6 +296,7 @@ void LanMenuPage::requestHost()
                            : m_lobbyNameEdit->text().trimmed();
     settings.maxPlayers = m_playersCombo->currentData().toInt();
     settings.stadiumId = m_stadiumCombo->currentData().toString();
+    settings.tournament = m_tournament;
     emit hostRequested(settings);
 }
 

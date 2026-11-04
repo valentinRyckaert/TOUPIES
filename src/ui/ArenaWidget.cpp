@@ -11,6 +11,8 @@
 #include <QPainterPath>
 #include <QtMath>
 
+#include <QRandomGenerator>
+
 #include <algorithm>
 #include <cmath>
 
@@ -24,6 +26,7 @@ constexpr double kAimStep = qDegreesToRadians(3.0);
 constexpr double kPowerStep = 0.05;
 constexpr double kMinArrow = 0.14; ///< Longueur de flèche (monde) à la force minimale.
 constexpr double kMaxArrow = 0.6;  ///< … et à la force maximale.
+constexpr double kEmberLifetime = 0.35;
 
 QString endReasonText(Battle::EndReason reason, int players)
 {
@@ -106,6 +109,8 @@ void ArenaWidget::resetVisuals()
 {
     m_trails.clear();
     m_sparks.clear();
+    m_embers.clear();
+    m_duelResultTimer = 0.0;
     m_flash = 0.0;
     m_lastPhase = MatchPhase::Aiming;
     if (m_session) {
@@ -141,9 +146,49 @@ void ArenaWidget::tick()
         m_lastPhase = state.phase;
     }
 
-    for (const ImpactEvent &impact : m_session->takeImpacts())
+    const int local = m_session->localPlayer();
+    for (const ImpactEvent &impact : m_session->takeImpacts()) {
         m_sparks.append({QPointF(impact.point.x, impact.point.y), 0.0, impact.intensity,
                          impact.special ? QColor::fromRgb(impact.color) : QColor()});
+        if (impact.duelLoser == ImpactEvent::kNoDuel)
+            continue;
+        const bool involved = impact.first == local || impact.second == local;
+        if (impact.duelLoser < 0) {
+            m_duelResult = tr("Duel nul !");
+            m_duelResultColor = QColor(230, 230, 235);
+        } else if (involved) {
+            const bool lost = impact.duelLoser == local;
+            m_duelResult = lost ? tr("Duel perdu…") : tr("Duel gagné !");
+            m_duelResultColor = lost ? QColor(240, 110, 90) : Theme::kAccent;
+        } else {
+            m_duelResult = tr("%1 perd le duel").arg(state.names.value(impact.duelLoser));
+            m_duelResultColor = slotColor(impact.duelLoser);
+        }
+        m_duelResultTimer = 1.6;
+    }
+
+    // Duel : gerbes d'étincelles de part et d'autre du point de friction.
+    if (state.duel.active) {
+        auto *rng = QRandomGenerator::global();
+        const Vec2 side = state.duel.normal.perpendicular();
+        for (int k = 0; k < 6; ++k) {
+            const double sign = k % 2 == 0 ? 1.0 : -1.0;
+            const double spread = (rng->generateDouble() - 0.5) * 1.2;
+            const Vec2 dir = (side * sign + state.duel.normal * spread).normalized();
+            const double speed = 0.4 + 0.8 * rng->generateDouble();
+            m_embers.append({QPointF(state.duel.point.x, state.duel.point.y),
+                             QPointF(dir.x, dir.y) * speed, 0.0});
+        }
+    }
+    for (Ember &ember : m_embers) {
+        ember.age += dt;
+        ember.position += ember.velocity * dt;
+        ember.velocity *= 0.92;
+    }
+    m_embers.erase(std::remove_if(m_embers.begin(), m_embers.end(),
+                                  [](const Ember &e) { return e.age > kEmberLifetime; }),
+                   m_embers.end());
+    m_duelResultTimer = std::max(0.0, m_duelResultTimer - dt);
 
     if (state.phase == MatchPhase::Fighting) {
         m_trails.resize(state.spinners.size());
@@ -400,6 +445,7 @@ void ArenaWidget::paintEvent(QPaintEvent *)
     paintSpinners(p);
     paintProjectiles(p);
     paintHud(p);
+    paintDuel(p);
     paintOverlay(p);
 }
 
@@ -549,6 +595,11 @@ void ArenaWidget::paintSpinners(QPainter &p)
         const Spinner &s = state.spinners[i];
         QPointF pos = toScreen(s.position);
 
+        // Duel : les toupies tremblent sur place.
+        if (state.duel.sideOf(i) >= 0) {
+            const double t = state.elapsed * 60.0 + i * 1.7;
+            pos += QPointF(std::sin(t * 1.3), std::cos(t * 1.7)) * (radius * 0.06);
+        }
         // Vacillement visuel quand la rotation faiblit.
         if (s.isActive() && s.spinRatio() < state.config.wobbleThreshold) {
             const double amount
@@ -580,6 +631,17 @@ void ArenaWidget::paintSpinners(QPainter &p)
         const QString label = i == m_session->localPlayer() ? tr("VOUS") : state.names.value(i);
         p.drawText(QRectF(pos.x() - 70, pos.y() - drawRadius - 22, 140, 18), Qt::AlignCenter,
                    p.fontMetrics().elidedText(label, Qt::ElideRight, 140));
+    }
+
+    // Étincelles de duel.
+    for (const Ember &ember : m_embers) {
+        const double t = ember.age / kEmberLifetime;
+        const QPointF head = toScreen({ember.position.x(), ember.position.y()});
+        const QPointF tail = head - ember.velocity * (scale() * 0.04);
+        QColor color = QColor(255, 210, 90).lighter(100 + int(60 * (1.0 - t)));
+        color.setAlphaF(1.0 - t);
+        p.setPen(QPen(color, 2.2, Qt::SolidLine, Qt::RoundCap));
+        p.drawLine(tail, head);
     }
 
     // Étincelles de choc.
@@ -636,6 +698,20 @@ void ArenaWidget::paintHud(QPainter &p)
     if (count <= 2) {
         p.drawText(QRectF(0, 8, width(), kHudHeight - 16), Qt::AlignHCenter | Qt::AlignVCenter,
                    timer);
+        if (state.series) {
+            // Match de tournoi : score avant cette manche.
+            QFont small = font();
+            small.setBold(true);
+            p.setFont(small);
+            p.setPen(Theme::kAccent);
+            p.drawText(QRectF(0, kHudHeight - 34, width(), 20), Qt::AlignHCenter,
+                       tr("Manche %1 · %2 – %3")
+                           .arg(state.series->rounds + 1)
+                           .arg(state.series->score[0])
+                           .arg(state.series->score[1]));
+            p.setFont(f);
+            p.setPen(QColor(230, 232, 240));
+        }
     } else {
         p.drawText(QRectF(margin, kHudHeight + 4, 120, 30), Qt::AlignLeft | Qt::AlignVCenter,
                    timer);
@@ -737,6 +813,9 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
     if (!status.isEmpty()) {
         text = status;
         color = QColor(230, 110, 100);
+    } else if (state.duel.sideOf(index) >= 0) {
+        text = tr("DUEL !");
+        color = QColor(255, 210, 90);
     } else if (s.isSlowed()) {
         text = tr("Gelée (%1 s)").arg(s.slowTimer, 0, 'f', 1);
         color = QColor(155, 231, 255);
@@ -814,6 +893,12 @@ void ArenaWidget::paintOverlay(QPainter &p)
             banner(tr("Partez !"), 4.0, QColor(255, 220, 90), 0);
             p.restore();
         }
+        if (m_duelResultTimer > 0.0) {
+            p.save();
+            p.setOpacity(std::min(1.0, m_duelResultTimer * 1.5));
+            banner(m_duelResult, 2.6, m_duelResultColor, -120);
+            p.restore();
+        }
         break;
     case MatchPhase::Finished: {
         p.fillRect(area, QColor(0, 0, 0, 120));
@@ -831,6 +916,24 @@ void ArenaWidget::paintOverlay(QPainter &p)
                    slotColor(winner), -20);
         banner(endReasonText(state.endReason, state.playerCount()), 1.1, QColor(235, 235, 240),
                14);
+        if (state.series) {
+            MatchSeries after = *state.series;
+            after.recordRound(winner, state.endReason);
+            const int gained = winner >= 0 ? after.score[winner] - state.series->score[winner] : 0;
+            QString line = tr("Score du match : %1 – %2").arg(after.score[0]).arg(after.score[1]);
+            if (gained > 0)
+                line += tr("  (+%n pt(s) pour %1)", nullptr, gained).arg(
+                    winner == local ? tr("vous") : state.names.value(winner));
+            banner(line, 1.2, Theme::kAccent, 52);
+            if (after.isOver()) {
+                const bool won = after.winner() == local;
+                banner(won ? tr("Match remporté !") : tr("Match perdu"), 1.6,
+                       won ? QColor(120, 230, 150) : QColor(240, 110, 90), 92);
+            } else {
+                banner(tr("Manche suivante dans quelques secondes…"), 1.0, QColor(200, 204, 214),
+                       90);
+            }
+        }
 
         if (state.playerCount() > 2) {
             QStringList lines;
@@ -844,6 +947,86 @@ void ArenaWidget::paintOverlay(QPainter &p)
         }
         break;
     }
+    }
+}
+
+void ArenaWidget::paintDuel(QPainter &p)
+{
+    const MatchState &state = m_session->state();
+    if (!state.duel.active || state.phase != MatchPhase::Fighting)
+        return;
+    const Duel &duel = state.duel;
+    const int local = m_session->localPlayer();
+    const int mine = duel.sideOf(local);
+    const double big = std::min(560.0, width() - 80.0);
+    const double small = big * 0.6;
+
+    if (mine >= 0) {
+        // Ma barre en bas, celle de l'adversaire juste au-dessus en plus petit.
+        const QRectF mineRect(width() / 2.0 - big / 2.0, height() - 58, big, 26);
+        const QRectF otherRect(width() / 2.0 - small / 2.0, mineRect.top() - 46, small, 13);
+        const int other = mine == 0 ? duel.second : duel.first;
+        paintDuelBar(p, otherRect, other, duel.sides[1 - mine], false);
+        paintDuelBar(p, mineRect, local, duel.sides[mine], true);
+    } else {
+        for (int k = 0; k < 2; ++k) {
+            const QRectF rect(width() / 2.0 - small / 2.0, height() - 40 - (1 - k) * 46, small, 13);
+            paintDuelBar(p, rect, k == 0 ? duel.first : duel.second, duel.sides[k], false);
+        }
+    }
+}
+
+void ArenaWidget::paintDuelBar(QPainter &p, const QRectF &rect, int spinner, const DuelSide &side,
+                               bool local)
+{
+    const MatchState &state = m_session->state();
+    const double half = rect.width() / 2.0;
+    const double radius = rect.height() / 2.0;
+
+    // Libellé au-dessus de la barre.
+    QFont f = font();
+    f.setBold(true);
+    f.setPointSizeF(font().pointSizeF() * (local ? 1.1 : 0.85));
+    p.setFont(f);
+    const QRectF label(rect.left() - 40, rect.top() - (local ? 24 : 18), rect.width() + 80,
+                       local ? 22 : 16);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0, 0, 0, 150));
+    p.drawRoundedRect(label.adjusted(30, 0, -30, 0), 6, 6);
+    p.setPen(slotColor(spinner));
+    QString text = local ? tr("DUEL ! Espace / clic quand le curseur est dans le vert")
+                         : tr("Duel — %1").arg(state.names.value(spinner));
+    if (side.done)
+        text = local ? tr("Série réussie ! En attente de l'adversaire…")
+                     : tr("%1 : série réussie").arg(state.names.value(spinner));
+    p.drawText(label, Qt::AlignCenter, text);
+
+    // Fond rouge, zone verte centrale.
+    p.setPen(QPen(QColor(0, 0, 0, 160), 1.5));
+    p.setBrush(QColor(200, 58, 58));
+    p.drawRoundedRect(rect, radius, radius);
+    const double zone = side.done ? half : side.zone * half;
+    const QRectF green(rect.center().x() - zone, rect.top(), 2.0 * zone, rect.height());
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(84, 214, 110));
+    p.drawRoundedRect(green, radius, radius);
+
+    // Curseur.
+    const double x = rect.center().x() + std::clamp(side.cursor, -1.0, 1.0) * half;
+    QColor glow = Qt::white;
+    glow.setAlpha(90);
+    p.setPen(QPen(glow, local ? 9.0 : 6.0, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(QPointF(x, rect.top() - 4), QPointF(x, rect.bottom() + 4));
+    p.setPen(QPen(Qt::white, local ? 3.0 : 2.0, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(QPointF(x, rect.top() - 4), QPointF(x, rect.bottom() + 4));
+
+    // Série finale : une pastille par réussite à taille minimale.
+    const double dot = local ? 7.0 : 4.5;
+    for (int k = 0; k < state.config.duelStreak; ++k) {
+        const QPointF c(rect.right() + 14 + k * (dot * 2.6), rect.center().y());
+        p.setPen(QPen(QColor(84, 214, 110), 1.5));
+        p.setBrush(k < side.streak ? QColor(84, 214, 110) : Qt::NoBrush);
+        p.drawEllipse(c, dot, dot);
     }
 }
 

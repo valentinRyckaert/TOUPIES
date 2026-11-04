@@ -65,11 +65,13 @@ QJsonObject toJson(const LobbyInfo &lobby)
             {"ready", p.ready},
             {"host", p.host},
         };
-        if (p.top)
-            player.insert("top", p.top->toJson());
+        QJsonArray tops;
+        for (const Top &top : p.tops)
+            tops.append(top.toJson());
+        player.insert("tops", tops);
         players.append(player);
     }
-    return {
+    QJsonObject json{
         {"id", lobby.lobbyId},
         {"name", lobby.name},
         {"max", lobby.maxPlayers},
@@ -78,6 +80,9 @@ QJsonObject toJson(const LobbyInfo &lobby)
         {"rules", lobby.rules.toJson()},
         {"players", players},
     };
+    if (lobby.tournament)
+        json.insert("tournament", lobby.tournament->toJson());
+    return json;
 }
 
 LobbyInfo lobbyFromJson(const QJsonObject &json, const PartCatalog &catalog)
@@ -89,6 +94,8 @@ LobbyInfo lobbyFromJson(const QJsonObject &json, const PartCatalog &catalog)
     lobby.stadiumId = json.value("stadium").toString();
     lobby.inGame = json.value("inGame").toBool();
     lobby.rules = MatchRules::fromJson(json.value("rules").toObject());
+    if (json.contains("tournament"))
+        lobby.tournament = TournamentSettings::fromJson(json.value("tournament").toObject());
     const QJsonArray players = json.value("players").toArray();
     for (const QJsonValue &value : players) {
         const QJsonObject o = value.toObject();
@@ -97,8 +104,10 @@ LobbyInfo lobbyFromJson(const QJsonObject &json, const PartCatalog &catalog)
         p.name = o.value("name").toString();
         p.ready = o.value("ready").toBool();
         p.host = o.value("host").toBool();
-        if (o.contains("top"))
-            p.top = Top::fromJson(o.value("top").toObject(), catalog);
+        for (const QJsonValue &top : o.value("tops").toArray()) {
+            if (const auto parsed = Top::fromJson(top.toObject(), catalog))
+                p.tops.append(*parsed);
+        }
         lobby.players.append(p);
     }
     return lobby;

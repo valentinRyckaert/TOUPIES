@@ -60,6 +60,9 @@ bool LobbyServer::start(const Settings &settings, quint16 port, quint16 discover
     m_lobby.maxPlayers = std::clamp(settings.maxPlayers, Battle::kMinPlayers, Battle::kMaxPlayers);
     m_lobby.stadiumId = Stadium::find(settings.stadiumId) ? settings.stadiumId
                                                           : Stadium::classic().id;
+    m_lobby.tournament = settings.tournament;
+    if (m_lobby.tournament)
+        m_lobby.tournament->fitBots(m_lobby.maxPlayers);
     LobbyPlayer host;
     host.id = kHostId;
     host.name = sanitizeName(settings.hostName, QStringLiteral("Hôte"));
@@ -112,10 +115,23 @@ quint16 LobbyServer::port() const
     return m_server ? m_server->serverPort() : 0;
 }
 
-void LobbyServer::setHostTop(const Top &top)
+void LobbyServer::setHostTops(const QList<Top> &tops)
 {
     if (LobbyPlayer *host = m_lobby.player(kHostId)) {
-        host->top = top;
+        host->tops = tops.mid(0, 3);
+        lobbyUpdated();
+    }
+}
+
+void LobbyServer::setTournamentSettings(TournamentSettings settings)
+{
+    if (!m_lobby.tournament)
+        return;
+    settings.participants = std::clamp(settings.participants, Tournament::kMinParticipants,
+                                       Tournament::kMaxParticipants);
+    settings.fitBots(m_lobby.maxPlayers);
+    if (settings != *m_lobby.tournament) {
+        m_lobby.tournament = settings;
         lobbyUpdated();
     }
 }
@@ -126,6 +142,8 @@ void LobbyServer::setMaxPlayers(int maxPlayers)
     const int value = std::clamp(maxPlayers, minimum, Battle::kMaxPlayers);
     if (value != m_lobby.maxPlayers) {
         m_lobby.maxPlayers = value;
+        if (m_lobby.tournament)
+            m_lobby.tournament->fitBots(value);
         lobbyUpdated();
     }
 }
@@ -150,8 +168,9 @@ bool LobbyServer::canStart() const
 {
     if (m_lobby.inGame || m_lobby.players.size() != m_lobby.maxPlayers)
         return false;
-    return std::all_of(m_lobby.players.begin(), m_lobby.players.end(), [](const LobbyPlayer &p) {
-        return p.top.has_value() && (p.host || p.ready);
+    const int needed = m_lobby.topsNeeded();
+    return std::all_of(m_lobby.players.begin(), m_lobby.players.end(), [&](const LobbyPlayer &p) {
+        return p.tops.size() >= needed && (p.host || p.ready);
     });
 }
 
@@ -163,7 +182,7 @@ QJsonObject LobbyServer::startMatch(quint32 seed)
         players.append(QJsonObject{
             {"id", p.id},
             {"name", p.name},
-            {"top", p.top ? p.top->toJson() : QJsonObject{}},
+            {"top", p.tops.isEmpty() ? QJsonObject{} : p.tops.first().toJson()},
         });
     }
     const QJsonObject start{
@@ -176,6 +195,12 @@ QJsonObject LobbyServer::startMatch(quint32 seed)
     broadcast(start);
     lobbyUpdated();
     return start;
+}
+
+void LobbyServer::startTournament()
+{
+    m_lobby.inGame = true;
+    lobbyUpdated();
 }
 
 void LobbyServer::returnToLobby()
@@ -267,18 +292,22 @@ void LobbyServer::onMessage(JsonChannel *channel, const QJsonObject &message)
     if (type == Msg::SelectTop) {
         if (m_lobby.inGame)
             return;
-        if (auto top = Top::fromJson(message.value("top").toObject(), m_catalog)) {
-            player->top = *top;
-            player->ready = false;
-            lobbyUpdated();
+        QList<Top> tops;
+        for (const QJsonValue &value : message.value("tops").toArray()) {
+            if (auto top = Top::fromJson(value.toObject(), m_catalog); top && tops.size() < 3)
+                tops.append(*top);
         }
+        player->tops = tops;
+        player->ready = false;
+        lobbyUpdated();
     } else if (type == Msg::Ready) {
-        if (m_lobby.inGame || !player->top)
+        if (m_lobby.inGame || player->tops.size() < m_lobby.topsNeeded())
             return;
         player->ready = message.value("ready").toBool();
         lobbyUpdated();
     } else if (type == Msg::Aim || type == Msg::Dash || type == Msg::Special
-               || type == Msg::Steer) {
+               || type == Msg::Steer || type == Msg::Duel || type == Msg::Order
+               || type == Msg::Forfeit) {
         if (m_lobby.inGame)
             emit gameMessage(client->id, message);
     }
@@ -370,6 +399,7 @@ QJsonObject LobbyServer::announcementJson() const
         {"max", m_lobby.maxPlayers},
         {"stadium", m_lobby.stadiumId},
         {"inGame", m_lobby.inGame},
+        {"tournament", m_lobby.tournament.has_value()},
     };
 }
 

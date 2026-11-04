@@ -1,6 +1,7 @@
 #include "ui/MainWindow.h"
 
 #include "core/PartCatalog.h"
+#include "net/TournamentSession.h"
 #include "session/LocalSession.h"
 #include "ui/BattlePage.h"
 #include "ui/BuilderPage.h"
@@ -8,10 +9,13 @@
 #include "ui/LobbyPage.h"
 #include "ui/MenuPage.h"
 #include "ui/SetupPage.h"
+#include "ui/TournamentPage.h"
+#include "ui/TournamentSetupPage.h"
 
 #include <QApplication>
 #include <QCloseEvent>
 #include <QMessageBox>
+#include <QRandomGenerator>
 #include <QStackedWidget>
 #include <QTimer>
 
@@ -33,14 +37,25 @@ MainWindow::MainWindow(QWidget *parent)
     m_battle = new BattlePage(m_stack);
     m_lanMenu = new LanMenuPage(m_stack);
     m_lobby = new LobbyPage(m_repository, m_stack);
+    m_tournamentSetup = new TournamentSetupPage(m_repository, m_stack);
+    m_tournamentPage = new TournamentPage(m_stack);
     for (QWidget *page : {static_cast<QWidget *>(m_menu), static_cast<QWidget *>(m_builder),
                           static_cast<QWidget *>(m_setup), static_cast<QWidget *>(m_battle),
-                          static_cast<QWidget *>(m_lanMenu), static_cast<QWidget *>(m_lobby)})
+                          static_cast<QWidget *>(m_lanMenu), static_cast<QWidget *>(m_lobby),
+                          static_cast<QWidget *>(m_tournamentSetup),
+                          static_cast<QWidget *>(m_tournamentPage)})
         m_stack->addWidget(page);
     setCentralWidget(m_stack);
 
     connect(m_menu, &MenuPage::playRequested, this, &MainWindow::showSetup);
-    connect(m_menu, &MenuPage::lanRequested, this, &MainWindow::showLanMenu);
+    connect(m_menu, &MenuPage::lanRequested, this, [this] {
+        m_lanMenu->setTournament(std::nullopt);
+        showLanMenu();
+    });
+    connect(m_menu, &MenuPage::tournamentRequested, this, [this] {
+        m_tournamentSetup->refresh();
+        showPage(m_tournamentSetup);
+    });
     connect(m_menu, &MenuPage::builderRequested, this, &MainWindow::showBuilder);
     connect(m_menu, &MenuPage::quitRequested, this, &QWidget::close);
     connect(m_builder, &BuilderPage::backRequested, this, &MainWindow::showMenu);
@@ -49,6 +64,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     setupSolo();
     setupLan();
+    setupTournaments();
     showMenu();
 
     if (!loaded) {
@@ -64,11 +80,13 @@ MainWindow::~MainWindow()
 {
     // La session réseau doit disparaître avant le lobby qu'elle utilise.
     m_battle->stop();
+    m_soloTournament.reset();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     m_battle->stop();
+    m_soloTournament.reset();
     m_lobby->leave();
     QMainWindow::closeEvent(event);
 }
@@ -89,10 +107,17 @@ void MainWindow::setupSolo()
             });
     connect(m_battle, &BattlePage::setupRequested, this, &MainWindow::showSetup);
     connect(m_battle, &BattlePage::leaveRequested, this, [this] {
-        if (m_battle->mode() == BattlePage::Mode::Solo)
+        if (m_battle->mode() == BattlePage::Mode::Tournament) {
+            if (m_tournament
+                && QMessageBox::question(this, tr("Abandonner le match"),
+                                         tr("Abandonner ce match ? Votre adversaire le remportera.")
+                                         ) == QMessageBox::Yes)
+                m_tournament->forfeitLocal();
+        } else if (m_battle->mode() == BattlePage::Mode::Solo) {
             showMenu();
-        else
+        } else {
             leaveLobby();
+        }
     });
     connect(m_battle, &BattlePage::rematchRequested, this, [this] {
         switch (m_battle->mode()) {
@@ -106,9 +131,66 @@ void MainWindow::setupSolo()
             showPage(m_lobby);
             break;
         case BattlePage::Mode::LanClient:
+        case BattlePage::Mode::Tournament:
             break;
         }
     });
+}
+
+void MainWindow::setupTournaments()
+{
+    connect(m_tournamentSetup, &TournamentSetupPage::backRequested, this, &MainWindow::showMenu);
+    connect(m_tournamentSetup, &TournamentSetupPage::soloRequested, this,
+            [this](const TournamentSettings &settings, const QList<Top> &tops) {
+                auto *rng = QRandomGenerator::global();
+                const QList<Participant> humans{{tr("Vous"), 0, Difficulty::Normal, tops}};
+                Tournament tournament(settings,
+                                      addBots(humans, settings, m_repository.allTops(),
+                                              rng->generate()),
+                                      rng->generate());
+                m_soloTournament = std::make_unique<net::TournamentDirector>(
+                    nullptr, std::move(tournament), rng->generate());
+                attachTournament(m_soloTournament.get(), false);
+            });
+    connect(m_tournamentSetup, &TournamentSetupPage::lanRequested, this, [this] {
+        m_lanMenu->setTournament(m_tournamentSetup->settings());
+        showLanMenu();
+    });
+    connect(m_lobby, &LobbyPage::tournamentStarted, this,
+            [this] { attachTournament(m_lobby->tournament(), m_lobby->isHost()); });
+    connect(m_tournamentPage, &TournamentPage::leaveRequested, this, [this] {
+        if (m_tournament && m_tournament == m_soloTournament.get()) {
+            if (QMessageBox::question(this, tr("Quitter le tournoi"),
+                                      tr("Quitter le tournoi ? Il sera perdu."))
+                != QMessageBox::Yes)
+                return;
+            m_battle->stop();
+            m_soloTournament.reset();
+            showMenu();
+        } else {
+            leaveLobby();
+        }
+    });
+    connect(m_tournamentPage, &TournamentPage::returnToLobbyRequested, this, [this] {
+        m_battle->stop();
+        m_lobby->returnToLobby();
+        showPage(m_lobby);
+    });
+}
+
+void MainWindow::attachTournament(net::TournamentController *tournament, bool host)
+{
+    m_tournament = tournament;
+    m_tournamentPage->setController(tournament, host);
+    if (!tournament)
+        return;
+    connect(tournament, &net::TournamentController::sessionReady, this, [this, tournament] {
+        showPage(m_battle);
+        m_battle->start(tournament->takeSession(), BattlePage::Mode::Tournament);
+    });
+    connect(tournament, &net::TournamentController::localMatchOver, this,
+            [this] { showPage(m_tournamentPage); });
+    showPage(m_tournamentPage);
 }
 
 void MainWindow::setupLan()

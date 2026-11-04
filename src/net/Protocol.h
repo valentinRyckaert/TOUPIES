@@ -2,6 +2,7 @@
 
 #include "core/Top.h"
 #include "game/MatchRules.h"
+#include "game/Tournament.h"
 
 #include <QHostAddress>
 #include <QJsonObject>
@@ -27,10 +28,14 @@ class PartCatalog;
 ///   par ligne. Chaque message possède un champ "type".
 /// - L'hôte fait autorité : il simule le combat et diffuse l'état ; les
 ///   clients n'envoient que leur visée (angle et force), leur pilotage,
-///   leurs dashs et leurs coups spéciaux.
+///   leurs dashs, leurs coups spéciaux et leurs appuis en duel.
+/// - Tournoi : l'hôte diffuse l'état du tournoi (« tournament ») et lance
+///   les manches de chaque match (« start » avec un champ « match ») auprès
+///   de ses seuls participants ; les clients envoient l'ordre de leurs
+///   toupies (« order ») ou leur abandon (« forfeit »).
 namespace net {
 
-constexpr int kProtocolVersion = 3;
+constexpr int kProtocolVersion = 4;
 constexpr quint16 kDefaultTcpPort = 45455;
 constexpr quint16 kDiscoveryPort = 45454;
 constexpr int kPortAttempts = 10;           ///< Ports essayés à partir du port par défaut.
@@ -49,6 +54,9 @@ const QString Aim = QStringLiteral("aim");
 const QString Dash = QStringLiteral("dash");
 const QString Special = QStringLiteral("special");
 const QString Steer = QStringLiteral("steer");
+const QString Duel = QStringLiteral("duel");
+const QString Order = QStringLiteral("order");
+const QString Forfeit = QStringLiteral("forfeit");
 // Hôte -> client
 const QString Welcome = QStringLiteral("welcome");
 const QString Info = QStringLiteral("info");
@@ -57,6 +65,7 @@ const QString Lobby = QStringLiteral("lobby");
 const QString Start = QStringLiteral("start");
 const QString State = QStringLiteral("state");
 const QString Closed = QStringLiteral("closed");
+const QString Tournament = QStringLiteral("tournament");
 } // namespace Msg
 
 /// Empreinte du catalogue de pièces : deux joueurs doivent avoir le même
@@ -70,7 +79,7 @@ struct LobbyPlayer
 {
     int id = -1;
     QString name;
-    std::optional<Top> top;
+    QList<Top> tops;     ///< 1 toupie, ou 3 pour un tournoi classique.
     bool ready = false;
     bool host = false;
 };
@@ -84,6 +93,14 @@ struct LobbyInfo
     bool inGame = false;
     MatchRules rules;
     QList<LobbyPlayer> players;
+    /// Lobby de tournoi : réglages (participants, bots, format).
+    std::optional<TournamentSettings> tournament;
+
+    /// Nombre de toupies que chaque joueur doit choisir.
+    int topsNeeded() const
+    {
+        return tournament ? MatchSeries::topsFor(tournament->matchFormat) : 1;
+    }
 
     const LobbyPlayer *player(int id) const;
     LobbyPlayer *player(int id);
@@ -104,6 +121,7 @@ struct LobbyAnnouncement
     int players = 0;
     int maxPlayers = 0;
     bool inGame = false;
+    bool tournament = false;
     qint64 lastSeenMs = 0;
 };
 

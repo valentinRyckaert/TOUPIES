@@ -22,6 +22,7 @@ ClientSession::ClientSession(LobbyClient *client, const MatchSetup &setup, QObje
                            setup.seed);
     initFromBattle(reference, setup.names);
     m_state.rules = setup.rules;
+    m_state.series = setup.series;
     m_localPlayer = client ? std::max(0, static_cast<int>(setup.playerIds.indexOf(client->playerId())))
                            : 0;
 
@@ -62,6 +63,10 @@ void ClientSession::update(double dt)
 
     // Extrapolation entre deux états : déplacement à vitesse constante.
     m_state.elapsed += dt;
+    for (DuelSide &side : m_state.duel.sides) {
+        if (m_state.duel.active && !side.done)
+            side.advance(dt);
+    }
     for (Projectile &p : m_state.projectiles) {
         if (p.ring)
             p.radius += p.speed * dt;
@@ -104,7 +109,12 @@ void ClientSession::setSteering(Vec2 direction)
 
 void ClientSession::requestDash()
 {
-    if (m_state.phase == MatchPhase::Fighting && m_client)
+    if (m_state.phase != MatchPhase::Fighting || !m_client)
+        return;
+    // En duel : appui jugé sur la position du curseur affichée ici.
+    if (const int side = m_state.duel.sideOf(m_localPlayer); side >= 0)
+        m_client->send({{"type", Msg::Duel}, {"c", m_state.duel.sides[side].cursor}});
+    else
         m_client->send({{"type", Msg::Dash}});
 }
 

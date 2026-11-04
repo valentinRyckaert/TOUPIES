@@ -28,9 +28,9 @@ public:
     const LobbyInfo &lobby() const { return m_lobby; }
     QString hostLabel() const { return m_hostLabel; }
 
-    void selectTop(const Top &top);
+    void selectTops(const QList<Top> &tops);
     void setReady(bool ready);
-    /// Message de jeu (visée, dash).
+    /// Message de jeu (visée, dash, duel…).
     void send(const QJsonObject &message);
 
 signals:

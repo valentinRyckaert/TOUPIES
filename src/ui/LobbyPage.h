@@ -3,6 +3,7 @@
 #include "core/Top.h"
 #include "net/LobbyClient.h"
 #include "net/LobbyServer.h"
+#include "net/TournamentSession.h"
 #include "session/MatchSession.h"
 
 #include <QList>
@@ -21,6 +22,7 @@ class RulesWidget;
 class StadiumWidget;
 class StatsWidget;
 class TopRepository;
+class TournamentSettingsWidget;
 
 /// Lobby réseau, côté hôte ou côté client : joueurs connectés, choix de sa
 /// toupie (parmi ses toupies locales), stadium et nombre de joueurs (hôte),
@@ -48,6 +50,8 @@ public:
     bool isActive() const { return m_server || m_client; }
     /// Session créée au lancement de la partie (la page en cède la propriété).
     std::unique_ptr<MatchSession> takeSession();
+    /// Tournoi en cours dans ce lobby (possédé par la page), ou nullptr.
+    net::TournamentController *tournament() const { return m_tournament.get(); }
 
     /// Recharge la liste des toupies locales (après passage par l'atelier).
     void refreshTops();
@@ -58,13 +62,15 @@ signals:
     void connectionLost(const QString &reason);
     void leaveRequested();
     void matchStarted();
+    void tournamentStarted();
     void returnedToLobby();
 
 private:
     const net::LobbyInfo *lobby() const;
     int localPlayerId() const;
     void rebuild();
-    void sendSelectedTop();
+    void sendSelectedTops();
+    void startTournament();
     void startMatch();
     void onClientMatchStarted(const QJsonObject &start);
     void onLobbyChanged();
@@ -74,6 +80,7 @@ private:
     std::unique_ptr<net::LobbyServer> m_server;
     std::unique_ptr<net::LobbyClient> m_client;
     std::unique_ptr<MatchSession> m_session;
+    std::unique_ptr<net::TournamentController> m_tournament;
     bool m_wasInGame = false;
 
     QLabel *m_title = nullptr;
@@ -84,8 +91,9 @@ private:
     QLabel *m_stadiumLabel = nullptr;
     StadiumWidget *m_stadiumPreview = nullptr;
     RulesWidget *m_rules = nullptr;
+    TournamentSettingsWidget *m_tournamentSettings = nullptr;
     QTableWidget *m_table = nullptr;
-    QComboBox *m_topCombo = nullptr;
+    QList<QComboBox *> m_topCombos; ///< 1 ou 3 visibles selon le lobby.
     StatsWidget *m_topPreview = nullptr;
     QLabel *m_status = nullptr;
     QPushButton *m_readyButton = nullptr;

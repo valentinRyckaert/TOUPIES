@@ -2,6 +2,7 @@
 
 #include "core/PartCatalog.h"
 
+#include <QJsonArray>
 #include <QTcpSocket>
 
 namespace toupie::net {
@@ -70,9 +71,12 @@ void LobbyClient::disconnectFromHost()
     m_lobby = LobbyInfo{};
 }
 
-void LobbyClient::selectTop(const Top &top)
+void LobbyClient::selectTops(const QList<Top> &tops)
 {
-    send({{"type", Msg::SelectTop}, {"top", top.toJson()}});
+    QJsonArray list;
+    for (const Top &top : tops)
+        list.append(top.toJson());
+    send({{"type", Msg::SelectTop}, {"tops", list}});
 }
 
 void LobbyClient::setReady(bool ready)
@@ -114,7 +118,7 @@ void LobbyClient::onMessage(const QJsonObject &message)
         emit lobbyChanged();
     } else if (type == Msg::Start) {
         emit matchStarted(message);
-    } else if (type == Msg::State) {
+    } else if (type == Msg::State || type == Msg::Tournament) {
         emit gameMessage(message);
     }
 }

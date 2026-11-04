@@ -128,6 +128,7 @@ MenuPage::MenuPage(QWidget *parent)
     QPushButton *play = addButton(tr("▶  Jouer contre le bot"), &MenuPage::playRequested);
     play->setDefault(true);
     addButton(tr("⇄  Multijoueur en réseau local"), &MenuPage::lanRequested);
+    addButton(tr("🏆  Tournois"), &MenuPage::tournamentRequested);
     addButton(tr("⚙  Assembler une toupie"), &MenuPage::builderRequested);
     addButton(tr("✕  Quitter"), &MenuPage::quitRequested);
     layout->addStretch(2);

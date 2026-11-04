@@ -1,6 +1,9 @@
 #include "net/HostSession.h"
 
 #include "net/LobbyServer.h"
+
+#include <QRandomGenerator>
+
 #include <algorithm>
 
 namespace toupie::net {
@@ -14,11 +17,19 @@ HostSession::HostSession(LobbyServer *server, const MatchSetup &setup, QObject *
 {
     initFromBattle(*m_battle, setup.names);
     m_state.rules = setup.rules;
+    m_state.series = setup.series;
     m_localPlayer = std::max(0, slotOf(LobbyServer::kHostId));
     m_angles.clear();
     for (int i = 0; i < m_battle->playerCount(); ++i) {
         m_angles.append((-m_battle->startPosition(i)).angle()); // Défaut : vers le centre.
         m_powers.append(1.0);
+        if (const int level = setup.botLevels.value(i, -1); level >= 0) {
+            m_bots.emplace_back(i, static_cast<Difficulty>(level),
+                                QRandomGenerator::global()->generate());
+            m_angles[i] = m_bots.back().chooseLaunchAngle(*m_battle);
+            m_powers[i] = m_bots.back().chooseLaunchPower(*m_battle);
+            m_state.aimed[i] = true;
+        }
     }
 
     if (m_server) {
@@ -83,6 +94,8 @@ void HostSession::onGameMessage(int playerId, const QJsonObject &message)
             m_battle->requestDash(slot);
         else if (type == Msg::Special)
             m_battle->requestSpecial(slot);
+        else if (type == Msg::Duel)
+            m_battle->duelPress(slot, message.value("c").toDouble());
     }
 }
 
@@ -106,7 +119,8 @@ void HostSession::update(double dt)
     case MatchPhase::Aiming: {
         m_aimTimer += dt;
         const bool everyone = !m_state.aimed.contains(false);
-        if (everyone || m_aimTimer >= kAimTimeout) {
+        // Sans serveur (combat local), le joueur prend tout son temps.
+        if (everyone || (m_server && m_aimTimer >= kAimTimeout)) {
             for (bool &aimed : m_state.aimed)
                 aimed = true; // Les retardataires partent vers le centre.
             m_state.countdown = kCountdownSeconds;
@@ -124,6 +138,8 @@ void HostSession::update(double dt)
         }
         break;
     case MatchPhase::Fighting:
+        for (BotController &bot : m_bots)
+            bot.update(*m_battle, dt);
         m_battle->advance(dt);
         m_pendingImpacts.append(syncFromBattle(*m_battle));
         if (m_battle->isFinished())
@@ -143,8 +159,15 @@ void HostSession::update(double dt)
 void HostSession::sendState()
 {
     m_sendTimer = 0.0;
-    if (m_server)
-        m_server->broadcast(encodeState(m_state, m_pendingImpacts));
+    if (m_server) {
+        // Seuls les participants reçoivent l'état (plusieurs matchs de
+        // tournoi peuvent se jouer en même temps).
+        const QJsonObject state = encodeState(m_state, m_pendingImpacts);
+        for (int id : m_setup.playerIds) {
+            if (id != LobbyServer::kHostId && id >= 0)
+                m_server->sendTo(id, state);
+        }
+    }
     m_pendingImpacts.clear();
 }
 

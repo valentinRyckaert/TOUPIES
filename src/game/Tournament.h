@@ -159,4 +159,9 @@ MatchSeries playBotMatch(const Participant &a, const Participant &b, MatchFormat
 /// Ordre de passage aléatoire des `count` toupies d'un bot.
 QList<int> randomOrder(int count, std::uint32_t seed);
 
+/// Complète les joueurs humains avec les bots des réglages (toupies
+/// différentes tirées au hasard dans `pool`).
+QList<Participant> addBots(QList<Participant> humans, const TournamentSettings &settings,
+                           const QList<Top> &pool, std::uint32_t seed);
+
 } // namespace toupie

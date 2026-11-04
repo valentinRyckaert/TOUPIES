@@ -169,6 +169,7 @@ void LobbyScanner::startNext()
             lobby.players = info.value("players").toInt();
             lobby.maxPlayers = info.value("max").toInt();
             lobby.inGame = info.value("inGame").toBool();
+            lobby.tournament = info.value("tournament").toBool();
             lobby.address = host;
             lobby.lastSeenMs = QDateTime::currentMSecsSinceEpoch();
             if (!lobby.lobbyId.isEmpty())

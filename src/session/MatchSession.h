@@ -2,6 +2,7 @@
 
 #include "game/Battle.h"
 #include "game/MatchRules.h"
+#include "game/Tournament.h"
 
 #include <QList>
 #include <QObject>
@@ -25,7 +26,10 @@ struct MatchState
     QList<Vec2> startPositions;
     QList<bool> aimed;              ///< Joueurs ayant validé leur visée.
     std::vector<Projectile> projectiles; ///< Vagues des coups spéciaux en cours.
+    Duel duel;
     MatchRules rules;
+    /// Match de tournoi : score avant cette manche (places 0 et 1 = camps 0 et 1).
+    std::optional<MatchSeries> series;
 
     MatchPhase phase = MatchPhase::Aiming;
     double countdown = 0.0;
