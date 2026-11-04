@@ -16,6 +16,7 @@ signals:
     void playRequested();
     void lanRequested();
     void tournamentRequested();
+    void tutorialRequested();
     void builderRequested();
     void updateRequested();
     void settingsRequested();

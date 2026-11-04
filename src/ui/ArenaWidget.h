@@ -97,6 +97,7 @@ private:
     void paintSpinnerHud(QPainter &p, int index, const QRectF &rect);
     void paintOverlay(QPainter &p);
     void paintDuel(QPainter &p);
+    void paintTutorial(QPainter &p);
     void paintDuelBar(QPainter &p, const QRectF &rect, int spinner, const DuelSide &side,
                       bool local);
 

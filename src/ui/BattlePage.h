@@ -19,7 +19,7 @@ class BattlePage : public QWidget
     Q_OBJECT
 
 public:
-    enum class Mode { Solo, LanHost, LanClient, Tournament };
+    enum class Mode { Solo, LanHost, LanClient, Tournament, Tutorial };
 
     explicit BattlePage(QWidget *parent = nullptr);
     ~BattlePage() override;

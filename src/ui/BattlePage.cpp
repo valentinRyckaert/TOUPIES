@@ -131,6 +131,11 @@ void BattlePage::updateButtons()
         m_score->setText(finished ? tr("En attente de l'hôte pour revenir au lobby…")
                                   : tr("Partie en réseau local"));
         break;
+    case Mode::Tutorial:
+        m_leaveButton->setText(tr("Quitter le tutoriel (Échap)"));
+        m_rematchButton->setVisible(false);
+        m_score->setText(tr("Tutoriel"));
+        break;
     case Mode::Tournament:
         m_leaveButton->setText(tr("Abandonner le match"));
         m_rematchButton->setVisible(false);

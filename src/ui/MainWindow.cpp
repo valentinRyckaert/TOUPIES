@@ -14,6 +14,7 @@
 #include "ui/SetupPage.h"
 #include "ui/TournamentPage.h"
 #include "ui/TournamentSetupPage.h"
+#include "ui/TutorialSession.h"
 
 #include <QApplication>
 #include <QCloseEvent>
@@ -67,6 +68,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_menu, &MenuPage::builderRequested, this, &MainWindow::showBuilder);
     connect(m_menu, &MenuPage::quitRequested, this, &QWidget::close);
     connect(m_menu, &MenuPage::updateRequested, this, &MainWindow::checkForUpdates);
+    connect(m_menu, &MenuPage::tutorialRequested, this, [this] {
+        showPage(m_battle);
+        m_battle->start(std::make_unique<TutorialSession>(), BattlePage::Mode::Tutorial);
+    });
     auto showSettings = [this] {
         m_settingsPage->refresh();
         showPage(m_settingsPage);
@@ -135,7 +140,8 @@ void MainWindow::setupSolo()
                                          tr("Abandonner ce match ? Votre adversaire le remportera.")
                                          ) == QMessageBox::Yes)
                 m_tournament->forfeitLocal();
-        } else if (m_battle->mode() == BattlePage::Mode::Solo) {
+        } else if (m_battle->mode() == BattlePage::Mode::Solo
+                   || m_battle->mode() == BattlePage::Mode::Tutorial) {
             showMenu();
         } else {
             leaveLobby();
@@ -154,6 +160,7 @@ void MainWindow::setupSolo()
             break;
         case BattlePage::Mode::LanClient:
         case BattlePage::Mode::Tournament:
+        case BattlePage::Mode::Tutorial:
             break;
         }
     });

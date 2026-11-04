@@ -2,6 +2,7 @@
 
 #include "game/SpecialMove.h"
 #include "ui/Controls.h"
+#include "ui/TutorialSession.h"
 #include "ui/StadiumPainter.h"
 #include "ui/Theme.h"
 #include "ui/TopPainter.h"
@@ -311,9 +312,15 @@ void ArenaWidget::mouseReleaseEvent(QMouseEvent *event)
 
 bool ArenaWidget::pressInput(int code, bool autoRepeat)
 {
-    const QList<Action> actions = Controls::instance().actionsFor(code);
+    QList<Action> actions = Controls::instance().actionsFor(code);
     if (actions.isEmpty())
         return false;
+    // Tutoriel : seules les actions de l'étape en cours passent.
+    if (auto *tutorial = qobject_cast<TutorialSession *>(m_session.data())) {
+        actions.removeIf([tutorial](Action a) { return !tutorial->handleAction(a); });
+        if (actions.isEmpty())
+            return true;
+    }
     const MatchPhase phase = m_session ? m_session->state().phase : MatchPhase::Finished;
     const bool aiming = phase == MatchPhase::Aiming && m_session && !m_session->localHasAimed();
     const bool steering = actions.contains(Action::SteerLeft) || actions.contains(Action::SteerRight)
@@ -456,6 +463,7 @@ void ArenaWidget::paintEvent(QPaintEvent *)
     paintHud(p);
     paintDuel(p);
     paintOverlay(p);
+    paintTutorial(p);
 }
 
 void ArenaWidget::paintStadium(QPainter &p)
@@ -964,6 +972,69 @@ void ArenaWidget::paintOverlay(QPainter &p)
         }
         break;
     }
+    }
+}
+
+void ArenaWidget::paintTutorial(QPainter &p)
+{
+    auto *tutorial = qobject_cast<TutorialSession *>(m_session.data());
+    const MatchState &state = m_session->state();
+    if (!tutorial || tutorial->bubble().isEmpty() || state.phase == MatchPhase::Countdown
+        || state.phase == MatchPhase::Finished)
+        return;
+
+    // Bulle au-dessus de la toupie désignée (ou au centre), avec une pointe.
+    QFont f = font();
+    f.setPointSizeF(font().pointSizeF() * 1.05);
+    p.setFont(f);
+    const double bubbleWidth = std::min(420.0, width() - 40.0);
+    const QString text = tutorial->bubble();
+    const QRectF textRect = p.fontMetrics().boundingRect(
+        QRect(0, 0, int(bubbleWidth - 32), 1000), Qt::TextWordWrap, text);
+    const double footer = tutorial->isPaused() ? 22.0 : 0.0;
+    const QSizeF size(bubbleWidth, textRect.height() + 28 + footer);
+    const int target = tutorial->bubbleTarget();
+    QPointF anchor = center();
+    if (target >= 0 && target < state.playerCount()) {
+        const Spinner &s = state.spinners[target];
+        anchor = toScreen(s.status == Spinner::Status::Waiting ? state.startPositions.value(target)
+                                                               : s.position);
+    }
+    const double radius = state.config.topRadius * scale();
+    const bool below = target >= 0 && anchor.y() - radius - 16 - size.height() < kHudHeight;
+    QRectF box(anchor.x() - size.width() / 2.0,
+               below ? anchor.y() + radius + 16 : anchor.y() - radius - 16 - size.height(),
+               size.width(), size.height());
+    if (target < 0)
+        box.moveCenter(anchor);
+    box.moveLeft(std::clamp(box.left(), 10.0, width() - box.width() - 10.0));
+
+    QPainterPath path;
+    path.addRoundedRect(box, 12, 12);
+    if (target >= 0) {
+        const double x = std::clamp(anchor.x(), box.left() + 24, box.right() - 24);
+        const double edge = below ? box.top() : box.bottom();
+        const double tip = below ? anchor.y() + radius + 2 : anchor.y() - radius - 2;
+        QPolygonF tail;
+        tail << QPointF(x - 10, edge) << QPointF(x, tip) << QPointF(x + 10, edge);
+        path.addPolygon(tail);
+        path.setFillRule(Qt::WindingFill);
+    }
+    p.setPen(QPen(Theme::kAccent, 2.0));
+    QColor fill = Theme::kPanel;
+    fill.setAlpha(240);
+    p.setBrush(fill);
+    p.drawPath(path.simplified());
+    p.setPen(QColor(235, 238, 242));
+    p.drawText(box.adjusted(16, 14, -16, -14 - footer), Qt::TextWordWrap, text);
+    if (tutorial->isPaused()) {
+        QFont small = font();
+        small.setPointSizeF(font().pointSizeF() * 0.85);
+        small.setBold(true);
+        p.setFont(small);
+        p.setPen(Theme::kAccent);
+        p.drawText(box.adjusted(16, 0, -16, -10), Qt::AlignBottom | Qt::AlignRight,
+                   tr("⏸ Jeu en pause"));
     }
 }
 

@@ -19,6 +19,7 @@
 #include "ui/TournamentPage.h"
 #include "ui/TournamentSettingsWidget.h"
 #include "ui/TournamentSetupPage.h"
+#include "ui/TutorialSession.h"
 
 #include <QSpinBox>
 
@@ -62,6 +63,7 @@ private slots:
     void tournamentParticipantsFollowFormat();
     void controlsAreRebindableAndSaved();
     void reboundKeyIsUsedInBattle();
+    void tutorialWalksThroughEveryAction();
 };
 
 void TestGui::initTestCase()
@@ -293,6 +295,61 @@ void TestGui::reboundKeyIsUsedInBattle()
     QTest::keyClick(arena, Qt::Key_L);
     QCOMPARE(battle->session()->state().phase, MatchPhase::Countdown);
     Controls::instance().reset();
+}
+
+void TestGui::tutorialWalksThroughEveryAction()
+{
+    using Step = TutorialSession::Step;
+    MainWindow window;
+    window.show();
+    emit window.findChild<MenuPage *>()->tutorialRequested();
+    auto *battle = window.findChild<BattlePage *>();
+    QCOMPARE(currentPage(window), battle);
+    QCOMPARE(battle->mode(), BattlePage::Mode::Tutorial);
+    auto *tutorial = qobject_cast<TutorialSession *>(battle->session());
+    QVERIFY(tutorial);
+    auto *arena = window.findChild<ArenaWidget *>();
+    arena->setFocus();
+    auto waitPause = [&](Step step) {
+        QTRY_VERIFY_WITH_TIMEOUT(tutorial->isPaused() && tutorial->step() == step, 20000);
+        QVERIFY(!tutorial->bubble().isEmpty());
+    };
+
+    // Visée : seules les touches présentées font avancer.
+    QTest::keyClick(arena, Qt::Key_Return);
+    QCOMPARE(tutorial->state().phase, MatchPhase::Aiming);
+    QTest::keyClick(arena, Qt::Key_Left);
+    QCOMPARE(tutorial->step(), Step::Power);
+    QTest::keyClick(arena, Qt::Key_Up);
+    QCOMPARE(tutorial->step(), Step::Launch);
+    QTest::keyClick(arena, Qt::Key_Return);
+    QCOMPARE(tutorial->state().phase, MatchPhase::Countdown);
+
+    // Pilotage : le jeu est figé tant que la touche n'est pas pressée.
+    waitPause(Step::Steer);
+    const double elapsed = tutorial->state().elapsed;
+    QTest::qWait(300);
+    QCOMPARE(tutorial->state().elapsed, elapsed);
+    QTest::keyClick(arena, Qt::Key_E); // Pas la touche présentée : ignorée.
+    QVERIFY(tutorial->isPaused());
+    QTest::keyPress(arena, Qt::Key_Right);
+    QVERIFY(!tutorial->isPaused());
+    QTest::qWait(200);
+    QTest::keyRelease(arena, Qt::Key_Right);
+
+    waitPause(Step::Dash);
+    QTest::keyClick(arena, Qt::Key_Space);
+    QTRY_VERIFY(tutorial->state().spinners[0].dashCooldown > 0.0 || tutorial->state().duel.active);
+    waitPause(Step::Special);
+    QTest::keyClick(arena, Qt::Key_E);
+    QTRY_VERIFY(tutorial->state().spinners[0].specialUsed);
+    waitPause(Step::Duel);
+    QTest::keyClick(arena, Qt::Key_Space);
+    QCOMPARE(tutorial->step(), Step::AfterDuel);
+    waitPause(Step::Done);
+    QTest::keyClick(arena, Qt::Key_Return);
+    QCOMPARE(tutorial->step(), Step::Free);
+    QVERIFY(tutorial->bubble().isEmpty());
 }
 
 QTEST_MAIN(TestGui)

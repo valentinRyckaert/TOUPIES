@@ -68,6 +68,8 @@ add_library(toupie_ui STATIC
     ui/SettingsPage.cpp
     ui/HelpPage.h
     ui/HelpPage.cpp
+    ui/TutorialSession.h
+    ui/TutorialSession.cpp
     ui/TopPainter.h
     ui/TopPainter.cpp
     ui/RulesWidget.h
