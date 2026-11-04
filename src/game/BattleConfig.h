@@ -103,6 +103,20 @@ struct BattleConfig
     double specialKnockbackScale = 1.0;
     bool specialsEnabled = true;
 
+    // --- Duel (deux toupies qui se percutent en plein dash) --------------------
+    /// Chaque duelliste a une barre de -1 à 1 parcourue par un curseur ; il faut
+    /// appuyer quand le curseur est dans la zone verte centrée sur 0, dont la
+    /// demi-largeur rétrécit à chaque réussite jusqu'à duelZoneMin.
+    double duelZoneStart = 0.45;
+    double duelZoneMin = 0.14;
+    double duelZoneShrink = 0.72;
+    double duelCursorSpeed = 2.2;   ///< Unités de barre par seconde.
+    double duelSpeedGain = 1.06;    ///< Accélération du curseur à chaque réussite.
+    int duelStreak = 3;             ///< Réussites à taille minimale pour un nul.
+    double duelTimeout = 3.0;       ///< Sans appui pendant ce délai : duel perdu.
+    /// Le perdant subit ce multiple des dégâts du dash adverse.
+    double duelDamageMultiplier = 1.5;
+
     // --- Mêlée (3-4 toupies) ---------------------------------------------------
     /// Endurance rendue à la toupie qui provoque une élimination (dernier choc
     /// reçu par la victime il y a moins de knockoutWindow secondes).

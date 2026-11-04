@@ -93,8 +93,8 @@ bool Battle::canDash(int index) const
         return false;
     const Spinner &self = m_spinners[index];
     return m_phase == Phase::Running && self.isActive() && !self.isDashing()
-        && !self.isDisarmed() && self.dashCooldown <= 0.0 && self.spin > m_config.dashCost
-        && nearestOpponent(index) >= 0;
+        && !self.isDisarmed() && !inDuel(index) && self.dashCooldown <= 0.0
+        && self.spin > m_config.dashCost && nearestOpponent(index) >= 0;
 }
 
 void Battle::setSteering(int index, Vec2 direction)
@@ -110,7 +110,7 @@ bool Battle::canSpecial(int index) const
     if (index < 0 || index >= playerCount() || !m_config.specialsEnabled)
         return false;
     const Spinner &self = m_spinners[index];
-    return m_phase == Phase::Running && self.isActive() && !self.isDisarmed()
+    return m_phase == Phase::Running && self.isActive() && !self.isDisarmed() && !inDuel(index)
         && !self.specialUsed && SpecialMove::find(self.top.special()).has_value()
         && nearestOpponent(index) >= 0;
 }
@@ -144,6 +144,8 @@ bool Battle::requestSpecial(int index)
 
 bool Battle::requestDash(int index, int targetIndex)
 {
+    if (const int side = m_duel.sideOf(index); side >= 0)
+        return duelPress(index, m_duel.sides[side].cursor);
     if (!canDash(index))
         return false;
     if (targetIndex < 0 || targetIndex >= playerCount() || targetIndex == index
@@ -269,10 +271,11 @@ double &Battle::pairCooldown(int i, int j)
 
 void Battle::step(double h)
 {
-    for (Spinner &s : m_spinners) {
-        if (s.isActive())
-            integrate(s, h);
+    for (int i = 0; i < playerCount(); ++i) {
+        if (m_spinners[i].isActive() && !inDuel(i))
+            integrate(m_spinners[i], h);
     }
+    updateDuel(h);
 
     for (double &cooldown : m_pairCooldowns)
         cooldown = std::max(0.0, cooldown - h);
@@ -311,6 +314,8 @@ void Battle::eliminate(int index, Spinner::Status status)
     s.status = status;
     s.dashTimer = 0.0;
     m_eliminated.append(index);
+    if (inDuel(index))
+        m_duel.active = false; // Abandon pendant un duel.
 
     // Mêlée : la toupie qui a provoqué l'élimination récupère de l'endurance.
     if (status != Spinner::Status::Forfeit && s.lastHitBy >= 0
@@ -426,8 +431,23 @@ void Battle::resolveCollision(int i, int j)
     const double mb = mass(b);
     const double total = ma + mb;
 
-    // Séparation des toupies (la plus lourde bouge moins).
+    // Duellistes : immobiles, ils repoussent simplement les autres toupies.
+    const bool aFrozen = inDuel(i);
+    const bool bFrozen = inDuel(j);
+    if (aFrozen && bFrozen)
+        return;
     const double overlap = minDistance - distance;
+    if (aFrozen || bFrozen) {
+        Spinner &moving = aFrozen ? b : a;
+        const Vec2 away = aFrozen ? n : -n;
+        moving.position += away * overlap;
+        const double toward = -moving.velocity.dot(away);
+        if (toward > 0.0)
+            moving.velocity += away * (toward * (1.0 + m_config.rimRestitution));
+        return;
+    }
+
+    // Séparation des toupies (la plus lourde bouge moins).
     a.position -= n * (overlap * mb / total);
     b.position += n * (overlap * ma / total);
 
@@ -446,6 +466,10 @@ void Battle::resolveCollision(int i, int j)
         return; // Contact prolongé : un seul choc comptabilisé.
 
     const double approach = std::max(0.0, closing);
+    if (a.isDashing() && b.isDashing() && !m_duel.active) {
+        startDuel(i, j, n, approach);
+        return;
+    }
     const double damageToA = collisionDamage(b, a, approach);
     const double damageToB = collisionDamage(a, b, approach);
     const double pushA = knockback(b, a, approach);
@@ -515,7 +539,7 @@ void Battle::updateProjectiles(double h)
             p.traveled = p.radius;
             for (int j = 0; j < playerCount(); ++j) {
                 const Spinner &t = m_spinners[j];
-                if (j == p.owner || !t.isActive() || p.hit.contains(j))
+                if (j == p.owner || !t.isActive() || inDuel(j) || p.hit.contains(j))
                     continue;
                 const double d = (t.position - p.origin).length();
                 if (d + m_config.topRadius >= previous - p.width
@@ -531,7 +555,7 @@ void Battle::updateProjectiles(double h)
             p.traveled += p.speed * h;
             for (int j = 0; j < playerCount(); ++j) {
                 const Spinner &t = m_spinners[j];
-                if (j == p.owner || !t.isActive())
+                if (j == p.owner || !t.isActive() || inDuel(j))
                     continue;
                 if (distanceToSegment(t.position, previous, p.position)
                     <= m_config.topRadius + p.width) {
@@ -617,6 +641,129 @@ void Battle::applySpecialHit(const Projectile &projectile, const SpecialMove &mo
     m_impacts.append(event);
 }
 
+// ---------------------------------------------------------------------------
+// Duels
+// ---------------------------------------------------------------------------
+
+void DuelSide::advance(double h)
+{
+    cursor += direction * speed * h;
+    // Aller-retour : le curseur rebondit aux extrémités de la barre.
+    while (cursor > 1.0 || cursor < -1.0) {
+        cursor = cursor > 1.0 ? 2.0 - cursor : -2.0 - cursor;
+        direction = -direction;
+    }
+}
+
+void Battle::startDuel(int i, int j, Vec2 normal, double approach)
+{
+    m_duel = Duel{};
+    m_duel.active = true;
+    m_duel.first = i;
+    m_duel.second = j;
+    m_duel.normal = normal;
+    m_duel.point = m_spinners[i].position + normal * m_config.topRadius;
+    m_duel.approach = approach;
+    for (DuelSide &side : m_duel.sides) {
+        side.speed = m_config.duelCursorSpeed;
+        side.zone = m_config.duelZoneStart;
+    }
+    for (int index : {i, j}) {
+        Spinner &s = m_spinners[index];
+        s.velocity = {};
+        s.dashTimer = 0.0;
+        s.lastHitBy = index == i ? j : i;
+        s.lastHitTime = m_elapsed;
+    }
+
+    ImpactEvent event;
+    event.point = m_duel.point;
+    event.intensity = 1.0;
+    event.first = i;
+    event.second = j;
+    m_impacts.append(event);
+}
+
+void Battle::updateDuel(double h)
+{
+    if (!m_duel.active)
+        return;
+    bool timedOut[2] = {false, false};
+    for (int k = 0; k < 2; ++k) {
+        DuelSide &side = m_duel.sides[k];
+        // Les duellistes tournent sur place (affichage) sans s'user.
+        Spinner &s = m_spinners[k == 0 ? m_duel.first : m_duel.second];
+        s.angle = std::fmod(s.angle + s.spinSign * (6.0 + 30.0 * s.spinRatio()) * h, 2.0 * kPi);
+        if (side.done)
+            continue;
+        side.advance(h);
+        side.idle += h;
+        timedOut[k] = side.idle > m_config.duelTimeout;
+    }
+    if (timedOut[0] && timedOut[1])
+        resolveDuel(-1);
+    else if (timedOut[0] || timedOut[1])
+        resolveDuel(timedOut[0] ? 0 : 1);
+}
+
+bool Battle::duelPress(int index, double cursor)
+{
+    const int k = m_duel.sideOf(index);
+    if (k < 0 || m_phase != Phase::Running || m_duel.sides[k].done)
+        return false;
+    DuelSide &side = m_duel.sides[k];
+    side.idle = 0.0;
+    if (std::abs(std::clamp(cursor, -1.0, 1.0)) > side.zone) {
+        resolveDuel(k);
+        return true;
+    }
+    if (side.zone <= m_config.duelZoneMin + 1e-9) {
+        side.done = ++side.streak >= m_config.duelStreak;
+    } else {
+        side.zone = std::max(m_config.duelZoneMin, side.zone * m_config.duelZoneShrink);
+    }
+    side.speed *= m_config.duelSpeedGain;
+    if (m_duel.sides[0].done && m_duel.sides[1].done)
+        resolveDuel(-1);
+    return true;
+}
+
+void Battle::resolveDuel(int loserSide)
+{
+    const Duel duel = m_duel;
+    m_duel.active = false;
+    Spinner &a = m_spinners[duel.first];
+    Spinner &b = m_spinners[duel.second];
+    const Vec2 n = duel.normal;
+
+    ImpactEvent event;
+    event.point = duel.point;
+    event.first = duel.first;
+    event.second = duel.second;
+    if (loserSide < 0) {
+        // Nul : les toupies se repoussent sans dégâts.
+        a.velocity -= n * knockback(b, a, duel.approach);
+        b.velocity += n * knockback(a, b, duel.approach);
+        event.intensity = 0.6;
+        event.duelLoser = -1;
+    } else {
+        Spinner &loser = loserSide == 0 ? a : b;
+        Spinner winner = loserSide == 0 ? b : a;
+        winner.boostTimer = std::max(winner.boostTimer, 1e-3); // Dégâts d'un dash.
+        const double damage = m_config.duelDamageMultiplier
+                            * collisionDamage(winner, loser, duel.approach);
+        loser.spin -= damage;
+        const Vec2 away = loserSide == 0 ? -n : n;
+        loser.velocity += away * knockback(winner, loser, duel.approach);
+        event.intensity = std::min(1.0, 0.4 + damage / 20.0);
+        event.duelLoser = loserSide == 0 ? duel.first : duel.second;
+    }
+    a.boostTimer = b.boostTimer = 0.0;
+    pairCooldown(std::min(duel.first, duel.second), std::max(duel.first, duel.second))
+        = m_config.contactCooldown;
+    m_impacts.append(event);
+}
+
 void Battle::checkEnd()
 {
     if (m_phase != Phase::Running)
@@ -664,6 +811,7 @@ void Battle::finish(int winner, EndReason reason)
     m_phase = Phase::Finished;
     m_winner = winner;
     m_endReason = reason;
+    m_duel.active = false;
     for (Spinner &s : m_spinners)
         s.dashTimer = 0.0;
 

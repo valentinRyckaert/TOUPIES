@@ -49,6 +49,8 @@ struct Outcome
 std::optional<Difficulty> g_secondDifficulty;
 /// Face à face : le second camp s'interdit les coups spéciaux.
 bool g_secondWithoutSpecials = false;
+/// Nombre total de duels terminés (tous combats confondus).
+long g_duels = 0;
 
 Outcome simulate(const QList<Top> &tops, const Stadium &stadium, const BattleConfig &config,
                  Difficulty difficulty, std::uint32_t seed)
@@ -80,6 +82,8 @@ Outcome simulate(const QList<Top> &tops, const Stadium &stadium, const BattleCon
         for (BotController &bot : bots)
             bot.update(battle, dt);
         battle.advance(dt);
+        for (const ImpactEvent &e : battle.takeImpacts())
+            g_duels += e.duelLoser != ImpactEvent::kNoDuel;
     }
 
     Outcome outcome;
@@ -381,8 +385,10 @@ int main(int argc, char *argv[])
             worst = qMin(worst, m.global(i));
             out << QString::asprintf("%10.1f%%\n", m.global(i));
         }
-        out << QString::asprintf("\nÉjections : %.1f%%, durée moyenne : %.1fs, pire type : %.1f%%\n",
-                                 100.0 * m.ringOuts / m.fights, m.duration / m.fights, worst);
+        out << QString::asprintf("\nÉjections : %.1f%%, durée moyenne : %.1fs, pire type : %.1f%%, "
+                                 "duels : %.2f par combat\n",
+                                 100.0 * m.ringOuts / m.fights, m.duration / m.fights, worst,
+                                 double(g_duels) / m.fights);
         out << "\nCoups spéciaux (duels entre boulons différents)\n";
         for (const auto &[id, score] : g_specialScore) {
             const auto move = SpecialMove::find(id);

@@ -25,13 +25,13 @@ BotController::Skill BotController::skillFor(Difficulty difficulty)
 {
     switch (difficulty) {
     case Difficulty::Easy:
-        return {0.45, 0.5, 0.2, 1.3, 0.15, false, false, false};
+        return {0.45, 0.5, 0.2, 1.3, 0.15, false, false, false, 0.075};
     case Difficulty::Normal:
-        return {0.25, 0.2, 0.6, 0.9, 0.0, false, false, false};
+        return {0.25, 0.2, 0.6, 0.9, 0.0, false, false, false, 0.045};
     case Difficulty::Hard:
         break;
     }
-    return {0.12, 0.07, 0.8, 0.9, 0.0, true, true, true};
+    return {0.12, 0.07, 0.8, 0.9, 0.0, true, true, true, 0.025};
 }
 
 BotController::BotController(int index, Difficulty difficulty, std::uint32_t seed)
@@ -202,6 +202,19 @@ void BotController::update(Battle &battle, double dt)
     if (battle.phase() != Battle::Phase::Running || !battle.spinner(m_index).isActive())
         return;
 
+    // Duel : appuyer quand le curseur passe au centre de la zone verte, avec
+    // une erreur de timing qui dépend du niveau.
+    const Duel &duel = battle.duel();
+    if (const int side = duel.sideOf(m_index); side >= 0) {
+        const DuelSide &bar = duel.sides[side];
+        const double next = bar.cursor + bar.direction * bar.speed * dt;
+        if (!bar.done && (bar.cursor < 0.0) != (next < 0.0)) {
+            std::normal_distribution<double> timing(0.0, m_skill.duelTiming);
+            battle.duelPress(m_index, timing(m_rng) * bar.speed);
+        }
+        return;
+    }
+
     const int target = chooseTarget(battle);
 
     // Pilotage : même cadence pour toutes les difficultés (un pilotage trop
@@ -211,6 +224,22 @@ void BotController::update(Battle &battle, double dt)
         m_steerTimer = 0.12;
         m_plan = choosePlan(battle, target);
         battle.setSteering(m_index, chooseSteering(battle, target));
+    }
+
+    // Contre-dash (réflexe, hors cadence de décision) : répondre à un dash
+    // adverse par un dash provoque un duel, où un bon timing fait la différence.
+    if (m_skill.tactics && battle.canDash(m_index)) {
+        const Spinner &self = battle.spinner(m_index);
+        for (int j = 0; j < battle.playerCount(); ++j) {
+            const Spinner &other = battle.spinner(j);
+            const Vec2 toMe = self.position - other.position;
+            if (j != m_index && other.isActive() && other.isDashing()
+                && other.dashDirection.dot(toMe.normalized()) > 0.9
+                && toMe.length() < battle.config().dashDistance() * 1.5) {
+                battle.requestDash(m_index, j);
+                return;
+            }
+        }
     }
 
     m_decisionTimer -= dt;

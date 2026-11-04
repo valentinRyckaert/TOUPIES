@@ -75,12 +75,50 @@ struct Projectile
 /// Un choc entre deux toupies (utilisé pour les effets visuels).
 struct ImpactEvent
 {
+    static constexpr int kNoDuel = -2;
+
     Vec2 point;
     double intensity = 0.0;
     int first = 0;
     int second = 1;
     bool special = false;  ///< Touché par un coup spécial.
     unsigned color = 0;    ///< Couleur du coup spécial.
+    int duelLoser = kNoDuel; ///< Fin de duel : perdant (-1 = nul).
+};
+
+/// Barre d'un duelliste.
+struct DuelSide
+{
+    double cursor = -1.0;    ///< Position du curseur (-1..1) ; zone verte centrée sur 0.
+    double direction = 1.0;
+    double speed = 0.0;      ///< Unités de barre par seconde.
+    double zone = 0.0;       ///< Demi-largeur de la zone verte.
+    int streak = 0;          ///< Réussites consécutives à la taille minimale.
+    double idle = 0.0;       ///< Secondes depuis le dernier appui.
+    bool done = false;       ///< Série finale réussie : attend l'adversaire.
+
+    /// Fait avancer le curseur (aller-retour sur la barre).
+    void advance(double h);
+};
+
+/// Duel : deux toupies qui se percutent en plein dash restent au contact
+/// pendant que chaque joueur tente d'appuyer dans la zone verte de sa barre.
+/// Un raté perd le duel ; si les deux réussissent la série finale, nul.
+struct Duel
+{
+    bool active = false;
+    int first = -1;
+    int second = -1;
+    Vec2 point;              ///< Point de friction.
+    Vec2 normal;             ///< De `first` vers `second`.
+    double approach = 0.0;   ///< Vitesse de rapprochement au contact.
+    DuelSide sides[2];
+
+    /// 0 ou 1 pour un duelliste, -1 sinon.
+    int sideOf(int spinner) const
+    {
+        return !active ? -1 : spinner == first ? 0 : spinner == second ? 1 : -1;
+    }
 };
 
 /// Simulation d'un combat entre 2 et 4 toupies dans un stadium.
@@ -120,8 +158,14 @@ public:
 
     bool canDash(int index) const;
     /// Déclenche un dash vers `target` (par défaut la toupie adverse la plus
-    /// proche) si c'est possible.
+    /// proche) si c'est possible. Pendant un duel, sert d'appui (duelPress
+    /// avec la position actuelle du curseur).
     bool requestDash(int index, int target = -1);
+
+    const Duel &duel() const { return m_duel; }
+    /// Appui d'un duelliste ; `cursor` est la position du curseur qu'il a vue
+    /// (un client réseau a un léger décalage avec l'hôte).
+    bool duelPress(int index, double cursor);
     /// Adversaire en jeu le plus proche (-1 s'il n'y en a pas).
     int nearestOpponent(int index) const;
 
@@ -165,6 +209,11 @@ private:
     void resolveCollision(int i, int j);
     void updateProjectiles(double h);
     void applySpecialHit(const Projectile &projectile, const SpecialMove &move, int target);
+    void startDuel(int i, int j, Vec2 normal, double approach);
+    void updateDuel(double h);
+    /// Fin du duel : `loserSide` 0 ou 1, -1 pour un nul.
+    void resolveDuel(int loserSide);
+    bool inDuel(int index) const { return m_duel.sideOf(index) >= 0; }
     void eliminate(int index, Spinner::Status status);
     void checkEnd();
     void finish(int winner, EndReason reason);
@@ -188,6 +237,7 @@ private:
     QList<ImpactEvent> m_impacts;
     std::vector<Projectile> m_projectiles;
     int m_nextProjectileId = 1;
+    Duel m_duel;
 };
 
 } // namespace toupie

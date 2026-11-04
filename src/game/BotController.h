@@ -33,8 +33,8 @@ QString toString(Difficulty difficulty);
 /// effet utile pour la suite) dépasse son coût réel ; en difficile, le bot
 /// enchaîne des combos (givre ou distorsion puis dash, onde sur une cible au
 /// bord…).
-/// La difficulté règle les réflexes, la précision, l'esquive des vagues et
-/// le niveau tactique.
+/// La difficulté règle les réflexes, la précision, l'esquive des vagues, le
+/// timing en duel et le niveau tactique.
 class BotController
 {
 public:
@@ -71,6 +71,7 @@ private:
         bool tactics;       ///< Placement et choix de plan élaborés.
         bool combos;        ///< Enchaînements coup spécial + dash.
         bool anticipate;    ///< Prévision des déplacements adverses.
+        double duelTiming;  ///< Écart-type du timing en duel (secondes).
     };
     static Skill skillFor(Difficulty difficulty);
 

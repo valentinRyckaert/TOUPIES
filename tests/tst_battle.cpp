@@ -65,6 +65,11 @@ private slots:
     void waveHitsTargetAndAppliesEffect();
     void ringHitsEveryOpponentInRange();
     void disarmBlocksDash();
+    void simultaneousDashesStartDuel();
+    void duelMissCostsOneAndHalfDashDamage();
+    void duelDrawAfterFinalStreak();
+    void idleDuellistLoses();
+    void harderBotsWinDuels();
 };
 
 void TestBattle::enduranceReducesPassiveLoss()
@@ -550,6 +555,106 @@ void TestBattle::disarmBlocksDash()
     QVERIFY(battle.spinner(1).isDisarmed());
     QVERIFY(!battle.canDash(1));
     QVERIFY(!battle.canSpecial(1));
+}
+
+namespace {
+/// Deux toupies immobiles proches qui dashent l'une vers l'autre au même moment.
+Battle duelBattle(std::uint32_t seed = 1)
+{
+    BattleConfig config = staticConfig();
+    config.startOffset = 0.3;
+    Battle battle(attackTop(), defenseTop(), config, seed);
+    battle.launch(0.0, M_PI);
+    battle.requestDash(0);
+    battle.requestDash(1);
+    runUntil(battle, 0.5, [&] { return battle.duel().active; });
+    return battle;
+}
+} // namespace
+
+void TestBattle::simultaneousDashesStartDuel()
+{
+    Battle battle = duelBattle();
+    QVERIFY(battle.duel().active);
+    const double spin0 = battle.spinner(0).spin;
+    const Vec2 position = battle.spinner(0).position;
+    QVERIFY(!battle.canDash(0));
+    run(battle, 1.0);
+    // Les duellistes restent figés, sans s'user, tant que personne n'appuie.
+    QVERIFY(battle.duel().active);
+    QCOMPARE(battle.spinner(0).spin, spin0);
+    QVERIFY((battle.spinner(0).position - position).length() < 1e-9);
+    QVERIFY(battle.duel().sides[0].cursor != -1.0);
+}
+
+void TestBattle::duelMissCostsOneAndHalfDashDamage()
+{
+    Battle battle = duelBattle();
+    Spinner dasher = battle.spinner(1);
+    dasher.boostTimer = 1.0;
+    const double expected = battle.config().duelDamageMultiplier
+                          * battle.collisionDamage(dasher, battle.spinner(0), battle.duel().approach);
+    const double before = battle.spinner(0).spin;
+    const double other = battle.spinner(1).spin;
+    QVERIFY(battle.duelPress(0, 1.0)); // Curseur au bord : raté.
+    QVERIFY(!battle.duel().active);
+    QVERIFY(std::abs(before - battle.spinner(0).spin - expected) < 1e-9);
+    QCOMPARE(battle.spinner(1).spin, other);
+    QVERIFY(battle.spinner(0).velocity.length() > 0.0);
+}
+
+void TestBattle::duelDrawAfterFinalStreak()
+{
+    Battle battle = duelBattle();
+    const double spins[2] = {battle.spinner(0).spin, battle.spinner(1).spin};
+    int presses = 0;
+    while (battle.duel().active && presses < 40) {
+        battle.duelPress(0, 0.0);
+        battle.duelPress(1, 0.0);
+        ++presses;
+    }
+    QVERIFY(!battle.duel().active);
+    // La zone rétrécit d'abord, puis il faut la série finale à taille minimale.
+    QVERIFY(presses > battle.config().duelStreak);
+    QCOMPARE(battle.spinner(0).spin, spins[0]);
+    QCOMPARE(battle.spinner(1).spin, spins[1]);
+    battle.advance(0.05);
+    const Vec2 gap = battle.spinner(1).position - battle.spinner(0).position;
+    QVERIFY((battle.spinner(1).velocity - battle.spinner(0).velocity).dot(gap) > 0.0);
+}
+
+void TestBattle::idleDuellistLoses()
+{
+    Battle battle = duelBattle();
+    const double before = battle.spinner(1).spin;
+    runUntil(battle, battle.config().duelTimeout + 1.0, [&] {
+        battle.duelPress(0, 0.0); // Le joueur 0 appuie bien, le joueur 1 ne fait rien.
+        return !battle.duel().active;
+    });
+    QVERIFY(!battle.duel().active);
+    QVERIFY(battle.spinner(1).spin < before);
+}
+
+void TestBattle::harderBotsWinDuels()
+{
+    int hardWins = 0;
+    constexpr int kDuels = 200;
+    for (int k = 0; k < kDuels; ++k) {
+        Battle battle = duelBattle(static_cast<std::uint32_t>(k));
+        const int hardSeat = k % 2;
+        BotController bots[2] = {{0, hardSeat == 0 ? Difficulty::Hard : Difficulty::Easy, 3u * k},
+                                 {1, hardSeat == 1 ? Difficulty::Hard : Difficulty::Easy, 3u * k + 1}};
+        const double spins[2] = {battle.spinner(0).spin, battle.spinner(1).spin};
+        while (battle.duel().active) {
+            for (BotController &bot : bots)
+                bot.update(battle, 1.0 / 60.0);
+            battle.advance(1.0 / 60.0);
+        }
+        const int easySeat = 1 - hardSeat;
+        hardWins += battle.spinner(easySeat).spin < spins[easySeat];
+    }
+    qInfo("Duels gagnés par le bot difficile contre le facile : %d/%d", hardWins, kDuels);
+    QVERIFY(hardWins > kDuels * 0.7);
 }
 
 namespace {
