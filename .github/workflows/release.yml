@@ -120,6 +120,14 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Notes de version (section du tag dans CHANGELOG.md)
+        run: |
+          awk -v v="${GITHUB_REF_NAME#v}" '/^## \[/ { p = index($0, "[" v "]") > 0; next } /^\[/ { p = 0 } p' \
+            CHANGELOG.md > release-notes.md
+          cat release-notes.md
+
       - uses: actions/download-artifact@v4
         with:
           path: packages
@@ -129,4 +137,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: packages/*
+          body_path: release-notes.md
           generate_release_notes: true

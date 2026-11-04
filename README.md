@@ -348,10 +348,11 @@ distribution, dossier en lecture seule) propose d'ouvrir la page de télécharge
   - Linux, Windows (MSVC) et macOS avec Qt 6.8 LTS : compilation, tests, binaires en artefacts.
 - **CD** ([`release.yml`](.github/workflows/release.yml), à chaque tag `vX.Y.Z`) : compilation
   et tests sur les trois systèmes, paquets AppImage (Linux), zip (Windows) et dmg (macOS),
-  vérification du démarrage de chaque paquet, publication dans une release GitHub.
+  vérification du démarrage de chaque paquet, publication dans une release GitHub dont les notes
+  reprennent la section du tag dans [`CHANGELOG.md`](CHANGELOG.md).
 
 ```sh
-git tag v1.0.0 && git push origin v1.0.0   # déclenche la publication
+git tag v1.1.0 && git push origin v1.1.0   # déclenche la publication
 ```
 
 Tests (`ctest`) :

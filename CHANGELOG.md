@@ -1,0 +1,66 @@
+# Changelog
+
+Toutes les évolutions notables de Toupie Arena. Le format suit
+[Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet respecte le
+[versionnage sémantique](https://semver.org/lang/fr/).
+
+## [1.1.0] — 2026-11-04
+
+### Ajouts
+
+- **Mises à jour intégrées** : le bouton « Mises à jour » du menu vérifie la dernière release,
+  télécharge le paquet de votre système, remplace l'ancienne version et relance le jeu
+  (AppImage sous Linux, zip sous Windows, dmg sous macOS). Une installation qui ne peut pas se
+  remplacer seule (compilée depuis les sources, dossier protégé) propose la page de
+  téléchargement.
+- **Paramètres** : toutes les touches se configurent, avec deux entrées par action (touche du
+  clavier ou bouton de la souris). Une touche déjà utilisée est retirée de l'action précédente ;
+  Échap reste réservée pour quitter. Bouton pour revenir aux touches par défaut.
+- **Aide** : récapitulatif des commandes (visée, combat, duel, fin de combat) avec les touches
+  actuellement configurées.
+- **Tutoriel** : un combat scénarisé contre une toupie d'entraînement à la trajectoire prévue.
+  Des bulles présentent chaque action (visée, force, lancer, pilotage, dash, coup spécial, duel)
+  et mettent le jeu en pause jusqu'à ce que vous appuyiez sur la touche présentée. Le duel est
+  guidé : une bulle l'explique, chaque erreur est expliquée sans être comptée, et la victoire
+  éjecte la toupie adverse.
+
+### Modifications
+
+- Les indications à l'écran (visée, dash, coup spécial, duel, boutons du combat) affichent les
+  touches configurées.
+- Menu principal : « Tutoriel » rejoint les boutons principaux ; Paramètres, Aide, Mises à jour
+  et Quitter forment une rangée compacte en dessous.
+- Les paquets de release sont compilés avec la version de leur tag, pour la recherche de mises à
+  jour.
+
+### Note de mise à jour
+
+La version 1.0.0 ne sait pas encore se mettre à jour : téléchargez la 1.1.0 une fois depuis la
+page des releases. Les versions suivantes pourront s'installer depuis le jeu.
+
+## [1.0.0] — 2026-11-04
+
+Première version publique.
+
+### Ajouts
+
+- **Combat de toupies** en 2D vu du dessus : toupies de quatre pièces (boulon, roue, partie
+  intermédiaire, pointe), types Attaque / Défense / Endurance / Équilibre, sens de rotation,
+  lancer avec direction et force, pilotage aux flèches, dash, et sept **coups spéciaux** (vagues
+  et anneaux à esquiver, une fois par partie, au prix de la moitié de l'endurance).
+- **Duels** : deux toupies qui se percutent en plein dash s'affrontent dans un duel de timing
+  (zone verte qui rétrécit, 1,5× les dégâts du dash adverse pour le perdant).
+- **Six stadiums** aux formes et propriétés différentes, et une section **Personnalisation**
+  (vitesse, rebonds, usure, dégâts, endurance, durée, pilotage, coups spéciaux…).
+- **Bot** en trois niveaux, avec des tactiques adaptées à sa toupie (dash et coup spécial
+  calculés, contre-dash, timing en duel selon le niveau).
+- **Multijoueur en réseau local** de 2 à 4 joueurs : création de lobby, découverte automatique
+  (UDP et balayage TCP), connexion par nom ou par adresse IP.
+- **Tournois** solo ou en réseau local, de 4 à 32 participants : ligue ou élimination directe,
+  matchs express (une toupie, 2 manches) ou classiques (trois toupies, 4 points), niveau de chaque
+  bot réglable.
+- **Atelier** pour assembler et enregistrer ses toupies.
+- **Paquets** Linux (AppImage), Windows (zip) et macOS (dmg) publiés par la CI.
+
+[1.1.0]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/valentinRyckaert/TOUPIES/releases/tag/v1.0.0
