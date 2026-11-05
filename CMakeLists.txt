@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(ToupieArena
-    VERSION 1.1.0
+    VERSION 1.2.0
     DESCRIPTION "Jeu de combat de toupies en 2D (C++/Qt)"
     LANGUAGES CXX)
 
