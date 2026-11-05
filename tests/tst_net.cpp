@@ -14,6 +14,7 @@
 #include <QJsonDocument>
 #include <QNetworkDatagram>
 #include <QTemporaryDir>
+#include <QThread>
 #include <QUdpSocket>
 
 #include <cmath>
@@ -48,6 +49,7 @@ private slots:
     void lobbyIsDiscoveredByName();
     void lobbyIsFoundByTcpScan();
     void hostAnswersDiscoveryQuery();
+    void scanSurvivesImmediateFailuresInThread();
     void localScanTargetsExcludeVirtualInterfaces();
     void stateCodecRoundTrip();
     void networkMatchRunsEndToEnd();
@@ -245,6 +247,24 @@ void TestNet::lobbyIsFoundByTcpScan()
 
     // La sonde n'occupe pas de place dans le lobby.
     QCOMPARE(server.lobby().players.size(), 1);
+}
+
+void TestNet::scanSurvivesImmediateFailuresInThread()
+{
+    // Des milliers de sondes qui échouent tout de suite, dans un fil à petite
+    // pile (comme sous macOS) : sans récursion, pas de débordement de pile.
+    QThread thread;
+    thread.setStackSize(512 * 1024);
+    auto *scanner = new LobbyScanner;
+    scanner->moveToThread(&thread);
+    QSignalSpy finished(scanner, &LobbyScanner::finished);
+    thread.start();
+    const QList<QHostAddress> hosts(3000, QHostAddress(QStringLiteral("255.255.255.255")));
+    QMetaObject::invokeMethod(scanner, [scanner, hosts] { scanner->scan(hosts); });
+    QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 20000);
+    thread.quit();
+    thread.wait();
+    delete scanner;
 }
 
 void TestNet::hostAnswersDiscoveryQuery()

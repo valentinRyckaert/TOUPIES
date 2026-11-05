@@ -11,7 +11,8 @@
 namespace toupie::net {
 
 namespace {
-constexpr int kConcurrency = 256;
+/// Sous la limite de fichiers ouverts par défaut de macOS (256).
+constexpr int kConcurrency = 128;
 constexpr int kProbeTimeoutMs = 350;
 constexpr int kMinPrefix = 20; ///< Au plus 4094 adresses par interface.
 
@@ -146,11 +147,8 @@ void LobbyScanner::cancel()
 
 void LobbyScanner::startNext()
 {
-    if (m_queue.isEmpty()) {
-        if (m_active.isEmpty())
-            emit finished();
+    if (m_queue.isEmpty())
         return;
-    }
     const auto [host, port] = m_queue.takeFirst();
     auto *socket = new QTcpSocket(this);
     m_active.append(socket);
@@ -199,7 +197,15 @@ void LobbyScanner::finishProbe(QTcpSocket *socket)
     socket->disconnect(this);
     socket->abort();
     socket->deleteLater();
-    startNext();
+    if (m_queue.isEmpty()) {
+        if (m_active.isEmpty())
+            emit finished();
+        return;
+    }
+    // Différé : une sonde qui échoue tout de suite (limite de fichiers ouverts,
+    // adresse refusée) rappellerait finishProbe en boucle et ferait déborder la
+    // pile, petite dans un fil secondaire (512 Ko sous macOS).
+    QMetaObject::invokeMethod(this, &LobbyScanner::startNext, Qt::QueuedConnection);
 }
 
 } // namespace toupie::net

@@ -65,6 +65,16 @@ jobs:
       - name: Tests
         run: ctest --test-dir build --timeout 300
 
+      - name: Pile d'appels en cas de plantage (macOS)
+        if: failure() && runner.os == 'macOS'
+        run: |
+          for t in build/tests/tst_*; do
+            [ -f "$t" ] && [ -x "$t" ] || continue
+            echo "::group::$t"
+            lldb --batch -o run -k "bt all" -k quit -- "$t" 2>&1 | tail -120
+            echo "::endgroup::"
+          done
+
       - name: Paquet Linux (AppImage)
         if: runner.os == 'Linux'
         env:
