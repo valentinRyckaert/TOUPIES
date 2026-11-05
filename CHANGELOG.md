@@ -4,7 +4,7 @@ Toutes les évolutions notables de Toupie Arena. Le format suit
 [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet respecte le
 [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [1.2.1] — 2026-11-05
 
 ### Corrections
 
@@ -95,7 +95,7 @@ Première version publique.
 - **Atelier** pour assembler et enregistrer ses toupies.
 - **Paquets** Linux (AppImage), Windows (zip) et macOS (dmg) publiés par la CI.
 
-[Non publié]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.2.0...HEAD
+[1.2.1]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/valentinRyckaert/TOUPIES/releases/tag/v1.0.0

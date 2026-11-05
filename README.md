@@ -367,7 +367,7 @@ distribution, dossier en lecture seule) propose d'ouvrir la page de télécharge
   reprennent la section du tag dans [`CHANGELOG.md`](CHANGELOG.md).
 
 ```sh
-git tag v1.2.0 && git push origin v1.2.0   # déclenche la publication
+git tag v1.2.1 && git push origin v1.2.1   # déclenche la publication
 ```
 
 Tests (`ctest`) :
