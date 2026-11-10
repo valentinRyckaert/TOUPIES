@@ -441,10 +441,12 @@ void chromaText(QPainter &p, const QRectF &r, int flags, const QString &text, co
                 const QColor &color, double offset)
 {
     p.setFont(font);
-    p.setPen(withAlpha(Theme::kMagenta, 0.75));
-    p.drawText(r.translated(-offset, 0), flags, text);
-    p.setPen(withAlpha(Theme::kCyan, 0.75));
-    p.drawText(r.translated(offset, offset * 0.4), flags, text);
+    if (offset > 0.0) { // 0 : texte net, sans les reflets magenta / cyan.
+        p.setPen(withAlpha(Theme::kMagenta, 0.75));
+        p.drawText(r.translated(-offset, 0), flags, text);
+        p.setPen(withAlpha(Theme::kCyan, 0.75));
+        p.drawText(r.translated(offset, offset * 0.4), flags, text);
+    }
     p.setPen(color);
     p.drawText(r, flags, text);
 }
@@ -1157,7 +1159,7 @@ void ArenaWidget::paintOverlay(QPainter &p)
             y -= 40;
         chromaText(p, QRectF(0, y, width(), 110), Qt::AlignCenter, title.toUpper(),
                    Theme::displayFont(std::min(96.0, width() / 9.0), true),
-                   winner == local ? QColor(Qt::white) : color, 6);
+                   winner == local ? QColor(Qt::white) : color, winner >= 0 && winner != local ? 0 : 6);
         y += 112;
         const QString reason = endReasonText(state.endReason, state.playerCount());
         if (!reason.isEmpty()) {
