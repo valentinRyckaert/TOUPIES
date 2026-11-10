@@ -211,9 +211,12 @@ void TestGui::builderSavesTopWithBolt()
     }
     QVERIFY(info);
     info->click();
-    auto *board = window.findChild<MovesBoard *>();
-    QVERIFY(board);
-    QTRY_VERIFY(board->isVisible());
+    auto *moves = qobject_cast<MovesPage *>(currentPage(window));
+    QVERIFY(moves);
+    QVERIFY(moves->findChild<MovesBoard *>());
+    emit moves->backRequested(); // Retour à l'atelier, toupie en cours conservée.
+    QCOMPARE(currentPage(window), builder);
+    QCOMPARE(name->text(), QStringLiteral("Test CI"));
 }
 
 void TestGui::lanLobbyStartsMatchWithHostRules()

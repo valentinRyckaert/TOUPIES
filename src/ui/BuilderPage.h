@@ -69,6 +69,8 @@ public:
 signals:
     void backRequested();
     void topsChanged();
+    /// Bouton d'info du coup spécial : la page des sept coups spéciaux.
+    void movesRequested();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;

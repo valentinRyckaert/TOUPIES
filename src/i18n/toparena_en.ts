@@ -1303,6 +1303,17 @@ Download and install it? The game will restart on the new version.</translation>
     </message>
 </context>
 <context>
+    <name>toupie::MovesPage</name>
+    <message>
+        <source>Retour</source>
+        <translation>Back</translation>
+    </message>
+    <message>
+        <source>Échap</source>
+        <translation>Esc</translation>
+    </message>
+</context>
+<context>
     <name>toupie::Part</name>
     <message>
         <source>Roue métallique</source>

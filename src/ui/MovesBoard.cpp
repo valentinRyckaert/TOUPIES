@@ -6,7 +6,11 @@
 #include "ui/TopPainter.h"
 #include "ui/Widgets.h"
 
-#include <QDialog>
+#include <QLabel>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QShortcut>
+#include <QVBoxLayout>
 #include <QPainter>
 #include <QPainterPath>
 
@@ -16,8 +20,9 @@ namespace toupie {
 
 namespace {
 constexpr double kTau = 2.0 * M_PI;
-// Contenu de la planche de la maquette (2400 × 1880), sans ses marges.
-const QRectF kContent(90, 80, 2220, 1750);
+// Une fiche de la maquette mesure 520 × 740 (unités de la planche).
+constexpr double kCardWidth = 560, kCardHeight = 740, kGap = 24;
+constexpr double kMinCardPixels = 500; // En dessous, une colonne de moins.
 
 /// Textes et jauges de la planche, à l'identique.
 struct MoveSheet
@@ -384,45 +389,70 @@ void paintSheet(QPainter &p, const MoveSheet &sheet, const QRectF &r)
 MovesBoard::MovesBoard(QWidget *parent)
     : QWidget(parent)
 {
-    setMinimumSize(720, 564);
 }
 
-QDialog *MovesBoard::createDialog(QWidget *parent)
+int MovesBoard::columns(int width)
 {
-    QDialog *dialog = createPopup(parent, tr("Coups spéciaux"), new MovesBoard);
-    if (parent)
-        dialog->resize(parent->window()->size() * 0.92);
-    return dialog;
+    return std::clamp(int((width + kGap) / (kMinCardPixels + kGap)), 1, 4);
+}
+
+int MovesBoard::heightForWidth(int width) const
+{
+    const int cols = columns(width);
+    const double card = (width - (cols - 1) * kGap) / cols;
+    const int rows = (int(std::size(kSheets)) + cols - 1) / cols;
+    return int(rows * card * kCardHeight / kCardWidth + (rows - 1) * kGap) + 2;
+}
+
+void MovesBoard::resizeEvent(QResizeEvent *)
+{
+    // La zone de défilement suit la hauteur que demandent les fiches à cette largeur.
+    setMinimumHeight(heightForWidth(width()));
 }
 
 void MovesBoard::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    Theme::paintBackground(p, rect());
-    // Coordonnées de la planche, mises à l'échelle de la fenêtre.
-    const double k = std::min(width() / kContent.width(), height() / kContent.height());
-    p.translate((width() - kContent.width() * k) / 2.0, (height() - kContent.height() * k) / 2.0);
-    p.scale(k, k);
-    p.translate(-kContent.topLeft());
-
-    Theme::paintSlashes(p, QPointF(120, 115), 16, Theme::kAccent);
-    p.setFont(display(15, 4.0));
-    p.setPen(Theme::kAccent);
-    p.drawText(QPointF(160, 130), tr("Coups spéciaux").toUpper());
-    p.setFont(display(54, 3.0));
-    p.setPen(Theme::kText);
-    p.drawText(QPointF(120, 188), tr("Sept signatures visuelles").toUpper());
-    p.setFont(body(21, QFont::Medium));
-    p.setPen(Theme::kMuted);
-    p.drawText(QPointF(120, 226), tr("Vague = projectile qui file vers l’adversaire le plus proche (esquivable). "
-                                     "Anneau = onde qui s’élargit autour du lanceur."));
-
+    const int cols = columns(width());
+    const double card = (width() - (cols - 1) * kGap) / cols, k = card / kCardWidth;
     for (int i = 0; i < int(std::size(kSheets)); ++i) {
-        const bool top = i < 4;
-        const QRectF r(120 + (top ? i * 545 : (i - 4) * 725), top ? 290 : 1060, top ? 520 : 700, 740);
-        paintSheet(p, kSheets[i], r);
+        p.save();
+        p.translate((i % cols) * (card + kGap), (i / cols) * (kCardHeight * k + kGap));
+        p.scale(k, k); // Coordonnées de la maquette, à l'échelle de la colonne.
+        paintSheet(p, kSheets[i], QRectF(0, 0, kCardWidth, kCardHeight));
+        p.restore();
     }
+}
+
+MovesPage::MovesPage(QWidget *parent)
+    : QWidget(parent)
+{
+    auto *root = new QVBoxLayout(this);
+    root->setSpacing(14);
+    auto *back = new QPushButton(tr("Retour"), this);
+    back->setProperty("variant", QStringLiteral("ghost"));
+    back->setProperty("glyph", QStringLiteral("back"));
+    back->setProperty("key", tr("Échap"));
+    root->addWidget(new TopBar(back, MovesBoard::tr("Coups spéciaux"), MovesBoard::tr("Sept signatures visuelles"), this));
+    auto *legend = new QLabel(MovesBoard::tr("Vague = projectile qui file vers l’adversaire le plus proche (esquivable). "
+                                             "Anneau = onde qui s’élargit autour du lanceur."),
+                              this);
+    legend->setObjectName(QStringLiteral("muted"));
+    legend->setFont(Theme::bodyFont(18, QFont::Medium));
+    legend->setWordWrap(true);
+    root->addWidget(legend);
+    auto *scroll = new QScrollArea(this);
+    scroll->setWidget(new MovesBoard(scroll));
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn); // Pas d'oscillation de la largeur.
+    scroll->setStyleSheet(QStringLiteral("QScrollArea, QScrollArea > QWidget > QWidget { background: transparent; }"));
+    root->addWidget(scroll, 1);
+    connect(back, &QPushButton::clicked, this, &MovesPage::backRequested);
+    connect(new QShortcut(QKeySequence(Qt::Key_Escape), this), &QShortcut::activated, this,
+            &MovesPage::backRequested);
 }
 
 } // namespace toupie

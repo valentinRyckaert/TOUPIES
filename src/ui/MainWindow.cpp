@@ -10,6 +10,7 @@
 #include "ui/HelpPage.h"
 #include "ui/LobbyPage.h"
 #include "ui/MenuPage.h"
+#include "ui/MovesBoard.h"
 #include "ui/SettingsPage.h"
 #include "ui/SetupPage.h"
 #include "ui/TournamentPage.h"
@@ -80,12 +81,14 @@ MainWindow::MainWindow(QWidget *parent)
     m_tournamentPage = new TournamentPage(m_stack);
     m_settingsPage = new SettingsPage(m_stack);
     m_helpPage = new HelpPage(m_stack);
+    m_movesPage = new MovesPage(m_stack);
     for (QWidget *page : {static_cast<QWidget *>(m_menu), static_cast<QWidget *>(m_builder),
                           static_cast<QWidget *>(m_setup), static_cast<QWidget *>(m_battle),
                           static_cast<QWidget *>(m_lanMenu), static_cast<QWidget *>(m_lobby),
                           static_cast<QWidget *>(m_tournamentSetup),
                           static_cast<QWidget *>(m_tournamentPage),
-                          static_cast<QWidget *>(m_settingsPage), static_cast<QWidget *>(m_helpPage)})
+                          static_cast<QWidget *>(m_settingsPage), static_cast<QWidget *>(m_helpPage),
+                          static_cast<QWidget *>(m_movesPage)})
         m_stack->addWidget(page);
     setCentralWidget(backdrop);
 
@@ -127,6 +130,9 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_helpPage, &HelpPage::backRequested, this, &MainWindow::showMenu);
     connect(m_builder, &BuilderPage::backRequested, this, &MainWindow::showMenu);
+    connect(m_builder, &BuilderPage::movesRequested, this, [this] { showPage(m_movesPage); });
+    // Retour à l'atelier tel qu'on l'a laissé (sans le recharger).
+    connect(m_movesPage, &MovesPage::backRequested, this, [this] { showPage(m_builder); });
     connect(m_builder, &BuilderPage::topsChanged, m_setup, &SetupPage::refresh);
     connect(m_builder, &BuilderPage::topsChanged, m_lobby, &LobbyPage::refreshTops);
 

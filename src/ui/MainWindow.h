@@ -16,6 +16,7 @@ class BuilderPage;
 class LanMenuPage;
 class LobbyPage;
 class MenuPage;
+class MovesPage;
 class HelpPage;
 class SettingsPage;
 class SetupPage;
@@ -65,6 +66,7 @@ private:
     TournamentSetupPage *m_tournamentSetup = nullptr;
     SettingsPage *m_settingsPage = nullptr;
     HelpPage *m_helpPage = nullptr;
+    MovesPage *m_movesPage = nullptr;
     TournamentPage *m_tournamentPage = nullptr;
     std::unique_ptr<net::TournamentDirector> m_soloTournament;
     QPointer<net::TournamentController> m_tournament;

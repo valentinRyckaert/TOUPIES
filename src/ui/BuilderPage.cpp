@@ -4,11 +4,9 @@
 #include "core/PartCatalog.h"
 #include "core/TopRepository.h"
 #include "game/SpecialMove.h"
-#include "ui/MovesBoard.h"
 #include "ui/TopPainter.h"
 #include "ui/Widgets.h"
 
-#include <QDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -395,12 +393,9 @@ public:
         m_info->setToolTip(BuilderPage::tr("Tous les coups spéciaux"));
         m_info->setAccessibleName(BuilderPage::tr("Tous les coups spéciaux"));
         m_info->setFixedSize(36, 32);
-        connect(m_info, &QPushButton::clicked, this, [this] {
-            QDialog *dialog = MovesBoard::createDialog(this);
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            dialog->open();
-        });
     }
+
+    QPushButton *infoButton() const { return m_info; }
 
     void setTop(const Top &top)
     {
@@ -706,6 +701,8 @@ BuilderPage::BuilderPage(const PartCatalog &catalog, TopRepository &repository, 
     rule->setStyleSheet(QStringLiteral("background-color: %1;").arg(Theme::kBorder.name()));
     bench->addWidget(rule);
     m_spin = new SpinPreview(m_benchBox);
+    connect(static_cast<SpinPreview *>(m_spin)->infoButton(), &QPushButton::clicked, this,
+            &BuilderPage::movesRequested);
     bench->addWidget(m_spin);
     body->addWidget(m_benchBox, 86);
 
