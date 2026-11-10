@@ -300,6 +300,8 @@ void PartSlot::openList()
         setIndex(chosen->data().toInt());
 }
 
+namespace {
+
 // --- Établi : vue éclatée reliée aux quatre cartes ------------------------------
 
 class Workbench : public QWidget
@@ -584,6 +586,8 @@ protected:
 private:
     Top m_top;
 };
+
+} // namespace
 
 // --- Page ---------------------------------------------------------------------------
 

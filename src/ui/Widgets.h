@@ -44,12 +44,21 @@ public:
     void setTitle(const QString &title);
     void setSubtitle(const QString &subtitle);
     QHBoxLayout *row() const { return m_row; }
+    /// Élément facultatif à droite (puce…), masqué quand la place manque.
+    void addOptional(QWidget *widget);
+
+    QSize minimumSizeHint() const override;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+    bool event(QEvent *event) override;
 
 private:
+    void fitOptional();
+
     QHBoxLayout *m_row = nullptr;
+    QList<QWidget *> m_optional;
     QLabel *m_title = nullptr;
     QLabel *m_subtitle = nullptr;
 };

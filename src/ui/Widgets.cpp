@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
@@ -73,6 +74,54 @@ void TopBar::setTitle(const QString &title)
 void TopBar::setSubtitle(const QString &subtitle)
 {
     m_subtitle->setText(subtitle);
+}
+
+void TopBar::addOptional(QWidget *widget)
+{
+    widget->setParent(this);
+    m_row->addWidget(widget);
+    m_optional.append(widget);
+}
+
+QSize TopBar::minimumSizeHint() const
+{
+    // Sans les éléments facultatifs : ils ne doivent pas élargir la fenêtre.
+    QSize s = QWidget::minimumSizeHint();
+    for (const QWidget *w : m_optional) {
+        if (w->isVisibleTo(this))
+            s.rwidth() -= w->sizeHint().width() + m_row->spacing();
+    }
+    return s;
+}
+
+void TopBar::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    fitOptional();
+}
+
+bool TopBar::event(QEvent *event)
+{
+    // Titre ou puce modifiés : la place disponible change.
+    if (event->type() == QEvent::LayoutRequest)
+        fitOptional();
+    return QWidget::event(event);
+}
+
+void TopBar::fitOptional()
+{
+    int needed = QWidget::minimumSizeHint().width();
+    for (QWidget *w : m_optional) {
+        if (!w->isVisibleTo(this))
+            needed += w->sizeHint().width() + m_row->spacing();
+    }
+    // Les premiers éléments disparaissent d'abord (les derniers sont les plus utiles).
+    for (QWidget *w : m_optional) {
+        const bool fits = needed <= width();
+        if (!fits)
+            needed -= w->sizeHint().width() + m_row->spacing();
+        w->setVisible(fits);
+    }
 }
 
 void TopBar::paintEvent(QPaintEvent *)

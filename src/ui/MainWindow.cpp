@@ -244,6 +244,9 @@ void MainWindow::setupTournaments()
             m_soloTournament.reset();
             showMenu();
         } else {
+            if (QMessageBox::question(this, tr("Quitter le tournoi"), tr("Quitter le tournoi en réseau ?"))
+                != QMessageBox::Yes)
+                return;
             leaveLobby();
         }
     });
