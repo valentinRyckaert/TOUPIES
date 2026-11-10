@@ -321,8 +321,13 @@ void paintBolt(QPainter &p, const Top &top, double R, double rot)
     p.setBrush(core);
     p.setPen(QPen(col, std::max(0.6, R * 0.05)));
     p.drawEllipse(QPointF(0, 0), R * 0.8, R * 0.8);
-    if (R >= 6.0)
+    if (R >= 6.0) {
+        // L'emblème tourne avec la toupie (seul le reflet, plus bas, reste fixe).
+        p.save();
+        p.rotate(qRadiansToDegrees(rot));
         paintEmblem(p, top.special(), QPointF(0, 0), R * 0.5, Qt::white, std::max(0.8, R * 0.08));
+        p.restore();
+    }
     p.setPen(Qt::NoPen);
     p.setBrush(QColor(255, 255, 255, 90));
     p.save();
