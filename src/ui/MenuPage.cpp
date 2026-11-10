@@ -1,10 +1,15 @@
 #include "ui/MenuPage.h"
 
 #include "core/PartCatalog.h"
+#include "game/Battle.h"
+#include "game/BotController.h"
+#include "game/Stadium.h"
+#include "ui/StadiumPainter.h"
 #include "ui/Theme.h"
 #include "ui/TopPainter.h"
 
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
@@ -13,6 +18,9 @@
 #include <QVBoxLayout>
 
 #include <cmath>
+#include <memory>
+#include <random>
+#include <vector>
 #include <QtMath>
 
 namespace toupie {
@@ -85,101 +93,142 @@ protected:
     }
 };
 
-/// Héros animé : une toupie en vedette, ses orbites et deux rivales qui tournent autour.
-class HeroWidget : public QWidget
+/// Démonstration en fond de menu : un vrai combat entre deux bots (toupies et
+/// stadium tirés au hasard) ; dès qu'il se termine, un autre commence.
+/// La simulation ne tourne que menu affiché, et le stadium est mis en cache :
+/// chaque image ne redessine que deux toupies et leurs coups spéciaux.
+class BotDemo : public QWidget
 {
 public:
-    explicit HeroWidget(QWidget *parent)
+    explicit BotDemo(QWidget *parent)
         : QWidget(parent)
-        , m_tops(PartCatalog::instance().presets())
+        , m_rng(std::random_device{}())
     {
         setMinimumSize(360, 360);
-        m_timer = startTimer(16);
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        restart();
     }
 
 protected:
+    void showEvent(QShowEvent *) override
+    {
+        m_clock.start();
+        if (!m_timer)
+            m_timer = startTimer(16);
+    }
+
+    void hideEvent(QHideEvent *) override
+    {
+        killTimer(m_timer);
+        m_timer = 0;
+    }
+
+    void resizeEvent(QResizeEvent *) override { m_cache = QPixmap(); }
+
     void timerEvent(QTimerEvent *event) override
     {
-        if (event->timerId() == m_timer) {
-            m_time += 0.016;
-            update();
+        if (event->timerId() != m_timer)
+            return;
+        const double dt = std::min(0.05, m_clock.restart() / 1000.0);
+        if (m_battle->isFinished()) {
+            m_pause -= dt;
+            if (m_pause <= 0.0)
+                restart();
+        } else {
+            for (BotController &bot : m_bots)
+                bot.update(*m_battle, dt);
+            m_battle->advance(dt);
+            if (m_battle->isFinished())
+                m_pause = 1.5; // Le temps de voir qui a gagné.
+            else if (m_battle->elapsed() > 60.0)
+                restart(); // Deux toupies d'endurance : on passe au combat suivant.
         }
+        update();
     }
 
     void paintEvent(QPaintEvent *) override
     {
-        if (m_tops.size() < 3)
-            return;
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
-        const double R = std::min(width(), height()) * 0.28;
-        const QPointF c(width() / 2.0, height() * 0.46);
+        const QPointF c(width() / 2.0, height() / 2.0);
+        const double k = scale();
+        if (m_cache.size() != size() * devicePixelRatioF()) {
+            m_cache = QPixmap(size() * devicePixelRatioF());
+            m_cache.setDevicePixelRatio(devicePixelRatioF());
+            m_cache.fill(Qt::transparent);
+            QPainter cache(&m_cache);
+            cache.setRenderHint(QPainter::Antialiasing);
+            StadiumPainter::paint(cache, m_battle->stadium(), m_battle->geometry(), c, k);
+        }
+        p.drawPixmap(0, 0, m_cache);
+        auto toScreen = [&](Vec2 v) { return c + QPointF(v.x, v.y) * k; };
 
-        // Sol lumineux et orbites.
-        QRadialGradient ground(c + QPointF(0, R * 1.25), R * 1.6);
-        QColor cyan = Theme::kCyan;
-        cyan.setAlpha(70);
-        ground.setColorAt(0.0, cyan);
-        cyan.setAlpha(0);
-        ground.setColorAt(1.0, cyan);
-        p.setPen(Qt::NoPen);
-        p.setBrush(ground);
-        p.drawEllipse(c + QPointF(0, R * 1.25), R * 1.6, R * 0.32);
-        p.setBrush(Qt::NoBrush);
-        p.setPen(QPen(Theme::kCyan, 2.0));
-        p.drawEllipse(c + QPointF(0, R * 1.25), R * 1.25, R * 0.18);
-        QPen dashed(Theme::kViolet, 1.5);
-        dashed.setDashPattern({3, 7});
-        p.setPen(dashed);
-        p.drawEllipse(c + QPointF(0, R * 1.25), R * 1.6, R * 0.25);
-        QLinearGradient ring(c - QPointF(R, R), c + QPointF(R, R));
-        ring.setColorAt(0.0, Theme::kCyan);
-        ring.setColorAt(0.5, Theme::kViolet);
-        ring.setColorAt(1.0, Theme::kAccent);
-        p.setPen(QPen(QBrush(ring), 1.5));
-        p.setOpacity(0.55);
-        p.drawEllipse(c, R * 1.42, R * 1.42);
+        for (const Projectile &shot : m_battle->projectiles()) {
+            QColor color = QColor::fromRgb(shot.color);
+            if (shot.ring) {
+                const double r = shot.radius * k;
+                color.setAlphaF(0.85 * (1.0 - shot.traveled / std::max(0.01, shot.range)));
+                p.setPen(QPen(color, std::max(2.0, shot.width * k)));
+                p.setBrush(Qt::NoBrush);
+                p.drawEllipse(toScreen(shot.origin), r, r);
+            } else {
+                const QPointF at = toScreen(shot.position);
+                QRadialGradient glow(at, shot.width * k * 3);
+                glow.setColorAt(0.0, color);
+                color.setAlpha(0);
+                glow.setColorAt(1.0, color);
+                p.setPen(Qt::NoPen);
+                p.setBrush(glow);
+                p.drawEllipse(at, shot.width * k * 3, shot.width * k * 3);
+            }
+        }
+        const double radius = m_battle->config().topRadius * k;
+        for (const Spinner &s : m_battle->spinners()) {
+            if (s.status == Spinner::Status::RingOut && m_battle->isFinished())
+                continue; // Éjectée : sortie du stadium.
+            p.setOpacity(s.isActive() ? 1.0 : 0.5);
+            TopPainter::paint(p, s.top, toScreen(s.position), radius, s.angle, s.isDashing() || s.isBoosted() ? 1.0 : 0.0);
+        }
         p.setOpacity(1.0);
-        QPen sweep(Theme::kAccent, 3.0, Qt::SolidLine, Qt::RoundCap);
-        p.setPen(sweep);
-        p.drawArc(QRectF(c.x() - R * 1.62, c.y() - R * 1.62, R * 3.24, R * 3.24),
-                  int(-m_time * 40 * 16) % (360 * 16), 60 * 16);
-
-        // Rivales en orbite (perspective).
-        for (int i = 0; i < 2; ++i) {
-            const double a = m_time * (0.5 + 0.2 * i) + i * M_PI;
-            const QPointF pos = c + QPointF(std::cos(a) * R * 1.4, std::sin(a) * R * 0.95);
-            const double size = R * (0.2 + 0.06 * std::sin(a));
-            TopPainter::paint(p, m_tops.at(1 + i), pos, size, m_time * (i ? -8.0 : 8.0));
-        }
-
-        // Toupie vedette et arcs de vitesse.
-        const Top &hero = m_tops.first();
-        const QColor type = TopPainter::typeColor(hero.type());
-        for (int i = 0; i < 3; ++i) {
-            QColor arc = type;
-            arc.setAlpha(200);
-            p.setPen(QPen(arc, std::max(2.0, R * 0.035), Qt::SolidLine, Qt::RoundCap));
-            const double start = -m_time * 300 + i * 120;
-            p.drawArc(QRectF(c.x() - R * 1.14, c.y() - R * 1.14, R * 2.28, R * 2.28),
-                      int(start * 16), 80 * 16);
-        }
-        QRadialGradient halo(c, R * 1.45);
-        QColor glow = type;
-        glow.setAlpha(90);
-        halo.setColorAt(0.5, glow);
-        glow.setAlpha(0);
-        halo.setColorAt(1.0, glow);
-        p.setPen(Qt::NoPen);
-        p.setBrush(halo);
-        p.drawEllipse(c, R * 1.45, R * 1.45);
-        TopPainter::paint(p, hero, c, R, m_time * spinSign(hero.spin()) * 7.0);
     }
 
 private:
-    QList<Top> m_tops;
+    double scale() const
+    {
+        // Même échelle quel que soit le stadium (ils ont tous la même surface).
+        double largest = 1.0;
+        for (const Stadium &stadium : Stadium::all())
+            largest = std::max(largest, stadium.size);
+        const double base = m_battle->config().stadiumRadius / std::max(0.1, m_battle->stadium().size);
+        return std::min(width(), height()) / 2.0 * 0.9 / (base * largest);
+    }
+
+    void restart()
+    {
+        const QList<Top> tops = PartCatalog::instance().presets();
+        const QList<Stadium> &stadiums = Stadium::all();
+        std::uniform_int_distribution<qsizetype> pickTop(0, tops.size() - 1), pickStadium(0, stadiums.size() - 1);
+        const qsizetype a = pickTop(m_rng);
+        qsizetype b = pickTop(m_rng);
+        if (b == a)
+            b = (a + 1) % tops.size();
+        const Stadium &stadium = stadiums.at(pickStadium(m_rng));
+        m_battle = std::make_unique<Battle>(QList<Top>{tops.at(a), tops.at(b)}, stadium, stadium.apply(BattleConfig{}),
+                                            static_cast<std::uint32_t>(m_rng()));
+        m_bots = {BotController(0, Difficulty::Hard, static_cast<std::uint32_t>(m_rng())),
+                  BotController(1, Difficulty::Hard, static_cast<std::uint32_t>(m_rng()))};
+        m_battle->launch({m_bots[0].chooseLaunchAngle(*m_battle), m_bots[1].chooseLaunchAngle(*m_battle)},
+                         {m_bots[0].chooseLaunchPower(*m_battle), m_bots[1].chooseLaunchPower(*m_battle)});
+        m_cache = QPixmap();
+    }
+
+    std::mt19937 m_rng;
+    std::unique_ptr<Battle> m_battle;
+    std::vector<BotController> m_bots;
+    QPixmap m_cache;
+    QElapsedTimer m_clock;
+    double m_pause = 0.0;
     int m_timer = 0;
-    double m_time = 0.0;
 };
 
 } // namespace
@@ -192,7 +241,7 @@ MenuPage::MenuPage(QWidget *parent)
     auto *column = new QVBoxLayout;
     column->setSpacing(12);
     root->addLayout(column, 0);
-    root->addWidget(new HeroWidget(this), 1);
+    root->addWidget(new BotDemo(this), 1);
 
     column->addStretch(1);
     column->addWidget(new LogoWidget(this));
