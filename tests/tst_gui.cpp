@@ -14,6 +14,7 @@
 #include "ui/LobbyPage.h"
 #include "ui/MainWindow.h"
 #include "ui/MenuPage.h"
+#include "ui/MovesBoard.h"
 #include "ui/RulesWidget.h"
 #include "ui/SetupPage.h"
 #include "ui/Theme.h"
@@ -201,6 +202,18 @@ void TestGui::builderSavesTopWithBolt()
     const Top &saved = repository.customTops().first();
     QCOMPARE(saved.bolt().id, PartCatalog::instance().parts(PartKind::Bolt).at(3).id);
     QCOMPARE(saved.wheel().id, PartCatalog::instance().parts(PartKind::Wheel).last().id);
+
+    // Bouton d'info du coup spécial : la planche des sept coups s'ouvre.
+    QPushButton *info = nullptr;
+    for (QPushButton *button : builder->findChildren<QPushButton *>()) {
+        if (button->property("glyph").toString() == QLatin1String("info"))
+            info = button;
+    }
+    QVERIFY(info);
+    info->click();
+    auto *board = window.findChild<MovesBoard *>();
+    QVERIFY(board);
+    QTRY_VERIFY(board->isVisible());
 }
 
 void TestGui::lanLobbyStartsMatchWithHostRules()

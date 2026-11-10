@@ -84,6 +84,8 @@ add_library(toupie_ui STATIC
     ui/ArenaWidget.cpp
     ui/MenuPage.h
     ui/MenuPage.cpp
+    ui/MovesBoard.h
+    ui/MovesBoard.cpp
     ui/BuilderPage.h
     ui/BuilderPage.cpp
     ui/SetupPage.h

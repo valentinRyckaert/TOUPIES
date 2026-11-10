@@ -495,7 +495,8 @@ private:
         if (!iconName.isEmpty()) {
             const int size = isMenuButton(w) ? 20 : 16;
             const int textWidth = QFontMetrics(font).horizontalAdvance(text);
-            const int x = isMenuButton(w) ? textLeft : r.center().x() - (size + 10 + textWidth) / 2;
+            const int gap = text.isEmpty() ? 0 : 10; // Bouton sans texte : icône centrée.
+            const int x = isMenuButton(w) ? textLeft : r.center().x() - (size + gap + textWidth) / 2;
             const QColor iconColor = v == Variant::Primary ? color : hover ? kAccent : kCyan;
             paintIcon(*p, iconName, QRectF(x, r.center().y() - size / 2.0, size, size),
                       enabled ? iconColor : color);
@@ -967,6 +968,10 @@ QPainterPath iconPath(const QString &name)
         p.addEllipse(QPointF(12, 13.5), 7.5, 7.5);
         poly({{12, 9.5}, {12, 13.5}, {14.5, 15}});
         poly({{9.5, 2.5}, {14.5, 2.5}});
+    } else if (name == QLatin1String("info")) {
+        p.addEllipse(QPointF(12, 12), 9, 9);
+        poly({{12, 11}, {12, 17}});
+        poly({{12, 7}, {12, 8}});
     } else if (name == QLatin1String("plus")) {
         poly({{12, 5}, {12, 19}});
         poly({{5, 12}, {19, 12}});

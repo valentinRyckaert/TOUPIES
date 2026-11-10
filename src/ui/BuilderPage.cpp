@@ -4,9 +4,11 @@
 #include "core/PartCatalog.h"
 #include "core/TopRepository.h"
 #include "game/SpecialMove.h"
+#include "ui/MovesBoard.h"
 #include "ui/TopPainter.h"
 #include "ui/Widgets.h"
 
+#include <QDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -386,6 +388,18 @@ public:
         setMinimumSize(420, 120);
         setMaximumHeight(250);
         m_timer = startTimer(16);
+        // Bouton d'info à droite du titre : la planche de tous les coups spéciaux.
+        m_info = new QPushButton(this);
+        m_info->setProperty("variant", QStringLiteral("ghost"));
+        m_info->setProperty("glyph", QStringLiteral("info"));
+        m_info->setToolTip(BuilderPage::tr("Tous les coups spéciaux"));
+        m_info->setAccessibleName(BuilderPage::tr("Tous les coups spéciaux"));
+        m_info->setFixedSize(36, 32);
+        connect(m_info, &QPushButton::clicked, this, [this] {
+            QDialog *dialog = MovesBoard::createDialog(this);
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            dialog->open();
+        });
     }
 
     void setTop(const Top &top)
@@ -399,6 +413,7 @@ public:
     {
         m_title = title;
         m_body = body;
+        placeInfo();
         update();
     }
 
@@ -413,6 +428,32 @@ public:
     QSize sizeHint() const override { return {780, 250}; }
 
 protected:
+    void resizeEvent(QResizeEvent *) override { placeInfo(); }
+
+    /// Zone de texte à droite de la toupie.
+    QRectF textRect() const
+    {
+        const double R = std::min({110.0, height() / 2.0 / 1.2, width() * 0.18});
+        return {R * 2.6 + 24, 8, width() - R * 2.6 - 24, height() - 16.0};
+    }
+
+    /// Titre en gras, sur la largeur laissée libre par le bouton d'info.
+    QRectF titleRect() const
+    {
+        const QRectF text = textRect();
+        return QFontMetrics(Theme::bodyFont(19, QFont::Bold))
+            .boundingRect(QRectF(text.left(), text.top(), text.width() - m_info->width() - 8, text.height()).toRect(),
+                          Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, m_title);
+    }
+
+    /// Le bouton d'info suit la fin du titre (« Coup spécial — … ⓘ »).
+    void placeInfo()
+    {
+        const QRectF title = titleRect();
+        m_info->move(int(std::min(title.right() + 10, width() - double(m_info->width()))),
+                     int(title.bottom() - QFontMetrics(Theme::bodyFont(19, QFont::Bold)).height() / 2.0 - m_info->height() / 2.0));
+    }
+
     void timerEvent(QTimerEvent *event) override
     {
         if (event->timerId() != m_timer || !isVisible())
@@ -445,7 +486,7 @@ protected:
         }
         TopPainter::paint(p, m_top, c, R, m_angle);
 
-        const QRectF text(c.x() + R * 1.3 + 24, 8, width() - c.x() - R * 1.3 - 24, height() - 16);
+        const QRectF text = textRect();
         const QFont bold = Theme::bodyFont(19, QFont::Bold), body = Theme::bodyFont(19, QFont::Medium);
         const QFont status = Theme::bodyFont(18, QFont::Bold);
         const QFontMetrics boldMetrics(bold), bodyMetrics(body);
@@ -454,7 +495,7 @@ protected:
         double y = text.top();
         p.setFont(bold);
         p.setPen(Theme::kText);
-        QRectF r = boldMetrics.boundingRect(QRectF(text.left(), y, text.width(), text.height()).toRect(), flags, m_title);
+        const QRectF r = titleRect();
         p.drawText(r, flags, m_title);
         y = r.bottom() + 4;
         p.setFont(body);
@@ -472,6 +513,7 @@ protected:
     }
 
 private:
+    QPushButton *m_info = nullptr;
     QString m_title;
     QString m_body;
     QString m_status;
