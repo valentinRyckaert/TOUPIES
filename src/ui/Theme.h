@@ -64,7 +64,7 @@ void paintTag(QPainter &painter, const QRectF &rect, const QString &text, const 
 void paintStatBar(QPainter &painter, const QRectF &rect, const QString &label, int value,
                   int segments, const QColor &color);
 /// Icône vectorielle de la charte (grille 24 × 24, à tracer) : play, lan, trophy, build,
-/// tuto, gear, help, update, quit, back, next, timer, plus, trash, save, sliders, check, lock, user.
+/// tuto, gear, help, update, quit, back, next, dash, timer, plus, trash, save, sliders, check, lock, user.
 /// Un bouton l'affiche si sa propriété « glyph » porte ce nom.
 QPainterPath iconPath(const QString &name);
 void paintIcon(QPainter &painter, const QString &name, const QRectF &rect, const QColor &color);

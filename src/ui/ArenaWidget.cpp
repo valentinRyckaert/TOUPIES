@@ -22,7 +22,7 @@ namespace toupie {
 
 namespace {
 constexpr double kTopBar = 56.0;      ///< Bandeau du haut : chrono, manche, stadium.
-constexpr double kBottomHud = 122.0; ///< Fiches des toupies en bas.
+constexpr double kBottomHud = 140.0; ///< Fiches des toupies en bas.
 constexpr int kTrailLength = 36;
 constexpr double kSparkLifetime = 0.4;
 constexpr double kAimStep = qDegreesToRadians(3.0);
@@ -295,6 +295,10 @@ void ArenaWidget::mouseMoveEvent(QMouseEvent *event)
 void ArenaWidget::mousePressEvent(QMouseEvent *event)
 {
     setFocus();
+    if (event->button() == Qt::LeftButton && m_specialRect.contains(event->position())) {
+        trySpecial(); // La carte du coup spécial, pas un dash.
+        return;
+    }
     const int code = Controls::mouseCode(event->button());
     const Controls &controls = Controls::instance();
     // Lancer à la souris : on vise d'abord là où se trouve le curseur.
@@ -878,129 +882,234 @@ void ArenaWidget::paintSpinners(QPainter &p)
     }
 }
 
+void ArenaWidget::setCaption(const QString &caption)
+{
+    m_caption = caption;
+    update();
+}
+
 void ArenaWidget::paintHud(QPainter &p)
 {
     const MatchState &state = m_session->state();
     const int count = std::max(1, state.playerCount());
     const double margin = 12.0;
+    auto spaced = [](QFont f, double spacing) {
+        f.setLetterSpacing(QFont::AbsoluteSpacing, spacing);
+        return f;
+    };
 
-    // Bandeau du haut : stadium à gauche, chrono et manche au centre.
+    // En haut à droite : stadium, nom de code et limite de temps (à gauche : boutons de la page).
     const QColor accent = QColor::fromRgb(state.stadium.accent);
-    QFont name = Theme::displayFont(18);
-    name.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
-    p.setFont(name);
+    p.setFont(spaced(Theme::displayFont(18), 2.0));
     p.setPen(Theme::kText);
-    const QString stadiumName = state.stadium.name.toUpper();
-    p.drawText(QRectF(margin + 4, 6, 400, 26), Qt::AlignLeft | Qt::AlignVCenter, stadiumName);
-    QFont code = Theme::displayFont(12);
-    code.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
-    p.setFont(code);
+    p.drawText(QRectF(width() - margin - 420, 8, 420, 24), Qt::AlignRight | Qt::AlignVCenter,
+               state.stadium.name.toUpper());
+    p.setFont(Theme::bodyFont(15, QFont::Bold));
     p.setPen(accent);
-    p.drawText(QRectF(margin + 4, 30, 400, 18), Qt::AlignLeft | Qt::AlignVCenter,
-               QStringLiteral("// %1").arg(state.stadium.codename.toUpper()));
+    p.drawText(QRectF(width() - margin - 420, 32, 420, 20), Qt::AlignRight | Qt::AlignVCenter,
+               QStringLiteral("%1 · %2").arg(state.stadium.codename.toUpper(),
+                                             state.config.maxDuration > 0.0
+                                                 ? tr("Limite %1 s").arg(qRound(state.config.maxDuration))
+                                                 : tr("Sans limite de temps").toLower()));
 
-    const QRectF tab(width() / 2.0 - 150, 2, 300, kTopBar - 6);
+    // Onglet central : manche et score (ou chrono), puis la légende de la page.
+    const QRectF tab(width() / 2.0 - 160, 2, 320, kTopBar - 6);
     p.fillPath(Theme::chamfer(tab, 0, 0, 16, 16), withAlpha(Theme::kPanel, 0.92));
     p.setPen(QPen(Theme::kBorderBright, 1.2));
     p.setBrush(Qt::NoBrush);
     p.drawPath(Theme::chamfer(tab, 0, 0, 16, 16));
-    // Avec une limite : compte à rebours ; sans limite : temps écoulé.
-    QString timer;
+    QString heading = state.series ? tr("Manche %1").arg(state.series->rounds + 1)
+                    : count > 2    ? tr("Mêlée à %1").arg(count)
+                                   : tr("Combat");
     if (state.config.maxDuration > 0.0) {
-        timer = QString::number(static_cast<int>(
+        heading += QStringLiteral(" · %1 s").arg(static_cast<int>(
             std::ceil(std::max(0.0, state.config.maxDuration - state.elapsed))));
+    }
+    p.setFont(spaced(Theme::displayFont(13), 2.5));
+    p.setPen(Theme::kMuted);
+    p.drawText(QRectF(tab.left(), tab.top() + 3, tab.width(), 18), Qt::AlignCenter, heading.toUpper());
+    p.setFont(Theme::displayFont(24));
+    const QRectF line(tab.left(), tab.top() + 20, tab.width(), 28);
+    if (state.series) {
+        p.setPen(slotColor(0));
+        p.drawText(line.adjusted(0, 0, -tab.width() / 2 - 30, 0), Qt::AlignRight | Qt::AlignVCenter,
+                   QString::number(state.series->score[0]));
+        p.setPen(Theme::kDim);
+        p.drawText(line, Qt::AlignCenter, QStringLiteral("–"));
+        p.setPen(slotColor(1));
+        p.drawText(line.adjusted(tab.width() / 2 + 30, 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter,
+                   QString::number(state.series->score[1]));
     } else {
         const int seconds = static_cast<int>(state.elapsed);
-        timer = QStringLiteral("%1:%2").arg(seconds / 60).arg(seconds % 60, 2, 10, QLatin1Char('0'));
+        p.setPen(Theme::kText);
+        p.drawText(line, Qt::AlignCenter,
+                   QStringLiteral("%1:%2").arg(seconds / 60).arg(seconds % 60, 2, 10, QLatin1Char('0')));
     }
-    p.setFont(Theme::displayFont(24));
-    p.setPen(Theme::kText);
-    p.drawText(QRectF(tab.left(), tab.top() + 2, tab.width(), 30), Qt::AlignCenter, timer);
-    QString line;
-    if (state.series)
-        line = tr("Manche %1 · %2 – %3")
-                   .arg(state.series->rounds + 1)
-                   .arg(state.series->score[0])
-                   .arg(state.series->score[1]);
-    else if (count > 2)
-        line = tr("Mêlée à %1").arg(count);
-    if (!line.isEmpty()) {
-        QFont small = Theme::displayFont(12);
-        small.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
-        p.setFont(small);
-        p.setPen(state.series ? Theme::kAccent : Theme::kMuted);
-        p.drawText(QRectF(tab.left(), tab.top() + 31, tab.width(), 16), Qt::AlignCenter, line.toUpper());
+    if (!m_caption.isEmpty()) {
+        p.setFont(Theme::bodyFont(15, QFont::DemiBold));
+        p.setPen(Theme::kMuted);
+        p.drawText(QRectF(0, tab.bottom() + 2, width(), 20), Qt::AlignCenter, m_caption);
     }
-    p.setFont(Theme::bodyFont(14, QFont::Bold));
-    p.setPen(Theme::kMuted);
-    p.drawText(QRectF(width() - margin - 300, 6, 300, 40), Qt::AlignRight | Qt::AlignVCenter,
-               state.config.maxDuration > 0.0 ? tr("Limite %1 s").arg(qRound(state.config.maxDuration))
-                                              : tr("Sans limite de temps"));
 
-    // Fiches des toupies en bas.
+    // Fiches des toupies en bas ; en duel, le coup spécial se place entre les deux.
     const double cardHeight = kBottomHud - 12;
     const double top = height() - kBottomHud + 4;
+    const int local = m_session->localPlayer();
+    const bool special = state.config.specialsEnabled && local >= 0 && local < count;
+    const double duelCard = std::min(600.0, (width() - 4 * margin) * 0.34);
+    const bool between = count <= 2 && duelCard >= 340.0;
+    m_specialRect = {};
+    QRectF localCard;
     if (count <= 2) {
-        const double cardWidth = std::min(430.0, (width() - 3 * margin) / 2.0);
-        paintSpinnerHud(p, 0, QRectF(margin, top, cardWidth, cardHeight));
+        const double cardWidth = between ? duelCard : std::min(430.0, (width() - 3 * margin) / 2.0);
+        const QRectF left(margin, top, cardWidth, cardHeight);
+        paintSpinnerHud(p, 0, left, false);
+        const QRectF right(width() - margin - cardWidth, top, cardWidth, cardHeight);
         if (count == 2)
-            paintSpinnerHud(p, 1, QRectF(width() - margin - cardWidth, top, cardWidth, cardHeight));
+            paintSpinnerHud(p, 1, right, true);
+        localCard = local == 1 ? right : left;
+        if (special && between) {
+            const double w = std::min(500.0, right.left() - left.right() - 2 * margin);
+            m_specialRect = QRectF(width() / 2.0 - w / 2.0, top + cardHeight - 72, w, 72);
+        }
     } else {
         const double cardWidth = (width() - (count + 1) * margin) / count;
-        for (int i = 0; i < count; ++i)
-            paintSpinnerHud(p, i, QRectF(margin + i * (cardWidth + margin), top, cardWidth, cardHeight));
+        for (int i = 0; i < count; ++i) {
+            const QRectF card(margin + i * (cardWidth + margin), top, cardWidth, cardHeight);
+            paintSpinnerHud(p, i, card, false);
+            if (i == local)
+                localCard = card;
+        }
+    }
+    if (special && m_specialRect.isNull()) {
+        const double w = std::min(500.0, width() - 2 * margin);
+        m_specialRect = QRectF(width() / 2.0 - w / 2.0, top - 84, w, 72);
+    }
+    if (special)
+        paintSpecial(p, m_specialRect);
+
+    // « DASH ! » au-dessus de la fiche du joueur pendant l'élan.
+    if (local >= 0 && local < count && (state.spinners[local].isDashing() || state.spinners[local].isBoosted())
+        && !localCard.isNull()) {
+        const double w = std::min(270.0, localCard.width());
+        const bool right = count == 2 && local == 1;
+        const QRectF box(right ? localCard.right() - w : localCard.left(), localCard.top() - 48, w, 36);
+        const QPainterPath path = Theme::skewed(box, 12);
+        p.fillPath(path, withAlpha(Theme::kCyan, 0.14));
+        p.setPen(QPen(Theme::kCyan, 1.3));
+        p.drawPath(path);
+        Theme::paintIcon(p, QStringLiteral("dash"), QRectF(box.left() + 24, box.center().y() - 9, 18, 18), Theme::kCyan);
+        p.setFont(spaced(Theme::displayFont(14), 2.0));
+        p.setPen(Theme::kCyan);
+        p.drawText(box.adjusted(54, 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter, tr("DASH !"));
     }
 }
 
-void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
+void ArenaWidget::paintSpecial(QPainter &p, const QRectF &r)
+{
+    const MatchState &state = m_session->state();
+    const Spinner &s = state.spinners[m_session->localPlayer()];
+    const auto move = SpecialMove::find(s.top.special());
+    if (!move)
+        return;
+    const bool available = state.phase == MatchPhase::Fighting && !s.specialUsed && s.isActive() && !s.isDisarmed();
+    p.save();
+    p.setOpacity(available ? 1.0 : s.specialUsed ? 0.4 : 0.7);
+    const QPainterPath card = Theme::chamfer(r, 16);
+    QLinearGradient fill(r.topLeft(), r.topRight());
+    fill.setColorAt(0.0, QColor(0x15, 0x14, 0x52));
+    fill.setColorAt(0.55, withAlpha(Theme::kViolet, 0.85));
+    fill.setColorAt(1.0, Theme::kMagenta);
+    p.fillPath(card, fill);
+    if (available) { // Pulsation : le coup est prêt.
+        p.setPen(QPen(withAlpha(Theme::kMagenta, 0.35 + 0.25 * std::sin(state.elapsed * 5.0)), 6.0));
+        p.drawPath(card);
+    }
+    p.setPen(QPen(QColor(0xc9, 0xb8, 0xff), 1.3));
+    p.drawPath(card);
+    const QRectF icon(r.left() + 14, r.top() + 12, r.height() - 24, r.height() - 24);
+    p.fillPath(Theme::chamfer(icon, 8), withAlpha(Theme::kVoid, 0.85));
+    p.setPen(QPen(QColor(255, 255, 255, 170), 1.0));
+    p.drawPath(Theme::chamfer(icon, 8));
+    TopPainter::paintEmblem(p, s.top.special(), icon.center(), icon.height() * 0.32, Qt::white, 1.8);
+
+    const QString key = Controls::codeText(Controls::instance().binding(Action::Special, 0));
+    QFont capFont = Theme::displayFont(12);
+    const double capWidth = std::max(26, QFontMetrics(capFont).horizontalAdvance(key) + 14);
+    const QRectF cap(r.right() - 24 - capWidth, r.center().y() - 12, capWidth, 24);
+    const QRectF text(icon.right() + 16, r.top(), cap.left() - icon.right() - 28, r.height());
+    QFont small = Theme::displayFont(11);
+    small.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+    p.setFont(small);
+    p.setPen(QColor(255, 255, 255, 190));
+    const QString caption = s.specialUsed ? tr("Coup spécial · utilisé") : tr("Coup spécial · coûte ¼ de l'endurance");
+    p.drawText(QRectF(text.left(), r.top() + 12, text.width(), 18), Qt::AlignLeft | Qt::AlignVCenter,
+               QFontMetrics(small).elidedText(caption.toUpper(), Qt::ElideRight, int(text.width())));
+    QFont name = Theme::displayFont(20);
+    name.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
+    p.setFont(name);
+    p.setPen(Qt::white);
+    p.drawText(QRectF(text.left(), r.top() + 30, text.width(), 30), Qt::AlignLeft | Qt::AlignVCenter,
+               QFontMetrics(name).elidedText(move->name.toUpper(), Qt::ElideRight, int(text.width())));
+    p.fillPath(Theme::chamfer(cap, 5, 0, 5, 0), withAlpha(Theme::kField, 0.9));
+    p.setPen(QPen(Theme::kBorderBright, 1.0));
+    p.drawPath(Theme::chamfer(cap, 5, 0, 5, 0));
+    p.setFont(capFont);
+    p.setPen(Theme::kCyan);
+    p.drawText(cap, Qt::AlignCenter, key);
+    p.restore();
+}
+
+void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect, bool mirrored)
 {
     const MatchState &state = m_session->state();
     const Spinner &s = state.spinners[index];
     const bool local = index == m_session->localPlayer();
     const QColor accent = slotColor(index);
     const bool out = s.status != Spinner::Status::Waiting && !s.isActive();
+    // Miroir (fiche de droite) : toupie à droite, endurance à gauche.
+    const Qt::Alignment near = mirrored ? Qt::AlignRight : Qt::AlignLeft;
+    const Qt::Alignment far = mirrored ? Qt::AlignLeft : Qt::AlignRight;
 
     p.save();
     if (out)
         p.setOpacity(0.55);
-    const QPainterPath card = Theme::chamfer(rect, 18);
+    const QPainterPath card = mirrored ? Theme::chamfer(rect, 0, 22, 0, 22) : Theme::chamfer(rect, 22, 0, 22, 0);
     p.fillPath(card, withAlpha(QColor(0x0b, 0x09, 0x30), 0.9));
-    p.setPen(QPen(local ? accent : withAlpha(accent, 0.55), local ? 2.0 : 1.2));
+    p.setPen(QPen(local ? accent : Theme::kBorder, local ? 2.0 : 1.4));
     p.setBrush(Qt::NoBrush);
     p.drawPath(card);
-    p.fillRect(QRectF(rect.left() + 18, rect.top() - 1, 50, 3), accent);
 
-    const double mini = std::min(30.0, rect.height() * 0.28);
-    TopPainter::paint(p, s.top, QPointF(rect.left() + 16 + mini, rect.top() + 16 + mini), mini,
-                      s.angle);
-    const double textLeft = rect.left() + 32 + mini * 2;
-    const double textWidth = rect.right() - textLeft - 90;
-    QFont title = Theme::displayFont(17);
-    title.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+    const double mini = std::min(32.0, rect.height() * 0.26);
+    const double iconX = mirrored ? rect.right() - 20 - mini : rect.left() + 20 + mini;
+    TopPainter::paint(p, s.top, QPointF(iconX, rect.top() + 14 + mini), mini, s.angle);
+    const double inset = 40 + mini * 2;
+    const QRectF texts = rect.adjusted(mirrored ? 110 : inset, 0, mirrored ? -inset : -110, 0);
+    QFont title = Theme::displayFont(20);
+    title.setLetterSpacing(QFont::AbsoluteSpacing, 2.5);
     p.setFont(title);
     p.setPen(accent);
     const QString who = (local ? tr("Vous") : state.names.value(index)).toUpper();
-    p.drawText(QRectF(textLeft, rect.top() + 10, textWidth + 80, 24), Qt::AlignLeft | Qt::AlignVCenter,
-               QFontMetrics(title).elidedText(who, Qt::ElideRight, int(textWidth + 20)));
-    p.setFont(Theme::bodyFont(14, QFont::DemiBold));
+    p.drawText(QRectF(texts.left(), rect.top() + 12, texts.width(), 28), near | Qt::AlignVCenter,
+               QFontMetrics(title).elidedText(who, Qt::ElideRight, int(texts.width())));
+    p.setFont(Theme::bodyFont(16, QFont::DemiBold));
     p.setPen(Theme::kMuted);
-    p.drawText(QRectF(textLeft, rect.top() + 34, textWidth + 40, 18), Qt::AlignLeft | Qt::AlignVCenter,
-               p.fontMetrics().elidedText(
-                   QStringLiteral("%1 · %2").arg(s.top.name(), toString(s.top.type())),
-                   Qt::ElideRight, int(textWidth + 30)));
+    p.drawText(QRectF(texts.left(), rect.top() + 40, texts.width(), 20), near | Qt::AlignVCenter,
+               p.fontMetrics().elidedText(QStringLiteral("%1 · %2").arg(s.top.name(), toString(s.top.type())),
+                                          Qt::ElideRight, int(texts.width())));
 
     // Endurance : valeur et jauge inclinée (repère rouge à 25 %).
     const double ratio = std::clamp(s.spinRatio(), 0.0, 1.0);
     const bool low = ratio < 0.25;
     const QColor bar = low ? Theme::kDanger : ratio < 0.5 ? Theme::kWarning : Theme::kAccent;
-    p.setFont(Theme::displayFont(30));
+    p.setFont(Theme::displayFont(34));
     p.setPen(low ? Theme::kDanger : Theme::kText);
-    p.drawText(QRectF(rect.right() - 96, rect.top() + 8, 80, 40), Qt::AlignRight | Qt::AlignVCenter,
+    p.drawText(QRectF(rect.left() + 22, rect.top() + 8, rect.width() - 44, 44), far | Qt::AlignVCenter,
                QString::number(qRound(s.spin)));
-    const QRectF gauge(rect.left() + 16, rect.top() + 60, rect.width() - 32, 14);
-    p.fillPath(Theme::skewed(gauge, 8), Theme::kField);
+    const QRectF gauge(rect.left() + 20, rect.top() + rect.height() * 0.6, rect.width() - 40, 16);
+    p.fillPath(Theme::skewed(gauge, 9), Theme::kField);
     p.setPen(QPen(Theme::kBorder, 1.0));
-    p.drawPath(Theme::skewed(gauge, 8));
+    p.drawPath(Theme::skewed(gauge, 9));
     if (ratio > 0.0) {
         QRectF fill = gauge;
         fill.setWidth(std::max(10.0, gauge.width() * ratio));
@@ -1009,8 +1118,8 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
         g.setColorAt(1.0, low ? Theme::kWarning : s.isSlowed() ? Theme::kCyan : Theme::kAccentBright);
         if (low && s.isActive())
             p.setOpacity(p.opacity() * (0.65 + 0.35 * std::sin(state.elapsed * 25.0)));
-        p.fillPath(Theme::skewed(fill, 8), g);
-        p.fillPath(Theme::skewed(QRectF(fill.left() + 2, fill.top() + 2, fill.width() - 4, 4), 3),
+        p.fillPath(Theme::skewed(fill, 9), g);
+        p.fillPath(Theme::skewed(QRectF(fill.left() + 2, fill.top() + 2, fill.width() - 4, 5), 3),
                    QColor(255, 255, 255, 70));
         p.setOpacity(out ? 0.55 : 1.0);
     }
@@ -1018,32 +1127,17 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
     p.setPen(QPen(Theme::kDanger, 2.0));
     p.drawLine(QPointF(mark + 4, gauge.top() - 3), QPointF(mark - 4, gauge.bottom() + 3));
 
-    // Coup spécial (une fois par partie) et état du dash.
-    const QRectF row(rect.left() + 16, gauge.bottom() + 8, rect.width() - 32, 20);
-    const auto move = SpecialMove::find(s.top.special());
-    if (move && state.config.specialsEnabled) {
-        const bool available = !s.specialUsed && s.isActive() && !s.isDisarmed();
-        QColor color = available ? QColor::fromRgb(move->color) : Theme::kDim;
-        if (available)
-            color = color.lighter(100 + int(20 * (0.5 + 0.5 * std::sin(state.elapsed * 5.0))));
-        TopPainter::paintEmblem(p, s.top.special(), QPointF(row.left() + 9, row.center().y()), 8,
-                                color, 1.6);
-        QString label = move->name;
-        if (s.specialUsed)
-            label = tr("%1 — utilisé").arg(move->name);
-        else if (local && state.phase == MatchPhase::Fighting)
-            label = tr("%1 : %2 (coûte ¼ de l'endurance)")
-                        .arg(Controls::instance().text(Action::Special), move->name);
-        QFont f = Theme::bodyFont(14, QFont::Bold);
-        p.setFont(f);
-        p.setPen(color);
-        p.drawText(QRectF(row.left() + 24, row.top(), row.width() * 0.62 - 24, row.height()),
-                   Qt::AlignLeft | Qt::AlignVCenter,
-                   QFontMetrics(f).elidedText(label, Qt::ElideRight, int(row.width() * 0.62 - 26)));
-    }
+    // « ENDURANCE » puis l'état : dash pour le joueur (son coup a sa carte), coup spécial sinon.
+    const QRectF row(rect.left() + 20, gauge.bottom() + 6, rect.width() - 40, rect.bottom() - gauge.bottom() - 10);
+    QFont label = Theme::bodyFont(13, QFont::Bold);
+    label.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+    p.setFont(label);
+    p.setPen(Theme::kMuted);
+    p.drawText(row, Qt::AlignLeft | Qt::AlignVCenter, tr("Endurance").toUpper());
 
     QString text;
     QColor color;
+    const auto move = SpecialMove::find(s.top.special());
     const QString status = statusText(s.status);
     if (!status.isEmpty()) {
         text = status;
@@ -1060,6 +1154,9 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
     } else if (state.phase == MatchPhase::Aiming) {
         text = state.aimed.value(index) ? tr("Prêt à lancer") : tr("Vise…");
         color = state.aimed.value(index) ? Theme::kAccent : Theme::kMuted;
+    } else if (!local && move && state.config.specialsEnabled) {
+        text = s.specialUsed ? tr("%1 — utilisé").arg(move->name) : tr("%1 disponible").arg(move->name);
+        color = s.specialUsed ? Theme::kDim : QColor::fromRgb(move->color);
     } else if (s.isBoosted()) {
         text = tr("DASH !");
         color = Theme::kCyan;
@@ -1070,18 +1167,14 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
         text = tr("Dash impossible");
         color = Theme::kDanger;
     } else {
-        text = local ? tr("Dash prêt (%1)").arg(Controls::instance().text(Action::Dash))
-                     : tr("Dash prêt");
+        text = local ? tr("Dash prêt (%1)").arg(Controls::instance().text(Action::Dash)) : tr("Dash prêt");
         color = Theme::kAccent;
     }
-    QFont f = Theme::displayFont(12);
-    f.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
+    QFont f = Theme::bodyFont(15, QFont::Bold);
     p.setFont(f);
     p.setPen(color);
-    const double right = row.width() * (move && state.config.specialsEnabled ? 0.38 : 1.0);
-    p.drawText(QRectF(row.right() - right, row.top(), right, row.height()),
-               Qt::AlignRight | Qt::AlignVCenter,
-               QFontMetrics(f).elidedText(text.toUpper(), Qt::ElideRight, int(right)));
+    const double width = row.width() - QFontMetrics(label).horizontalAdvance(tr("Endurance").toUpper()) - 16;
+    p.drawText(row, Qt::AlignRight | Qt::AlignVCenter, QFontMetrics(f).elidedText(text, Qt::ElideRight, int(width)));
     p.restore();
 }
 

@@ -7,6 +7,7 @@
 #include <QPixmap>
 #include <QPointF>
 #include <QPointer>
+#include <QRectF>
 #include <QSet>
 #include <QTimer>
 #include <QWidget>
@@ -37,6 +38,8 @@ public:
     static QColor slotColor(int slot);
 
     QSize sizeHint() const override { return {760, 760}; }
+    /// Légende sous l'onglet du haut (bilan des victoires, mode de jeu…).
+    void setCaption(const QString &caption);
 
 signals:
     void matchFinished(int winner);
@@ -94,7 +97,9 @@ private:
     void paintAim(QPainter &p);
     void paintSpinners(QPainter &p);
     void paintHud(QPainter &p);
-    void paintSpinnerHud(QPainter &p, int index, const QRectF &rect);
+    void paintSpinnerHud(QPainter &p, int index, const QRectF &rect, bool mirrored);
+    /// Carte du coup spécial du joueur local (cliquable).
+    void paintSpecial(QPainter &p, const QRectF &rect);
     void paintOverlay(QPainter &p);
     void paintDuel(QPainter &p);
     void paintTutorial(QPainter &p);
@@ -114,6 +119,8 @@ private:
     QString m_duelResult;      ///< Bandeau de fin de duel.
     QColor m_duelResultColor;
     double m_duelResultTimer = 0.0;
+    QString m_caption;
+    QRectF m_specialRect; ///< Carte du coup spécial (vide si absente).
     QPixmap m_stadiumCache;
     QString m_stadiumCacheKey;
 

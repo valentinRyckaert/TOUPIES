@@ -958,6 +958,11 @@ QPainterPath iconPath(const QString &name)
         poly({{15, 5}, {8, 12}, {15, 19}});
     } else if (name == QLatin1String("next")) {
         poly({{9, 5}, {16, 12}, {9, 19}});
+    } else if (name == QLatin1String("dash")) {
+        poly({{3, 12}, {14, 12}});
+        poly({{10, 7}, {16, 12}, {10, 17}});
+        poly({{18, 6}, {18, 18}});
+        poly({{21, 8}, {21, 16}});
     } else if (name == QLatin1String("timer")) {
         p.addEllipse(QPointF(12, 13.5), 7.5, 7.5);
         poly({{12, 9.5}, {12, 13.5}, {14.5, 15}});
