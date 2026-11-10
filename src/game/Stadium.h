@@ -48,6 +48,8 @@ struct Stadium
     QString id;
     QString name;
     QString description;
+    QString codename;           ///< Nom de code affiché sous le nom (« Noyau Holo »…).
+    unsigned accent = 0x34d6ff; ///< Couleur signature (0xRRGGBB) de l'interface.
 
     StadiumGeometry::Kind shape = StadiumGeometry::Kind::Circle;
     int sides = 8;

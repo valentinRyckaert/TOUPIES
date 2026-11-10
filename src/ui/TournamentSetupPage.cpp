@@ -1,4 +1,5 @@
 #include "ui/TournamentSetupPage.h"
+#include "ui/Theme.h"
 
 #include "core/TopRepository.h"
 #include "game/Stadium.h"
@@ -21,12 +22,7 @@ namespace toupie {
 namespace {
 QLabel *pageTitle(const QString &text, QWidget *parent)
 {
-    auto *title = new QLabel(text, parent);
-    QFont font = title->font();
-    font.setPointSizeF(font.pointSizeF() * 1.6);
-    font.setBold(true);
-    title->setFont(font);
-    title->setObjectName(QStringLiteral("title"));
+    auto *title = Theme::createTitle(text, parent);
     return title;
 }
 } // namespace
@@ -44,19 +40,23 @@ TournamentSetupPage::TournamentSetupPage(TopRepository &repository, QWidget *par
     auto *choiceLayout = new QVBoxLayout(choice);
     choiceLayout->addWidget(pageTitle(tr("Tournois"), choice));
     choiceLayout->addStretch();
-    auto *solo = createChoiceCard(tr("🏆  Tournoi solo"),
+    auto *solo = createChoiceCard(tr("Tournoi solo"),
                                   tr("Vous contre des bots : ligue ou élimination directe, "
                                      "de 4 à 32 participants."),
                                   choice);
-    auto *lan = createChoiceCard(tr("⇄  Tournoi en réseau local"),
+    auto *lan = createChoiceCard(tr("Tournoi en réseau local"),
                                  tr("De 2 à 4 joueurs humains, chacun sur sa machine, complétés "
                                     "par des bots."),
                                  choice);
+    solo->setProperty("glyph", QStringLiteral("trophy"));
+    lan->setProperty("glyph", QStringLiteral("lan"));
     choiceLayout->addWidget(solo);
     choiceLayout->addWidget(lan);
     choiceLayout->addStretch();
     auto *choiceButtons = new QHBoxLayout;
     auto *back = new QPushButton(tr("Retour au menu"), choice);
+    back->setProperty("variant", QStringLiteral("ghost"));
+    back->setProperty("glyph", QStringLiteral("back"));
     choiceButtons->addWidget(back);
     choiceButtons->addStretch();
     choiceLayout->addLayout(choiceButtons);
@@ -94,7 +94,9 @@ TournamentSetupPage::TournamentSetupPage(TopRepository &repository, QWidget *par
     QDialog *rulesPopup = createPopup(this, tr("Personnalisation"), m_rules);
 
     auto *soloButtons = new QHBoxLayout;
-    auto *previous = new QPushButton(tr("◀ Retour"), soloPage);
+    auto *previous = new QPushButton(tr("Retour"), soloPage);
+    previous->setProperty("variant", QStringLiteral("ghost"));
+    previous->setProperty("glyph", QStringLiteral("back"));
     auto *start = new QPushButton(tr("Lancer le tournoi"), soloPage);
     start->setObjectName(QStringLiteral("accent"));
     start->setMinimumHeight(40);

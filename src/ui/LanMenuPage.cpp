@@ -1,4 +1,5 @@
 #include "ui/LanMenuPage.h"
+#include "ui/Theme.h"
 
 #include "game/Stadium.h"
 #include "ui/StadiumPainter.h"
@@ -26,7 +27,7 @@ const QString kNameSetting = QStringLiteral("lan/playerName");
 QString defaultPlayerName()
 {
     const QString user = qEnvironmentVariable("USER", qEnvironmentVariable("USERNAME"));
-    return user.isEmpty() ? QStringLiteral("Joueur") : user.left(net::kMaxNameLength);
+    return user.isEmpty() ? LanMenuPage::tr("Joueur") : user.left(net::kMaxNameLength);
 }
 
 QString stadiumName(const QString &id)
@@ -41,12 +42,7 @@ LanMenuPage::LanMenuPage(QWidget *parent)
 {
     auto *root = new QVBoxLayout(this);
 
-    m_title = new QLabel(tr("Multijoueur en réseau local"), this);
-    QFont titleFont = m_title->font();
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
-    titleFont.setBold(true);
-    m_title->setFont(titleFont);
-    m_title->setObjectName(QStringLiteral("title"));
+    m_title = Theme::createTitle(tr("Multijoueur en réseau local"), this);
     root->addWidget(m_title);
 
     auto *topRow = new QHBoxLayout;
@@ -56,7 +52,8 @@ LanMenuPage::LanMenuPage(QWidget *parent)
     m_nameEdit->setText(QSettings().value(kNameSetting, defaultPlayerName()).toString());
     nameForm->addRow(tr("Votre pseudo"), m_nameEdit);
     topRow->addLayout(nameForm, 1);
-    m_openCreateButton = new QPushButton(tr("＋  Créer un lobby…"), this);
+    m_openCreateButton = new QPushButton(tr("Créer un lobby…"), this);
+    m_openCreateButton->setProperty("glyph", QStringLiteral("plus"));
     m_openCreateButton->setObjectName(QStringLiteral("accent"));
     m_openCreateButton->setMinimumHeight(36);
     topRow->addWidget(m_openCreateButton);
@@ -134,6 +131,8 @@ LanMenuPage::LanMenuPage(QWidget *parent)
 
     auto *bottom = new QHBoxLayout;
     auto *backButton = new QPushButton(tr("Retour au menu"), this);
+    backButton->setProperty("variant", QStringLiteral("ghost"));
+    backButton->setProperty("glyph", QStringLiteral("back"));
     bottom->addWidget(backButton);
     bottom->addStretch();
     root->addLayout(bottom);
@@ -177,7 +176,7 @@ void LanMenuPage::setTournament(const std::optional<TournamentSettings> &setting
     m_title->setText(settings ? tr("Tournoi en réseau local") : tr("Multijoueur en réseau local"));
     m_createBox->setTitle(settings ? tr("Créer un tournoi (lobby des joueurs humains)")
                                    : tr("Créer un lobby"));
-    m_openCreateButton->setText(settings ? tr("＋  Créer un tournoi…") : tr("＋  Créer un lobby…"));
+    m_openCreateButton->setText(settings ? tr("Créer un tournoi…") : tr("Créer un lobby…"));
     m_createButton->setText(settings ? tr("Créer le lobby du tournoi") : tr("Créer le lobby"));
 }
 
@@ -235,7 +234,7 @@ void LanMenuPage::refreshLobbies()
                                     .arg(lobby.maxPlayers)
                                     .arg(lobby.inGame ? tr(" (en partie)") : QString());
         auto *item = new QTreeWidgetItem(
-            m_lobbyList, {lobby.tournament ? tr("🏆 %1 (tournoi)").arg(lobby.name) : lobby.name,
+            m_lobbyList, {lobby.tournament ? tr("%1 (tournoi)").arg(lobby.name) : lobby.name,
                           lobby.hostName, players, stadiumName(lobby.stadiumId),
                           QStringLiteral("%1:%2").arg(lobby.address.toString()).arg(lobby.port)});
         item->setData(0, Qt::UserRole, lobby.lobbyId);

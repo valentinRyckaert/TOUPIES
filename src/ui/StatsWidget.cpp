@@ -2,6 +2,7 @@
 
 #include "core/PartCatalog.h"
 #include "game/SpecialMove.h"
+#include "ui/Theme.h"
 #include "ui/TopPainter.h"
 
 #include <QPainter>
@@ -16,27 +17,34 @@ int maxStat()
     return value;
 }
 
-void drawBar(QPainter &p, const QRectF &rect, const QString &label, int value, const QColor &color,
-             const QColor &textColor)
+/// Barre de stat segmentée : libellé, valeur et segments inclinés.
+void drawBar(QPainter &p, const QRectF &rect, const QString &label, int value, const QColor &color)
 {
-    const double labelWidth = 82.0;
-    p.setPen(textColor);
-    p.drawText(QRectF(rect.left(), rect.top(), labelWidth, rect.height()),
-               Qt::AlignVCenter | Qt::AlignLeft, label);
+    QFont small = Theme::bodyFont(13, QFont::Bold);
+    small.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
+    small.setCapitalization(QFont::AllUppercase);
+    p.setFont(small);
+    p.setPen(Theme::kMuted);
+    const double textHeight = rect.height() * 0.5;
+    p.drawText(QRectF(rect.left(), rect.top(), rect.width(), textHeight),
+               Qt::AlignLeft | Qt::AlignBottom, label);
+    p.setFont(Theme::displayFont(15));
+    p.setPen(color);
+    p.drawText(QRectF(rect.left(), rect.top(), rect.width(), textHeight),
+               Qt::AlignRight | Qt::AlignBottom, QString::number(value));
 
-    const QRectF track(rect.left() + labelWidth, rect.top() + rect.height() * 0.25,
-                       rect.width() - labelWidth - 30, rect.height() * 0.5);
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(127, 127, 127, 60));
-    p.drawRoundedRect(track, 4, 4);
-    QRectF fill = track;
-    fill.setWidth(track.width() * qBound(0, value, maxStat()) / maxStat());
-    p.setBrush(color);
-    p.drawRoundedRect(fill, 4, 4);
-
-    p.setPen(textColor);
-    p.drawText(QRectF(track.right() + 6, rect.top(), 24, rect.height()),
-               Qt::AlignVCenter | Qt::AlignRight, QString::number(value));
+    const int segments = maxStat();
+    const double gap = 3.0;
+    const double y = rect.top() + textHeight + 4;
+    const double h = std::max(6.0, rect.height() - textHeight - 6);
+    const double w = (rect.width() - (segments - 1) * gap) / segments;
+    const int on = qBound(0, value, segments);
+    for (int i = 0; i < segments; ++i) {
+        QColor c = i < on ? color : Theme::kBorder;
+        if (i >= on)
+            c.setAlpha(140);
+        p.fillPath(Theme::skewed(QRectF(rect.left() + i * (w + gap), y, w + 3, h), 3), c);
+    }
 }
 } // namespace
 
@@ -62,12 +70,12 @@ void StatsWidget::setMystery(const QString &caption)
 
 QSize StatsWidget::sizeHint() const
 {
-    return {380, 140};
+    return {420, 190};
 }
 
 QSize StatsWidget::minimumSizeHint() const
 {
-    return {300, 130};
+    return {320, 180};
 }
 
 void StatsWidget::timerEvent(QTimerEvent *event)
@@ -84,27 +92,25 @@ void StatsWidget::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    const QColor text = palette().color(QPalette::WindowText);
-    p.setPen(text);
 
-    const double previewRadius = qMin(height() * 0.36, 50.0);
-    const QPointF previewCenter(previewRadius + 12, height() / 2.0);
-    const double left = previewCenter.x() + previewRadius + 18;
+    const double previewRadius = qMin(height() * 0.4, 62.0);
+    const QPointF previewCenter(previewRadius + 14, height() / 2.0);
+    const double left = previewCenter.x() + previewRadius + 24;
     const double width = this->width() - left - 8;
 
     if (!m_top) {
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(127, 127, 127, 60));
+        QPen dashed(Theme::kBorderBright, 1.5);
+        dashed.setDashPattern({3, 5});
+        p.setPen(dashed);
+        p.setBrush(Theme::kField);
         p.drawEllipse(previewCenter, previewRadius, previewRadius);
-        QFont f = font();
-        f.setPointSizeF(f.pointSizeF() * 2.2);
-        f.setBold(true);
-        p.setFont(f);
-        p.setPen(text);
+        p.setFont(Theme::displayFont(previewRadius * 0.9));
+        p.setPen(Theme::kCyan);
         p.drawText(QRectF(previewCenter.x() - previewRadius, previewCenter.y() - previewRadius,
                           2 * previewRadius, 2 * previewRadius),
                    Qt::AlignCenter, QStringLiteral("?"));
-        p.setFont(font());
+        p.setFont(Theme::bodyFont(16, QFont::DemiBold));
+        p.setPen(Theme::kMuted);
         p.drawText(QRectF(left, 0, width, height()),
                    Qt::AlignVCenter | Qt::AlignLeft | Qt::TextWordWrap,
                    m_mysteryCaption.isEmpty() ? tr("Aucune toupie") : m_mysteryCaption);
@@ -112,39 +118,58 @@ void StatsWidget::paintEvent(QPaintEvent *)
     }
 
     const Top &top = *m_top;
+    const QColor accent = TopPainter::typeColor(top.type());
+    QRadialGradient halo(previewCenter, previewRadius * 1.35);
+    QColor glow = accent;
+    glow.setAlpha(60);
+    halo.setColorAt(0.6, glow);
+    glow.setAlpha(0);
+    halo.setColorAt(1.0, glow);
+    p.setPen(Qt::NoPen);
+    p.setBrush(halo);
+    p.drawEllipse(previewCenter, previewRadius * 1.35, previewRadius * 1.35);
+    QPen ring(accent, 1.2);
+    ring.setDashPattern({2, 6});
+    p.setPen(ring);
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(previewCenter, previewRadius * 1.14, previewRadius * 1.14);
     TopPainter::paint(p, top, previewCenter, previewRadius, m_angle);
 
     const Stats stats = top.stats();
-    const QColor accent = TopPainter::typeColor(top.type());
-    const double line = qMax(18.0, (height() - 12) / 5.0);
-    double y = 6;
+    double y = 4;
+    QFont name = Theme::displayFont(20);
+    name.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
+    p.setFont(name);
+    p.setPen(Theme::kText);
+    const QString title = top.name().isEmpty() ? tr("(sans nom)") : top.name();
+    p.drawText(QRectF(left, y, width, 28), Qt::AlignVCenter | Qt::AlignLeft,
+               p.fontMetrics().elidedText(title.toUpper(), Qt::ElideRight, int(width)));
+    y += 32;
 
-    QFont bold = font();
-    bold.setBold(true);
-    bold.setPointSizeF(bold.pointSizeF() * 1.15);
-    p.setFont(bold);
-    p.setPen(text);
-    p.drawText(QRectF(left, y, width, line), Qt::AlignVCenter | Qt::AlignLeft,
-               top.name().isEmpty() ? tr("(sans nom)") : top.name());
-    y += line;
-
-    p.setFont(font());
+    const QString type = toString(top.type());
+    const double tagWidth = std::min(width * 0.45, 46.0 + type.size() * 10.5);
+    Theme::paintTag(p, QRectF(left, y, tagWidth, 22), type, accent);
     const auto move = SpecialMove::find(top.special());
-    const QString info = tr("%1  ·  %2  ·  ✦ %3")
-                             .arg(toString(top.type()), toString(top.spin()).toLower(),
-                                  move ? move->name : tr("aucun"));
-    p.setPen(accent);
-    p.drawText(QRectF(left, y, width, line), Qt::AlignVCenter | Qt::AlignLeft, info);
-    y += line;
+    p.setFont(Theme::bodyFont(15, QFont::Bold));
+    const QColor moveColor = TopPainter::moveColor(top.special());
+    const double infoLeft = left + tagWidth + 12;
+    TopPainter::paintEmblem(p, top.special(), QPointF(infoLeft + 9, y + 11), 8, moveColor, 1.6);
+    p.setPen(moveColor);
+    const QString info = tr("%1  ·  %2").arg(move ? move->name : tr("aucun"),
+                                             toString(top.spin()).toLower());
+    p.drawText(QRectF(infoLeft + 24, y, width - tagWidth - 36, 22), Qt::AlignVCenter | Qt::AlignLeft,
+               p.fontMetrics().elidedText(info, Qt::ElideRight, int(width - tagWidth - 36)));
+    y += 30;
 
-    drawBar(p, QRectF(left, y, width, line), tr("Attaque"), stats.attack,
-            TopPainter::typeColor(TopType::Attack), text);
+    const double line = std::max(30.0, (height() - y - 4) / 3.0);
+    drawBar(p, QRectF(left, y, width, line - 4), tr("Attaque"), stats.attack,
+            TopPainter::typeColor(TopType::Attack));
     y += line;
-    drawBar(p, QRectF(left, y, width, line), tr("Défense"), stats.defense,
-            TopPainter::typeColor(TopType::Defense), text);
+    drawBar(p, QRectF(left, y, width, line - 4), tr("Défense"), stats.defense,
+            TopPainter::typeColor(TopType::Defense));
     y += line;
-    drawBar(p, QRectF(left, y, width, line), tr("Endurance"), stats.endurance,
-            TopPainter::typeColor(TopType::Endurance), text);
+    drawBar(p, QRectF(left, y, width, line - 4), tr("Endurance"), stats.endurance,
+            TopPainter::typeColor(TopType::Endurance));
 }
 
 } // namespace toupie

@@ -16,7 +16,7 @@ BattlePage::BattlePage(QWidget *parent)
     : QWidget(parent)
 {
     auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(0, 0, 0, 6);
+    root->setContentsMargins(0, 0, 0, 4);
 
     m_arena = new ArenaWidget(this);
     root->addWidget(m_arena, 1);
@@ -27,8 +27,12 @@ BattlePage::BattlePage(QWidget *parent)
     m_setupButton = new QPushButton(tr("Changer de toupies"), this);
     m_rematchButton = new QPushButton(this);
     m_specialButton = new QPushButton(tr("Coup spécial (E)"), this);
-    m_specialButton->setObjectName(QStringLiteral("accent"));
+    m_specialButton->setProperty("variant", QStringLiteral("holo"));
+    m_leaveButton->setProperty("variant", QStringLiteral("ghost"));
+    m_leaveButton->setProperty("glyph", QStringLiteral("back"));
+    m_rematchButton->setProperty("variant", QStringLiteral("primary"));
     m_score = new QLabel(this);
+    m_score->setObjectName(QStringLiteral("muted"));
     bar->addWidget(m_leaveButton);
     bar->addWidget(m_setupButton);
     bar->addStretch();

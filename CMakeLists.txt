@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(ToupieArena
+project(TopArena
     VERSION 1.2.1
-    DESCRIPTION "Jeu de combat de toupies en 2D (C++/Qt)"
+    DESCRIPTION "Top Arena : jeu de combat de toupies en 2D (C++/Qt)"
     LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)

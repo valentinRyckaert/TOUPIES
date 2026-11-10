@@ -16,8 +16,12 @@
 #include "ui/TournamentSetupPage.h"
 #include "ui/TutorialSession.h"
 
+#include "ui/Theme.h"
+
 #include <QApplication>
 #include <QCloseEvent>
+#include <QPainter>
+#include <QVBoxLayout>
 #include <QDesktopServices>
 #include <QMessageBox>
 #include <QProgressDialog>
@@ -27,16 +31,45 @@
 
 namespace toupie {
 
+namespace {
+/// Fond holographique commun à tous les écrans (mis en cache à chaque taille).
+class Backdrop : public QWidget
+{
+public:
+    using QWidget::QWidget;
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        const qreal dpr = devicePixelRatioF();
+        if (m_cache.size() != size() * dpr) {
+            m_cache = QPixmap(size() * dpr);
+            m_cache.setDevicePixelRatio(dpr);
+            QPainter cache(&m_cache);
+            Theme::paintBackground(cache, rect());
+        }
+        QPainter(this).drawPixmap(0, 0, m_cache);
+    }
+
+private:
+    QPixmap m_cache;
+};
+} // namespace
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_repository(PartCatalog::instance())
 {
-    setWindowTitle(tr("Toupie Arena"));
-    resize(940, 880);
+    setWindowTitle(QStringLiteral("Top Arena")); // Nom du jeu : jamais traduit.
+    resize(1180, 860);
 
     const bool loaded = m_repository.load();
 
-    m_stack = new QStackedWidget(this);
+    auto *backdrop = new Backdrop(this);
+    auto *backdropLayout = new QVBoxLayout(backdrop);
+    backdropLayout->setContentsMargins(16, 12, 16, 12);
+    m_stack = new QStackedWidget(backdrop);
+    backdropLayout->addWidget(m_stack);
     m_menu = new MenuPage(m_stack);
     m_builder = new BuilderPage(PartCatalog::instance(), m_repository, m_stack);
     m_setup = new SetupPage(m_repository, m_stack);
@@ -54,7 +87,7 @@ MainWindow::MainWindow(QWidget *parent)
                           static_cast<QWidget *>(m_tournamentPage),
                           static_cast<QWidget *>(m_settingsPage), static_cast<QWidget *>(m_helpPage)})
         m_stack->addWidget(page);
-    setCentralWidget(m_stack);
+    setCentralWidget(backdrop);
 
     connect(m_menu, &MenuPage::playRequested, this, &MainWindow::showSetup);
     connect(m_menu, &MenuPage::lanRequested, this, [this] {
@@ -84,6 +117,14 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_menu, &MenuPage::helpRequested, this, showHelp);
     connect(m_helpPage, &HelpPage::settingsRequested, this, showSettings);
     connect(m_settingsPage, &SettingsPage::backRequested, this, &MainWindow::showMenu);
+    connect(m_settingsPage, &SettingsPage::restartRequested, this, [this] {
+        QString error;
+        if (net::Updater::restart(&error))
+            close();
+        else
+            QMessageBox::information(this, tr("Langue"),
+                                     tr("Relancez le jeu pour appliquer la langue.\n%1").arg(error));
+    });
     connect(m_helpPage, &HelpPage::backRequested, this, &MainWindow::showMenu);
     connect(m_builder, &BuilderPage::backRequested, this, &MainWindow::showMenu);
     connect(m_builder, &BuilderPage::topsChanged, m_setup, &SetupPage::refresh);
@@ -122,13 +163,19 @@ void MainWindow::setupSolo()
 {
     connect(m_setup, &SetupPage::backRequested, this, &MainWindow::showMenu);
     connect(m_setup, &SetupPage::fightRequested, this,
-            [this](const Top &player, const Top &opponent, Difficulty difficulty,
+            [this](const Top &player, const QList<Top> &opponents, Difficulty difficulty,
                    const QString &stadiumId, const MatchRules &rules) {
                 const Stadium stadium = Stadium::find(stadiumId).value_or(Stadium::classic());
-                auto session = std::make_unique<LocalSession>(
-                    QList<Top>{player, opponent},
-                    QStringList{tr("Vous"), tr("Bot %1").arg(toString(difficulty))}, stadium,
-                    difficulty, rules);
+                QList<Top> tops{player};
+                QStringList names{tr("Vous")};
+                for (int i = 0; i < opponents.size(); ++i) {
+                    tops.append(opponents.at(i));
+                    // Seul, le bot porte sa difficulté ; en mêlée, un numéro.
+                    names.append(tr("Bot %1").arg(opponents.size() == 1 ? toString(difficulty)
+                                                                        : QString::number(i + 1)));
+                }
+                auto session = std::make_unique<LocalSession>(tops, names, stadium, difficulty,
+                                                              rules);
                 showPage(m_battle);
                 m_battle->start(std::move(session), BattlePage::Mode::Solo);
             });

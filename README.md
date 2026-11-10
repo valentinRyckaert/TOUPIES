@@ -1,4 +1,4 @@
-# Toupie Arena
+# Top Arena
 
 [![CI](https://github.com/valentinRyckaert/TOUPIES/actions/workflows/ci.yml/badge.svg)](https://github.com/valentinRyckaert/TOUPIES/actions/workflows/ci.yml)
 [![Release](https://github.com/valentinRyckaert/TOUPIES/actions/workflows/release.yml/badge.svg)](https://github.com/valentinRyckaert/TOUPIES/actions/workflows/release.yml)
@@ -7,9 +7,10 @@ Jeu de combat de toupies en 2D, vu du dessus, écrit en C++17 avec Qt 6 (Widgets
 
 Fonctionnalités :
 
-- **Jouer contre le bot** : choisissez votre toupie, celle du bot (ou au hasard), la
-  difficulté, le stadium et les règles, réglez la force et la direction du lancer, puis
-  pilotez, dashez et déclenchez votre coup spécial au bon moment.
+- **Jouer contre les bots** : choisissez votre toupie, de 1 à 3 bots (leur toupie, ou au
+  hasard), leur difficulté, le stadium et les règles, réglez la force et la direction du
+  lancer, puis pilotez, dashez et déclenchez votre coup spécial au bon moment. Avec 2 ou 3
+  bots, le combat devient une mêlée à 3 ou 4 toupies : la dernière en jeu gagne.
 - **Multijoueur en réseau local** (2 à 4 joueurs) : créez un lobby ou rejoignez-en un depuis
   la liste des lobbys détectés, par son nom ou par adresse IP ; chacun choisit sa toupie parmi
   ses propres toupies.
@@ -19,8 +20,11 @@ Fonctionnalités :
 - **Duels** : deux toupies qui dashent l'une vers l'autre au même moment s'affrontent dans un
   duel de timing.
 - **Tutoriel** : un combat scénarisé qui présente chaque action pas à pas.
-- **Paramètres et aide** : touches du clavier et boutons de la souris configurables, et page
-  d'aide qui récapitule les commandes.
+- **Paramètres et aide** : langue du jeu (français ou anglais), touches du clavier et boutons
+  de la souris configurables, et page d'aide qui récapitule les commandes.
+- **Charte « Holo Combat »** : reflets holographiques bleu / violet, vert fluo pour les actions
+  et coins coupés ; chaque roue a sa silhouette, chaque stadium sa matière et chaque coup
+  spécial son effet visuel. Maquettes de référence dans [`design/`](design/README.md).
 - **Mises à jour** : le jeu vérifie s'il existe une version plus récente, la télécharge,
   remplace l'ancienne et redémarre dessus.
 - **Assembler une toupie** : un boulon (coup spécial), une roue métallique, une partie
@@ -31,7 +35,8 @@ Fonctionnalités :
 ## Compilation
 
 Prérequis : CMake ≥ 3.21, un compilateur C++17, Qt ≥ 6.4 (modules Core, Gui, Network,
-Widgets, Test).
+Widgets, Test et les outils Linguist ; sous Ubuntu : `qt6-base-dev`, `qt6-tools-dev`,
+`qt6-tools-dev-tools`, `qt6-l10n-tools`).
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -45,8 +50,22 @@ Options CMake : `TOUPIE_WERROR` (avertissements = erreurs), `TOUPIE_BUILD_TOOLS`
 `BUILD_TESTING`. `toupie_arena --smoke-test` démarre le jeu puis le ferme (vérification des
 paquets).
 
+### Traductions
+
+Le français est la langue source ; les traductions vivent dans `src/i18n/` (format Qt
+Linguist) et sont compilées dans l'exécutable. Après avoir ajouté ou modifié des textes :
+
+```sh
+lupdate src -ts src/i18n/toparena_en.ts -locations none   # puis traduire (Qt Linguist)
+```
+
+Le nom du jeu, « Top Arena », n'est jamais traduit. Changer de langue (Paramètres) relance le
+jeu.
+
 Les toupies assemblées sont enregistrées en JSON dans le dossier de données de l'application
-(`~/.local/share/ToupieArena/ToupieArena/tops.json` sous Linux).
+(`~/.local/share/ToupieArena/ToupieArena/tops.json` sous Linux). Ce dossier, l'exécutable
+(`toupie_arena`) et les identifiants internes gardent l'ancien nom du jeu, pour conserver les
+toupies et les paramètres et pour que les mises à jour automatiques continuent de fonctionner.
 
 ## Commandes
 

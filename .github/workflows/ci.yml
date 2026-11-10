@@ -30,7 +30,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake ninja-build g++ qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev libxkbcommon-dev
+            cmake ninja-build g++ qt6-base-dev qt6-base-dev-tools qt6-tools-dev qt6-tools-dev-tools \
+            qt6-l10n-tools libgl1-mesa-dev libxkbcommon-dev
 
       - name: Configuration
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DTOUPIE_WERROR=ON
@@ -61,7 +62,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake ninja-build g++ qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev libxkbcommon-dev
+            cmake ninja-build g++ qt6-base-dev qt6-base-dev-tools qt6-tools-dev qt6-tools-dev-tools \
+            qt6-l10n-tools libgl1-mesa-dev libxkbcommon-dev
 
       - name: Configuration
         run: >
@@ -129,7 +131,7 @@ jobs:
       - name: Archive du binaire
         uses: actions/upload-artifact@v4
         with:
-          name: toupie-arena-${{ matrix.os }}
+          name: top-arena-${{ matrix.os }}
           path: |
             build/src/toupie_arena
             build/toupie_arena.exe

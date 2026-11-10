@@ -43,6 +43,22 @@ QString appBundle()
     return bundle.endsWith(QStringLiteral(".app")) ? bundle : QString();
 }
 #endif
+/// Démarre un programme détaché. Environnement propre : celui d'une AppImage
+/// pointe vers son point de montage, qui disparaît à sa fermeture.
+bool launch(const QString &program, const QStringList &arguments)
+{
+    QProcess process;
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if (env.contains(QStringLiteral("APPIMAGE"))) {
+        for (const char *name : {"APPIMAGE", "APPDIR", "ARGV0", "OWD", "LD_LIBRARY_PATH", "QT_PLUGIN_PATH"})
+            env.remove(QString::fromLatin1(name));
+    }
+    process.setProcessEnvironment(env);
+    process.setProgram(program);
+    process.setArguments(arguments);
+    return process.startDetached();
+}
+
 } // namespace
 
 bool isNewerVersion(const QString &candidate, const QString &current)
@@ -204,18 +220,23 @@ bool Updater::installAndRestart(const QString &package, QString *error)
             *error = QString::fromStdString(ec.message());
         return false;
     }
-    // Environnement propre : celui de l'ancienne AppImage pointe vers son
-    // point de montage, qui disparaît à sa fermeture.
-    QProcess process;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    for (const char *name : {"APPIMAGE", "APPDIR", "ARGV0", "OWD", "LD_LIBRARY_PATH", "QT_PLUGIN_PATH"})
-        env.remove(QString::fromLatin1(name));
-    process.setProcessEnvironment(env);
-    process.setProgram(appImage);
-    const bool started = process.startDetached();
+    const bool started = launch(appImage, {});
 #endif
     if (!started && error)
         *error = QObject::tr("Impossible de lancer l'installation.");
+    return started;
+}
+
+bool Updater::restart(QString *error)
+{
+    QString program = QCoreApplication::applicationFilePath();
+#if !defined(Q_OS_WIN) && !defined(Q_OS_MACOS)
+    if (const QString appImage = qEnvironmentVariable("APPIMAGE"); !appImage.isEmpty())
+        program = appImage; // Le binaire monté disparaît avec l'instance actuelle.
+#endif
+    const bool started = launch(program, QCoreApplication::arguments().mid(1));
+    if (!started && error)
+        *error = QObject::tr("Impossible de relancer le jeu.");
     return started;
 }
 

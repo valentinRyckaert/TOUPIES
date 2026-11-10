@@ -1,3 +1,4 @@
+#include "ui/Language.h"
 #include "ui/MainWindow.h"
 #include "ui/Theme.h"
 
@@ -7,11 +8,15 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    // Identifiants internes inchangés depuis « Toupie Arena » : ils fixent le dossier
+    // des toupies sauvegardées et des paramètres.
     QApplication::setApplicationName(QStringLiteral("ToupieArena"));
     QApplication::setOrganizationName(QStringLiteral("ToupieArena"));
-    QApplication::setApplicationDisplayName(QStringLiteral("Toupie Arena"));
+    QApplication::setApplicationDisplayName(QStringLiteral("Top Arena"));
     QApplication::setApplicationVersion(QStringLiteral(TOUPIE_VERSION));
 
+    // Avant toute page : catalogue, stadiums et coups sont traduits à leur création.
+    toupie::Language::install(app);
     toupie::Theme::apply(app);
 
     toupie::MainWindow window;

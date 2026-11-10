@@ -1,5 +1,7 @@
 #include "game/SpecialMove.h"
 
+#include <QCoreApplication>
+
 namespace toupie {
 
 const QList<SpecialMove> &SpecialMove::all()
@@ -16,8 +18,9 @@ QList<SpecialMove> &SpecialMove::registry()
 
         SpecialMove wave;
         wave.id = QStringLiteral("onde");
-        wave.name = QStringLiteral("Onde de choc");
-        wave.description = QStringLiteral(
+        wave.name = QCoreApplication::translate("toupie::SpecialMove", "Onde de choc");
+        wave.description = QCoreApplication::translate(
+            "toupie::SpecialMove",
             "Anneau qui repousse violemment toutes les toupies proches : idéal pour éjecter "
             "une cible déjà au bord. Dégâts faibles, portée courte.");
         wave.shape = Shape::Ring;
@@ -26,13 +29,14 @@ QList<SpecialMove> &SpecialMove::registry()
         wave.speed = 1.2;
         wave.range = 0.75;
         wave.width = 0.06;
-        wave.color = 0x7fd6ff;
+        wave.color = 0x34d6ff;
         list.append(wave);
 
         SpecialMove spear;
         spear.id = QStringLiteral("lance");
-        spear.name = QStringLiteral("Lance d'acier");
-        spear.description = QStringLiteral(
+        spear.name = QCoreApplication::translate("toupie::SpecialMove", "Lance d'acier");
+        spear.description = QCoreApplication::translate(
+            "toupie::SpecialMove",
             "Trait fin qui inflige les plus lourds dégâts à une cible, sans autre effet. "
             "Presque aucun recul, et assez lent pour être esquivé de loin.");
         spear.damage = 24.0;
@@ -40,13 +44,14 @@ QList<SpecialMove> &SpecialMove::registry()
         spear.speed = 1.1;
         spear.range = 1.8;
         spear.width = 0.05;
-        spear.color = 0xe8eef5;
+        spear.color = 0xc9d8ff;
         list.append(spear);
 
         SpecialMove frost;
         frost.id = QStringLiteral("givre");
-        frost.name = QStringLiteral("Souffle de givre");
-        frost.description = QStringLiteral(
+        frost.name = QCoreApplication::translate("toupie::SpecialMove", "Souffle de givre");
+        frost.description = QCoreApplication::translate(
+            "toupie::SpecialMove",
             "Vague glacée : pendant 3 secondes, la cible est fortement ralentie, ne peut plus "
             "piloter et le froid use sa rotation trois fois plus vite. Dégâts moyens.");
         frost.damage = 18.5;
@@ -57,13 +62,14 @@ QList<SpecialMove> &SpecialMove::registry()
         frost.effect = Effect::Slow;
         frost.effectStrength = 0.95;
         frost.effectDuration = 3.1;
-        frost.color = 0x9be7ff;
+        frost.color = 0x8ff3ff;
         list.append(frost);
 
         SpecialMove vortex;
         vortex.id = QStringLiteral("vortex");
-        vortex.name = QStringLiteral("Vortex");
-        vortex.description = QStringLiteral(
+        vortex.name = QCoreApplication::translate("toupie::SpecialMove", "Vortex");
+        vortex.description = QCoreApplication::translate(
+            "toupie::SpecialMove",
             "Anneau à longue portée qui aspire violemment toutes les toupies vers le centre "
             "du stadium : provoque la mêlée, empêche de fuir. Dégâts modérés.");
         vortex.shape = Shape::Ring;
@@ -73,13 +79,14 @@ QList<SpecialMove> &SpecialMove::registry()
         vortex.width = 0.07;
         vortex.effect = Effect::PullToCenter;
         vortex.effectStrength = 2.0;
-        vortex.color = 0xb58cff;
+        vortex.color = 0x8f5bff;
         list.append(vortex);
 
         SpecialMove warp;
         warp.id = QStringLiteral("distorsion");
-        warp.name = QStringLiteral("Distorsion");
-        warp.description = QStringLiteral(
+        warp.name = QCoreApplication::translate("toupie::SpecialMove", "Distorsion");
+        warp.description = QCoreApplication::translate(
+            "toupie::SpecialMove",
             "Vague lente qui blesse la cible et la téléporte près du bord du stadium, lancée "
             "vers l'extérieur : elle risque l'éjection. Facile à esquiver de loin.");
         warp.damage = 23.0;
@@ -89,13 +96,14 @@ QList<SpecialMove> &SpecialMove::registry()
         warp.effect = Effect::Teleport;
         warp.effectStrength = 0.868; // Niveau (0 = centre, 1 = bord) d'arrivée.
         warp.knockback = 0.5;       // Vitesse vers l'extérieur après téléportation.
-        warp.color = 0xff7ad9;
+        warp.color = 0xd24bff;
         list.append(warp);
 
         SpecialMove siphon;
         siphon.id = QStringLiteral("siphon");
-        siphon.name = QStringLiteral("Siphon");
-        siphon.description = QStringLiteral(
+        siphon.name = QCoreApplication::translate("toupie::SpecialMove", "Siphon");
+        siphon.description = QCoreApplication::translate(
+            "toupie::SpecialMove",
             "Vague qui vole l'endurance de la cible : la toupie récupère 60 % de ce qu'elle "
             "inflige. Dégâts modérés, recul faible.");
         siphon.damage = 12.0;
@@ -105,13 +113,14 @@ QList<SpecialMove> &SpecialMove::registry()
         siphon.width = 0.08;
         siphon.effect = Effect::Drain;
         siphon.effectStrength = 0.6;
-        siphon.color = 0xff5c6c;
+        siphon.color = 0xff3b6b;
         list.append(siphon);
 
         SpecialMove quake;
         quake.id = QStringLiteral("seisme");
-        quake.name = QStringLiteral("Séisme");
-        quake.description = QStringLiteral(
+        quake.name = QCoreApplication::translate("toupie::SpecialMove", "Séisme");
+        quake.description = QCoreApplication::translate(
+            "toupie::SpecialMove",
             "Secousse qui blesse toutes les toupies très proches et les empêche de dasher "
             "ou de lancer leur coup spécial pendant 6 secondes. Portée très courte.");
         quake.shape = Shape::Ring;
@@ -122,7 +131,7 @@ QList<SpecialMove> &SpecialMove::registry()
         quake.width = 0.07;
         quake.effect = Effect::Disarm;
         quake.effectDuration = 6.0;
-        quake.color = 0xffb347;
+        quake.color = 0xb8ff2e;
         list.append(quake);
 
         return list;

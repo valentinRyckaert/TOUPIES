@@ -21,7 +21,8 @@
 namespace toupie {
 
 namespace {
-constexpr double kHudHeight = 100.0;
+constexpr double kTopBar = 56.0;      ///< Bandeau du haut : chrono, manche, stadium.
+constexpr double kBottomHud = 122.0; ///< Fiches des toupies en bas.
 constexpr int kTrailLength = 36;
 constexpr double kSparkLifetime = 0.4;
 constexpr double kAimStep = qDegreesToRadians(3.0);
@@ -66,8 +67,7 @@ QString statusText(Spinner::Status status)
 
 QColor ArenaWidget::slotColor(int slot)
 {
-    static const QColor colors[] = {Theme::kAccent, QColor(255, 138, 92), QColor(92, 200, 255),
-                                    QColor(213, 140, 255)};
+    static const QColor colors[] = {Theme::kAccent, Theme::kDanger, Theme::kCyan, Theme::kWarning};
     return colors[qBound(0, slot, 3)];
 }
 
@@ -404,13 +404,13 @@ void ArenaWidget::focusOutEvent(QFocusEvent *event)
 double ArenaWidget::scale() const
 {
     const double radius = m_session ? m_session->state().geometry.radius : 1.0;
-    const double available = std::min<double>(width(), height() - kHudHeight);
+    const double available = std::min<double>(width(), height() - kTopBar - kBottomHud);
     return available / 2.0 * 0.88 / std::max(0.1, radius);
 }
 
 QPointF ArenaWidget::center() const
 {
-    return {width() / 2.0, kHudHeight + (height() - kHudHeight) / 2.0};
+    return {width() / 2.0, kTopBar + (height() - kTopBar - kBottomHud) / 2.0};
 }
 
 QPointF ArenaWidget::toScreen(Vec2 world) const
@@ -428,6 +428,56 @@ Vec2 ArenaWidget::toWorld(QPointF screen) const
 // Rendu
 // ---------------------------------------------------------------------------
 
+namespace {
+
+QColor withAlpha(QColor c, double a)
+{
+    c.setAlphaF(std::clamp(a, 0.0, 1.0));
+    return c;
+}
+
+/// Texte à décalage chromatique (magenta / cyan), comme le logo.
+void chromaText(QPainter &p, const QRectF &r, int flags, const QString &text, const QFont &font,
+                const QColor &color, double offset)
+{
+    p.setFont(font);
+    p.setPen(withAlpha(Theme::kMagenta, 0.75));
+    p.drawText(r.translated(-offset, 0), flags, text);
+    p.setPen(withAlpha(Theme::kCyan, 0.75));
+    p.drawText(r.translated(offset, offset * 0.4), flags, text);
+    p.setPen(color);
+    p.drawText(r, flags, text);
+}
+
+/// Bandeau incliné : plein (raison de fin) ou en fondu (« Partez ! », duel).
+void band(QPainter &p, const QRectF &r, const QColor &color, bool solid)
+{
+    if (solid) {
+        QLinearGradient g(r.topLeft(), r.topRight());
+        g.setColorAt(0.0, color);
+        g.setColorAt(1.0, color.lighter(125));
+        p.fillPath(Theme::skewed(r, r.height() * 0.35), g);
+        return;
+    }
+    QLinearGradient g(r.topLeft(), r.topRight());
+    g.setColorAt(0.0, withAlpha(color, 0.0));
+    g.setColorAt(0.2, withAlpha(color, 0.28));
+    g.setColorAt(0.8, withAlpha(color, 0.28));
+    g.setColorAt(1.0, withAlpha(color, 0.0));
+    p.fillPath(Theme::skewed(r, r.height() * 0.35), g);
+    p.setPen(QPen(color, 2.0));
+    p.drawLine(QPointF(r.left() + r.width() * 0.1, r.top()), QPointF(r.right(), r.top()));
+    p.drawLine(QPointF(r.left(), r.bottom()), QPointF(r.right() - r.width() * 0.1, r.bottom()));
+}
+
+double pseudoRandom(int seed)
+{
+    const double x = std::sin(seed * 12.9898) * 43758.5453;
+    return x - std::floor(x);
+}
+
+} // namespace
+
 void ArenaWidget::resizeEvent(QResizeEvent *event)
 {
     m_stadiumCacheKey.clear();
@@ -438,22 +488,10 @@ void ArenaWidget::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-
-    QLinearGradient background(0, 0, 0, height());
-    background.setColorAt(0.0, Theme::kBackground);
-    background.setColorAt(1.0, Theme::kBackgroundDeep);
-    p.fillRect(rect(), background);
-    // Grille discrète façon « arène numérique ».
-    QColor grid = Theme::kAccent;
-    grid.setAlpha(10);
-    p.setPen(QPen(grid, 1.0));
-    for (int x = 0; x < width(); x += 32)
-        p.drawLine(x, 0, x, height());
-    for (int y = 0; y < height(); y += 32)
-        p.drawLine(0, y, width(), y);
-
-    if (!m_session)
+    if (!m_session) {
+        Theme::paintBackground(p, rect());
         return;
+    }
 
     paintStadium(p);
     if (m_session->state().phase == MatchPhase::Aiming)
@@ -472,24 +510,32 @@ void ArenaWidget::paintStadium(QPainter &p)
     const QString key = QStringLiteral("%1/%2x%3").arg(state.stadium.id).arg(width()).arg(height());
     const qreal dpr = devicePixelRatioF();
     if (key != m_stadiumCacheKey) {
+        // Fond et stadium ne changent qu'avec la taille : une seule image.
         m_stadiumCache = QPixmap(size() * dpr);
         m_stadiumCache.setDevicePixelRatio(dpr);
-        m_stadiumCache.fill(Qt::transparent);
         QPainter cache(&m_stadiumCache);
+        Theme::paintBackground(cache, rect());
         StadiumPainter::paint(cache, state.stadium, state.geometry, center(), scale());
         m_stadiumCacheKey = key;
     }
     p.drawPixmap(0, 0, m_stadiumCache);
 
-    // Points de départ.
+    // Points de départ : losange et cercle à la couleur de chaque place.
     if (state.phase == MatchPhase::Aiming || state.phase == MatchPhase::Countdown) {
         const double r = state.config.topRadius * scale() * 1.5;
         for (int i = 0; i < state.startPositions.size(); ++i) {
-            QColor c = slotColor(i);
-            c.setAlpha(state.aimed.value(i) ? 200 : 110);
-            p.setPen(QPen(c, 2.0, state.aimed.value(i) ? Qt::SolidLine : Qt::DashLine));
+            const QPointF c = toScreen(state.startPositions.at(i));
+            const bool aimed = state.aimed.value(i);
+            QPen ring(withAlpha(slotColor(i), aimed ? 0.9 : 0.5), 2.0);
+            if (!aimed)
+                ring.setDashPattern({4, 4});
+            p.setPen(ring);
             p.setBrush(Qt::NoBrush);
-            p.drawEllipse(toScreen(state.startPositions.at(i)), r, r);
+            p.drawEllipse(c, r, r);
+            const double d = r * 1.25;
+            p.setPen(QPen(withAlpha(slotColor(i), 0.7), 1.5));
+            p.drawPolygon(QPolygonF{c + QPointF(0, -d), c + QPointF(d, 0), c + QPointF(0, d),
+                                    c + QPointF(-d, 0)});
         }
     }
 }
@@ -510,81 +556,189 @@ void ArenaWidget::paintAim(QPainter &p)
     // Plus la flèche est longue et épaisse, plus le lancer est puissant.
     const double t = (m_aimPower - state.config.launchPowerMin)
                    / std::max(1e-6, state.config.launchPowerMax - state.config.launchPowerMin);
-    QColor glow = color;
-    glow.setAlpha(70);
-    p.setPen(QPen(glow, 10.0 + 8.0 * t, Qt::SolidLine, Qt::RoundCap));
-    p.drawLine(from, to);
-    p.setPen(QPen(color, 3.0 + 4.0 * t, Qt::SolidLine, Qt::RoundCap));
-    p.drawLine(from, to);
+    QPainterPath shaft(from);
+    shaft.lineTo(to);
+    Theme::strokeGlow(p, shaft, color, 3.0 + 4.0 * t);
 
     const QPointF d = (to - from) / std::max(1e-6, std::hypot((to - from).x(), (to - from).y()));
     const QPointF n(-d.y(), d.x());
-    QPolygonF head;
-    const double size = 12.0 + 6.0 * t;
-    head << to + d * size << to + n * size * 0.65 << to - n * size * 0.65;
+    const double size = 14.0 + 6.0 * t;
     p.setPen(Qt::NoPen);
     p.setBrush(color);
-    p.drawPolygon(head);
+    p.drawPolygon(QPolygonF{to + d * size, to + n * size * 0.65 - d * size * 0.2, to,
+                            to - n * size * 0.65 - d * size * 0.2});
 
-    QFont f = font();
-    f.setBold(true);
+    // Libellé au-delà de la pointe.
+    const QPointF labelCenter = to + d * (size + 40);
+    const QRectF labelRect(labelCenter.x() - 62, labelCenter.y() - 14, 124, 28);
+    p.fillPath(Theme::chamfer(labelRect, 8), withAlpha(Theme::kField, 0.92));
+    p.setPen(QPen(color, 1.3));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(Theme::chamfer(labelRect, 8));
+    QFont f = Theme::displayFont(14);
+    f.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
     p.setFont(f);
     p.setPen(color);
-    // Libellé au-delà de la pointe, sur un fond pour rester lisible.
-    const QPointF labelCenter = to + d * (size + 34);
-    const QRectF labelRect(labelCenter.x() - 52, labelCenter.y() - 11, 104, 22);
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0, 0, 0, 150));
-    p.drawRoundedRect(labelRect, 6, 6);
-    p.setPen(color);
-    p.drawText(labelRect, Qt::AlignCenter, tr("Force %1 %").arg(qRound(m_aimPower * 100)));
+    p.drawText(labelRect, Qt::AlignCenter, tr("Force %1 %").arg(qRound(m_aimPower * 100)).toUpper());
 }
 
 void ArenaWidget::paintProjectiles(QPainter &p)
 {
     const MatchState &state = m_session->state();
     const double s = scale();
+    const double time = state.elapsed;
     for (const Projectile &proj : state.projectiles) {
         const QColor color = QColor::fromRgb(proj.color);
         const double fade = std::clamp(1.0 - proj.traveled / std::max(1e-6, proj.range), 0.0, 1.0);
+        const double alpha = 0.4 + 0.6 * fade;
         if (proj.ring) {
-            // Anneau qui s'élargit, de plus en plus transparent.
             const QPointF c = toScreen(proj.origin);
             const double r = proj.radius * s;
-            QColor glow = color;
-            glow.setAlphaF(0.25 * (0.3 + 0.7 * fade));
+            QPen limit(withAlpha(color, 0.3), 1.0);
+            limit.setDashPattern({2, 6});
+            p.setPen(limit);
             p.setBrush(Qt::NoBrush);
-            p.setPen(QPen(glow, proj.width * s * 3.0));
-            p.drawEllipse(c, r, r);
-            QColor core = color;
-            core.setAlphaF(0.4 + 0.6 * fade);
-            p.setPen(QPen(core, std::max(2.0, proj.width * s * 0.8)));
-            p.drawEllipse(c, r, r);
-            // Portée maximale en pointillés.
-            QColor limit = color;
-            limit.setAlpha(60);
-            p.setPen(QPen(limit, 1.0, Qt::DotLine));
             p.drawEllipse(c, proj.range * s, proj.range * s);
+            if (proj.move == QLatin1String("vortex")) {
+                // Bras de spirale aspirés vers le centre.
+                for (int k = 0; k < 4; ++k) {
+                    QPainterPath arm;
+                    for (int i = 0; i <= 36; ++i) {
+                        const double a = k * M_PI / 2 + i * 0.14 - time * 4.0;
+                        const QPointF q = c + QPointF(std::cos(a), std::sin(a)) * r * (1.0 - i / 40.0);
+                        i == 0 ? arm.moveTo(q) : arm.lineTo(q);
+                    }
+                    Theme::strokeGlow(p, arm, withAlpha(color, alpha), 2.5);
+                }
+                p.setBrush(QColor(0, 0, 0, 200));
+                p.setPen(QPen(color, 2.0));
+                p.drawEllipse(c, r * 0.16, r * 0.16);
+            } else if (proj.move == QLatin1String("seisme")) {
+                // Failles qui courent jusqu'au front de l'onde.
+                for (int k = 0; k < 10; ++k) {
+                    double a = k * M_PI / 5 + pseudoRandom(proj.id * 31 + k);
+                    double rr = r * 0.15;
+                    QPainterPath fault(c + QPointF(std::cos(a), std::sin(a)) * rr);
+                    for (int step = 0; rr < r && step < 12; ++step) {
+                        rr += r * (0.1 + 0.08 * pseudoRandom(proj.id + k * 7 + step));
+                        a += (pseudoRandom(k * 13 + step) - 0.5) * 0.5;
+                        fault.lineTo(c + QPointF(std::cos(a), std::sin(a)) * std::min(rr, r));
+                    }
+                    Theme::strokeGlow(p, fault, withAlpha(color, alpha), 1.8);
+                }
+                QPen front(withAlpha(color, alpha), 2.0);
+                front.setDashPattern({3, 4});
+                p.setPen(front);
+                p.setBrush(Qt::NoBrush);
+                p.drawEllipse(c, r, r);
+            } else {
+                // Onde de choc : anneaux, décalage chromatique et éclats.
+                p.setBrush(Qt::NoBrush);
+                p.setPen(QPen(withAlpha(color, 0.25 * alpha), proj.width * s * 3.0));
+                p.drawEllipse(c, r, r);
+                p.setPen(QPen(withAlpha(Theme::kMagenta, 0.5 * alpha), 1.5));
+                p.drawEllipse(c, r + 4, r + 4);
+                p.setPen(QPen(withAlpha(color, alpha), std::max(2.5, proj.width * s * 0.8)));
+                p.drawEllipse(c, r, r);
+                p.setPen(QPen(withAlpha(color, 0.45 * alpha), 1.5));
+                p.drawEllipse(c, r * 0.7, r * 0.7);
+                p.setPen(Qt::NoPen);
+                p.setBrush(withAlpha(color, alpha));
+                for (int k = 0; k < 14; ++k) {
+                    const double a = k * M_PI / 7 + pseudoRandom(proj.id + k) * 0.3;
+                    const QPointF dir(std::cos(a), std::sin(a));
+                    const QPointF side(-dir.y(), dir.x());
+                    const QPointF base = c + dir * (r + 6);
+                    p.drawPolygon(QPolygonF{base + side * 3, base + dir * 12, base - side * 3});
+                }
+            }
             continue;
         }
-        // Vague : front en arc perpendiculaire à la direction, avec une traînée.
+
+        // Vague : un front qui file vers sa cible, avec une signature propre.
         const QPointF c = toScreen(proj.position);
         const double angle = qRadiansToDegrees(std::atan2(proj.direction.y, proj.direction.x));
         const double half = (proj.width + state.config.topRadius * 0.6) * s;
         p.save();
         p.translate(c);
         p.rotate(angle);
-        for (int k = 4; k >= 0; --k) {
-            QColor trail = color;
-            trail.setAlphaF((k == 0 ? 0.95 : 0.18) * (0.4 + 0.6 * fade));
-            const double back = k * half * 0.45;
-            const double w = half * (1.0 - k * 0.12);
-            QPainterPath arc;
-            arc.moveTo(-back - w * 0.35, -w);
-            arc.quadTo(-back + w * 0.55, 0.0, -back - w * 0.35, w);
-            p.setPen(QPen(trail, k == 0 ? 4.0 : 6.0, Qt::SolidLine, Qt::RoundCap));
-            p.setBrush(Qt::NoBrush);
-            p.drawPath(arc);
+        p.setOpacity(alpha);
+        if (proj.move == QLatin1String("lance")) {
+            p.setPen(QPen(withAlpha(color, 0.6), 1.3));
+            for (int i = 0; i < 7; ++i) {
+                const double y = (pseudoRandom(proj.id * 5 + i) - 0.5) * half * 1.6;
+                const double x0 = -half * (2.5 + 3.0 * pseudoRandom(i + 3));
+                p.drawLine(QPointF(x0, y), QPointF(x0 + half * 1.6, y));
+            }
+            QPainterPath shaft(QPointF(-half * 4.0, 0));
+            shaft.lineTo(QPointF(-half * 0.3, 0));
+            Theme::strokeGlow(p, shaft, color, 3.0);
+            const QPolygonF head{{half * 0.9, 0}, {-half * 0.45, -half * 0.6}, {-half * 0.15, 0},
+                                 {-half * 0.45, half * 0.6}};
+            p.setBrush(Qt::white);
+            p.setPen(QPen(color, 2.0));
+            p.drawPolygon(head);
+        } else if (proj.move == QLatin1String("givre")) {
+            QLinearGradient cone(QPointF(0, 0), QPointF(-half * 4.0, 0));
+            cone.setColorAt(0.0, withAlpha(color, 0.5));
+            cone.setColorAt(1.0, withAlpha(color, 0.0));
+            p.setPen(Qt::NoPen);
+            p.setBrush(cone);
+            p.drawPolygon(QPolygonF{{half * 0.2, -half * 0.5}, {half * 0.2, half * 0.5},
+                                    {-half * 4.0, half * 1.4}, {-half * 4.0, -half * 1.4}});
+            for (int i = 0; i < 8; ++i) {
+                const double x = -half * std::fmod(pseudoRandom(proj.id + i) * 4.0 + time * 3.0, 4.0);
+                const double y = (pseudoRandom(i * 11 + proj.id) - 0.5) * (half * 0.6 - x * 0.6);
+                TopPainter::paintEmblem(p, QStringLiteral("givre"), QPointF(x, y), half * 0.18,
+                                        Qt::white, 1.2);
+            }
+            QPainterPath front(QPointF(-half * 0.2, -half));
+            front.quadTo(QPointF(half * 0.6, 0), QPointF(-half * 0.2, half));
+            Theme::strokeGlow(p, front, color, 3.0);
+        } else if (proj.move == QLatin1String("distorsion")) {
+            for (int i = 0; i < 7; ++i) {
+                const double jitter = std::sin(time * 37.0 + i * 13.0) * half * 0.5;
+                const QColor bar = i % 2 ? Theme::kMagenta : Theme::kCyan;
+                p.fillRect(QRectF(-half * 3.2 + jitter, -half + i * half * 0.3, half * 2.8,
+                                  half * 0.16),
+                           withAlpha(bar, 0.75));
+            }
+            QPainterPath front(QPointF(-half * 0.3, -half));
+            front.quadTo(QPointF(half * 0.5, 0), QPointF(-half * 0.3, half));
+            Theme::strokeGlow(p, front, Theme::kMagenta, 3.0);
+        } else if (proj.move == QLatin1String("siphon")) {
+            for (int k = -1; k <= 1; ++k) {
+                QPainterPath tendril;
+                for (int i = 0; i <= 24; ++i) {
+                    const double x = -half * 4.0 * i / 24.0;
+                    const double y = k * half * 0.35 + std::sin(i * 0.6 - time * 10.0 + k) * half * 0.25;
+                    i == 0 ? tendril.moveTo(QPointF(0, y)) : tendril.lineTo(QPointF(x, y));
+                }
+                Theme::strokeGlow(p, tendril, color, k ? 1.2 : 2.6);
+            }
+            p.setPen(Qt::NoPen);
+            p.setBrush(color);
+            for (int i = 0; i < 5; ++i) {
+                const double x = -half * std::fmod(i * 0.8 + time * 4.0, 4.0);
+                QPainterPath drop(QPointF(x, -half * 0.22));
+                drop.cubicTo(QPointF(x + half * 0.12, -half * 0.05), QPointF(x + half * 0.14, half * 0.08),
+                             QPointF(x, half * 0.14));
+                drop.cubicTo(QPointF(x - half * 0.14, half * 0.08), QPointF(x - half * 0.12, -half * 0.05),
+                             QPointF(x, -half * 0.22));
+                p.drawPath(drop);
+            }
+        } else {
+            for (int k = 4; k >= 0; --k) {
+                const double back = k * half * 0.45;
+                const double w = half * (1.0 - k * 0.12);
+                QPainterPath arc;
+                arc.moveTo(-back - w * 0.35, -w);
+                arc.quadTo(-back + w * 0.55, 0.0, -back - w * 0.35, w);
+                p.setPen(QPen(withAlpha(color, k == 0 ? 0.95 : 0.18), k == 0 ? 4.0 : 6.0,
+                              Qt::SolidLine, Qt::RoundCap));
+                p.setBrush(Qt::NoBrush);
+                p.drawPath(arc);
+            }
         }
         p.restore();
     }
@@ -595,16 +749,18 @@ void ArenaWidget::paintSpinners(QPainter &p)
     const MatchState &state = m_session->state();
     const double radius = state.config.topRadius * scale();
 
-    // Traînées.
+    // Traînées lumineuses à la couleur du type.
     for (size_t i = 0; i < m_trails.size() && i < state.spinners.size(); ++i) {
         const QList<QPointF> &trail = m_trails[i];
         const QColor base = TopPainter::typeColor(state.spinners[i].top.type());
         for (int k = 1; k < trail.size(); ++k) {
-            QColor c = base;
-            c.setAlphaF(0.35 * k / trail.size());
-            p.setPen(QPen(c, radius * 0.5 * k / trail.size(), Qt::SolidLine, Qt::RoundCap));
-            p.drawLine(toScreen({trail[k - 1].x(), trail[k - 1].y()}),
-                       toScreen({trail[k].x(), trail[k].y()}));
+            const double f = double(k) / trail.size();
+            p.setPen(QPen(withAlpha(base, 0.12 * f), radius * 1.1 * f, Qt::SolidLine, Qt::RoundCap));
+            const QPointF a = toScreen({trail[k - 1].x(), trail[k - 1].y()});
+            const QPointF b = toScreen({trail[k].x(), trail[k].y()});
+            p.drawLine(a, b);
+            p.setPen(QPen(withAlpha(base, 0.45 * f), radius * 0.35 * f, Qt::SolidLine, Qt::RoundCap));
+            p.drawLine(a, b);
         }
     }
 
@@ -638,16 +794,54 @@ void ArenaWidget::paintSpinners(QPainter &p)
         }
         const double glow = s.isBoosted() ? s.boostTimer / state.config.dashBoostDuration : 0.0;
         TopPainter::paint(p, s.top, pos, drawRadius, s.angle, glow);
+        if (s.isActive() && s.isSlowed()) {
+            // Gelée : coque de glace hexagonale.
+            const double r = drawRadius * 1.38;
+            QPolygonF shell, inner;
+            for (int k = 0; k < 6; ++k) {
+                const double a = k * M_PI / 3 + state.elapsed * 0.3;
+                shell << pos + QPointF(std::cos(a), std::sin(a)) * r;
+                inner << pos + QPointF(std::cos(a + 0.5), std::sin(a + 0.5)) * r * 0.84;
+            }
+            p.setBrush(withAlpha(QColor(0x8f, 0xf3, 0xff), 0.18));
+            p.setPen(QPen(QColor(255, 255, 255, 210), 1.5));
+            p.drawPolygon(shell);
+            p.setBrush(Qt::NoBrush);
+            p.setPen(QPen(withAlpha(QColor(0x8f, 0xf3, 0xff), 0.7), 1.0));
+            p.drawPolygon(inner);
+        }
+        if (s.isActive() && s.isDisarmed()) {
+            // Sonnée : anneau en pointillés et cadenas.
+            QPen dashed(Theme::kAccentBright, 1.8);
+            dashed.setDashPattern({2, 3});
+            p.setPen(dashed);
+            p.setBrush(Qt::NoBrush);
+            p.drawEllipse(pos, drawRadius * 1.3, drawRadius * 1.3);
+            const QRectF lock(pos.x() + drawRadius * 0.9, pos.y() - drawRadius * 1.6, 18, 18);
+            p.fillPath(Theme::chamfer(lock.adjusted(-3, -3, 3, 3), 4), withAlpha(Theme::kField, 0.9));
+            Theme::paintIcon(p, QStringLiteral("lock"), lock, Theme::kAccentBright);
+        }
         p.restore();
 
-        // Étiquette.
-        QFont f = font();
-        f.setBold(true);
-        p.setFont(f);
-        p.setPen(slotColor(i));
+        // Étiquette inclinée à la couleur de la place.
         const QString label = i == m_session->localPlayer() ? tr("VOUS") : state.names.value(i);
-        p.drawText(QRectF(pos.x() - 70, pos.y() - drawRadius - 22, 140, 18), Qt::AlignCenter,
-                   p.fontMetrics().elidedText(label, Qt::ElideRight, 140));
+        QFont f = Theme::displayFont(12);
+        f.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
+        const QString text = QFontMetrics(f).elidedText(label.toUpper(), Qt::ElideRight, 130);
+        const double tw = QFontMetrics(f).horizontalAdvance(text) + 26;
+        const QRectF tag(pos.x() - tw / 2.0, pos.y() - drawRadius - 34, tw, 20);
+        p.save();
+        if (out)
+            p.setOpacity(0.5);
+        p.fillPath(Theme::skewed(tag, 7), slotColor(i));
+        p.setPen(Qt::NoPen);
+        p.setBrush(slotColor(i));
+        p.drawPolygon(QPolygonF{QPointF(pos.x() - 5, tag.bottom()), QPointF(pos.x() + 5, tag.bottom()),
+                                QPointF(pos.x(), tag.bottom() + 6)});
+        p.setFont(f);
+        p.setPen(QColor(0x05, 0x04, 0x0f));
+        p.drawText(tag, Qt::AlignCenter, text);
+        p.restore();
     }
 
     // Étincelles de duel.
@@ -655,7 +849,7 @@ void ArenaWidget::paintSpinners(QPainter &p)
         const double t = ember.age / kEmberLifetime;
         const QPointF head = toScreen({ember.position.x(), ember.position.y()});
         const QPointF tail = head - ember.velocity * (scale() * 0.04);
-        QColor color = QColor(255, 210, 90).lighter(100 + int(60 * (1.0 - t)));
+        QColor color = (int(ember.age * 100) % 3) ? Theme::kWarning : QColor(Qt::white);
         color.setAlphaF(1.0 - t);
         p.setPen(QPen(color, 2.2, Qt::SolidLine, Qt::RoundCap));
         p.drawLine(tail, head);
@@ -666,15 +860,18 @@ void ArenaWidget::paintSpinners(QPainter &p)
         const double t = spark.age / kSparkLifetime;
         const QPointF c = toScreen({spark.position.x(), spark.position.y()});
         const double size = radius * (0.6 + 1.6 * t) * (0.6 + spark.intensity);
-        QColor color = spark.color.isValid() ? spark.color : QColor(255, 230, 120);
-        color.setAlphaF(1.0 - t);
-        p.setPen(QPen(color, 2.5));
-        p.setBrush(Qt::NoBrush);
+        const QColor color = spark.color.isValid() ? spark.color : Theme::kWarning;
+        QRadialGradient flash(c, size);
+        flash.setColorAt(0.0, withAlpha(Qt::white, 0.8 * (1.0 - t)));
+        flash.setColorAt(1.0, withAlpha(color, 0.0));
+        p.setPen(Qt::NoPen);
+        p.setBrush(flash);
         p.drawEllipse(c, size, size);
-        for (int k = 0; k < 6; ++k) {
-            const double a = k * M_PI / 3.0 + spark.intensity;
+        p.setPen(QPen(withAlpha(color, 1.0 - t), 2.2, Qt::SolidLine, Qt::RoundCap));
+        for (int k = 0; k < 8; ++k) {
+            const double a = k * M_PI / 4.0 + spark.intensity;
             const QPointF dir(std::cos(a), std::sin(a));
-            p.drawLine(c + dir * size * 0.6, c + dir * size * 1.2);
+            p.drawLine(c + dir * size * 0.5, c + dir * size * (k % 2 ? 1.0 : 1.35));
         }
     }
 }
@@ -683,26 +880,28 @@ void ArenaWidget::paintHud(QPainter &p)
 {
     const MatchState &state = m_session->state();
     const int count = std::max(1, state.playerCount());
-    const double margin = 10.0;
-    if (count <= 2) {
-        const double panelWidth = std::min(330.0, (width() - 3 * margin) / 2.0 - 40);
-        paintSpinnerHud(p, 0, QRectF(margin, 8, panelWidth, kHudHeight - 16));
-        if (count == 2)
-            paintSpinnerHud(p, 1, QRectF(width() - margin - panelWidth, 8, panelWidth,
-                                         kHudHeight - 16));
-    } else {
-        const double panelWidth = (width() - (count + 1) * margin) / count;
-        for (int i = 0; i < count; ++i)
-            paintSpinnerHud(p, i, QRectF(margin + i * (panelWidth + margin), 8, panelWidth,
-                                         kHudHeight - 16));
-    }
+    const double margin = 12.0;
 
-    // Chronomètre et stadium.
-    QFont f = font();
-    f.setPointSizeF(f.pointSizeF() * 1.6);
-    f.setBold(true);
-    p.setFont(f);
-    p.setPen(QColor(230, 232, 240));
+    // Bandeau du haut : stadium à gauche, chrono et manche au centre.
+    const QColor accent = QColor::fromRgb(state.stadium.accent);
+    QFont name = Theme::displayFont(18);
+    name.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+    p.setFont(name);
+    p.setPen(Theme::kText);
+    const QString stadiumName = state.stadium.name.toUpper();
+    p.drawText(QRectF(margin + 4, 6, 400, 26), Qt::AlignLeft | Qt::AlignVCenter, stadiumName);
+    QFont code = Theme::displayFont(12);
+    code.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+    p.setFont(code);
+    p.setPen(accent);
+    p.drawText(QRectF(margin + 4, 30, 400, 18), Qt::AlignLeft | Qt::AlignVCenter,
+               QStringLiteral("// %1").arg(state.stadium.codename.toUpper()));
+
+    const QRectF tab(width() / 2.0 - 150, 2, 300, kTopBar - 6);
+    p.fillPath(Theme::chamfer(tab, 0, 0, 16, 16), withAlpha(Theme::kPanel, 0.92));
+    p.setPen(QPen(Theme::kBorderBright, 1.2));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(Theme::chamfer(tab, 0, 0, 16, 16));
     // Avec une limite : compte à rebours ; sans limite : temps écoulé.
     QString timer;
     if (state.config.maxDuration > 0.0) {
@@ -712,33 +911,43 @@ void ArenaWidget::paintHud(QPainter &p)
         const int seconds = static_cast<int>(state.elapsed);
         timer = QStringLiteral("%1:%2").arg(seconds / 60).arg(seconds % 60, 2, 10, QLatin1Char('0'));
     }
-    if (count <= 2) {
-        p.drawText(QRectF(0, 8, width(), kHudHeight - 16), Qt::AlignHCenter | Qt::AlignVCenter,
-                   timer);
-        if (state.series) {
-            // Match de tournoi : score avant cette manche.
-            QFont small = font();
-            small.setBold(true);
-            p.setFont(small);
-            p.setPen(Theme::kAccent);
-            p.drawText(QRectF(0, kHudHeight - 34, width(), 20), Qt::AlignHCenter,
-                       tr("Manche %1 · %2 – %3")
-                           .arg(state.series->rounds + 1)
-                           .arg(state.series->score[0])
-                           .arg(state.series->score[1]));
-            p.setFont(f);
-            p.setPen(QColor(230, 232, 240));
-        }
-    } else {
-        p.drawText(QRectF(margin, kHudHeight + 4, 120, 30), Qt::AlignLeft | Qt::AlignVCenter,
-                   timer);
+    p.setFont(Theme::displayFont(24));
+    p.setPen(Theme::kText);
+    p.drawText(QRectF(tab.left(), tab.top() + 2, tab.width(), 30), Qt::AlignCenter, timer);
+    QString line;
+    if (state.series)
+        line = tr("Manche %1 · %2 – %3")
+                   .arg(state.series->rounds + 1)
+                   .arg(state.series->score[0])
+                   .arg(state.series->score[1]);
+    else if (count > 2)
+        line = tr("Mêlée à %1").arg(count);
+    if (!line.isEmpty()) {
+        QFont small = Theme::displayFont(12);
+        small.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+        p.setFont(small);
+        p.setPen(state.series ? Theme::kAccent : Theme::kMuted);
+        p.drawText(QRectF(tab.left(), tab.top() + 31, tab.width(), 16), Qt::AlignCenter, line.toUpper());
     }
-    f.setPointSizeF(font().pointSizeF());
-    f.setBold(false);
-    p.setFont(f);
-    p.setPen(QColor(170, 175, 190));
-    p.drawText(QRectF(width() - 260 - margin, kHudHeight + 4, 260, 24),
-               Qt::AlignRight | Qt::AlignVCenter, tr("Stadium %1").arg(state.stadium.name));
+    p.setFont(Theme::bodyFont(14, QFont::Bold));
+    p.setPen(Theme::kMuted);
+    p.drawText(QRectF(width() - margin - 300, 6, 300, 40), Qt::AlignRight | Qt::AlignVCenter,
+               state.config.maxDuration > 0.0 ? tr("Limite %1 s").arg(qRound(state.config.maxDuration))
+                                              : tr("Sans limite de temps"));
+
+    // Fiches des toupies en bas.
+    const double cardHeight = kBottomHud - 12;
+    const double top = height() - kBottomHud + 4;
+    if (count <= 2) {
+        const double cardWidth = std::min(430.0, (width() - 3 * margin) / 2.0);
+        paintSpinnerHud(p, 0, QRectF(margin, top, cardWidth, cardHeight));
+        if (count == 2)
+            paintSpinnerHud(p, 1, QRectF(width() - margin - cardWidth, top, cardWidth, cardHeight));
+    } else {
+        const double cardWidth = (width() - (count + 1) * margin) / count;
+        for (int i = 0; i < count; ++i)
+            paintSpinnerHud(p, i, QRectF(margin + i * (cardWidth + margin), top, cardWidth, cardHeight));
+    }
 }
 
 void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
@@ -746,138 +955,139 @@ void ArenaWidget::paintSpinnerHud(QPainter &p, int index, const QRectF &rect)
     const MatchState &state = m_session->state();
     const Spinner &s = state.spinners[index];
     const bool local = index == m_session->localPlayer();
-    const bool alignRight = state.playerCount() == 2 && index == 1;
     const QColor accent = slotColor(index);
-    const Qt::Alignment align = (alignRight ? Qt::AlignRight : Qt::AlignLeft) | Qt::AlignVCenter;
+    const bool out = s.status != Spinner::Status::Waiting && !s.isActive();
 
-    QColor border = accent;
-    border.setAlpha(local ? 230 : 90);
-    p.setPen(QPen(border, local ? 2.0 : 1.0));
-    QColor panel = Theme::kPanel;
-    panel.setAlpha(230);
-    p.setBrush(panel);
-    p.drawRoundedRect(rect, 10, 10);
+    p.save();
+    if (out)
+        p.setOpacity(0.55);
+    const QPainterPath card = Theme::chamfer(rect, 18);
+    p.fillPath(card, withAlpha(QColor(0x0b, 0x09, 0x30), 0.9));
+    p.setPen(QPen(local ? accent : withAlpha(accent, 0.55), local ? 2.0 : 1.2));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(card);
+    p.fillRect(QRectF(rect.left() + 18, rect.top() - 1, 50, 3), accent);
 
-    const QRectF inner = rect.adjusted(10, 6, -10, -6);
-    QFont f = font();
-    f.setBold(true);
-    p.setFont(f);
+    const double mini = std::min(30.0, rect.height() * 0.28);
+    TopPainter::paint(p, s.top, QPointF(rect.left() + 16 + mini, rect.top() + 16 + mini), mini,
+                      s.angle);
+    const double textLeft = rect.left() + 32 + mini * 2;
+    const double textWidth = rect.right() - textLeft - 90;
+    QFont title = Theme::displayFont(17);
+    title.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+    p.setFont(title);
     p.setPen(accent);
-    const QString title = QStringLiteral("%1 — %2 (%3)")
-                              .arg(local ? tr("Vous") : state.names.value(index), s.top.name(),
-                                   toString(s.top.type()));
-    p.drawText(QRectF(inner.left(), inner.top(), inner.width(), 18), align,
-               p.fontMetrics().elidedText(title, Qt::ElideRight, int(inner.width())));
+    const QString who = (local ? tr("Vous") : state.names.value(index)).toUpper();
+    p.drawText(QRectF(textLeft, rect.top() + 10, textWidth + 80, 24), Qt::AlignLeft | Qt::AlignVCenter,
+               QFontMetrics(title).elidedText(who, Qt::ElideRight, int(textWidth + 20)));
+    p.setFont(Theme::bodyFont(14, QFont::DemiBold));
+    p.setPen(Theme::kMuted);
+    p.drawText(QRectF(textLeft, rect.top() + 34, textWidth + 40, 18), Qt::AlignLeft | Qt::AlignVCenter,
+               p.fontMetrics().elidedText(
+                   QStringLiteral("%1 · %2").arg(s.top.name(), toString(s.top.type())),
+                   Qt::ElideRight, int(textWidth + 30)));
 
-    // Barre d'endurance.
-    const QRectF bar(inner.left(), inner.top() + 22, inner.width(), 14);
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0, 0, 0, 120));
-    p.drawRoundedRect(bar, 5, 5);
+    // Endurance : valeur et jauge inclinée (repère rouge à 25 %).
     const double ratio = std::clamp(s.spinRatio(), 0.0, 1.0);
-    QRectF fill = bar;
-    fill.setWidth(bar.width() * ratio);
-    if (alignRight)
-        fill.moveRight(bar.right());
-    const QColor barColor = ratio > 0.5 ? QColor(70, 200, 110)
-                          : ratio > 0.25 ? QColor(235, 185, 50)
-                                         : QColor(230, 70, 60);
-    p.setBrush(barColor);
-    p.drawRoundedRect(fill, 5, 5);
-    f.setBold(false);
-    f.setPointSizeF(font().pointSizeF() * 0.85);
-    p.setFont(f);
-    p.setPen(Qt::white);
-    p.drawText(bar, Qt::AlignCenter, tr("Endurance %1").arg(qRound(s.spin)));
+    const bool low = ratio < 0.25;
+    const QColor bar = low ? Theme::kDanger : ratio < 0.5 ? Theme::kWarning : Theme::kAccent;
+    p.setFont(Theme::displayFont(30));
+    p.setPen(low ? Theme::kDanger : Theme::kText);
+    p.drawText(QRectF(rect.right() - 96, rect.top() + 8, 80, 40), Qt::AlignRight | Qt::AlignVCenter,
+               QString::number(qRound(s.spin)));
+    const QRectF gauge(rect.left() + 16, rect.top() + 60, rect.width() - 32, 14);
+    p.fillPath(Theme::skewed(gauge, 8), Theme::kField);
+    p.setPen(QPen(Theme::kBorder, 1.0));
+    p.drawPath(Theme::skewed(gauge, 8));
+    if (ratio > 0.0) {
+        QRectF fill = gauge;
+        fill.setWidth(std::max(10.0, gauge.width() * ratio));
+        QLinearGradient g(fill.topLeft(), fill.topRight());
+        g.setColorAt(0.0, bar);
+        g.setColorAt(1.0, low ? Theme::kWarning : s.isSlowed() ? Theme::kCyan : Theme::kAccentBright);
+        if (low && s.isActive())
+            p.setOpacity(p.opacity() * (0.65 + 0.35 * std::sin(state.elapsed * 25.0)));
+        p.fillPath(Theme::skewed(fill, 8), g);
+        p.fillPath(Theme::skewed(QRectF(fill.left() + 2, fill.top() + 2, fill.width() - 4, 4), 3),
+                   QColor(255, 255, 255, 70));
+        p.setOpacity(out ? 0.55 : 1.0);
+    }
+    const double mark = gauge.left() + gauge.width() * 0.25;
+    p.setPen(QPen(Theme::kDanger, 2.0));
+    p.drawLine(QPointF(mark + 4, gauge.top() - 3), QPointF(mark - 4, gauge.bottom() + 3));
 
-    // Coup spécial : disponible une seule fois par partie.
+    // Coup spécial (une fois par partie) et état du dash.
+    const QRectF row(rect.left() + 16, gauge.bottom() + 8, rect.width() - 32, 20);
     const auto move = SpecialMove::find(s.top.special());
-    const QRectF gauge(inner.left(), bar.bottom() + 4, inner.width(), 12);
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0, 0, 0, 120));
-    p.drawRoundedRect(gauge, 4, 4);
     if (move && state.config.specialsEnabled) {
         const bool available = !s.specialUsed && s.isActive() && !s.isDisarmed();
-        QColor pill = QColor::fromRgb(move->color);
-        if (available) {
-            const double pulse = 0.5 + 0.5 * std::sin(state.elapsed * 5.0);
-            pill = pill.lighter(100 + int(25 * pulse));
-        } else {
-            pill = QColor(70, 76, 84);
-        }
-        p.setBrush(pill);
-        p.drawRoundedRect(gauge, 4, 4);
-        QFont small = font();
-        small.setPointSizeF(font().pointSizeF() * 0.75);
-        small.setBold(available);
-        p.setFont(small);
-        p.setPen(available ? QColor(20, 22, 26) : QColor(160, 166, 174));
+        QColor color = available ? QColor::fromRgb(move->color) : Theme::kDim;
+        if (available)
+            color = color.lighter(100 + int(20 * (0.5 + 0.5 * std::sin(state.elapsed * 5.0))));
+        TopPainter::paintEmblem(p, s.top.special(), QPointF(row.left() + 9, row.center().y()), 8,
+                                color, 1.6);
         QString label = move->name;
         if (s.specialUsed)
             label = tr("%1 — utilisé").arg(move->name);
         else if (local && state.phase == MatchPhase::Fighting)
             label = tr("%1 : %2 (coûte ¼ de l'endurance)")
                         .arg(Controls::instance().text(Action::Special), move->name);
-        p.drawText(gauge, Qt::AlignCenter,
-                   QFontMetrics(small).elidedText(label, Qt::ElideRight, int(gauge.width()) - 6));
+        QFont f = Theme::bodyFont(14, QFont::Bold);
         p.setFont(f);
+        p.setPen(color);
+        p.drawText(QRectF(row.left() + 24, row.top(), row.width() * 0.62 - 24, row.height()),
+                   Qt::AlignLeft | Qt::AlignVCenter,
+                   QFontMetrics(f).elidedText(label, Qt::ElideRight, int(row.width() * 0.62 - 26)));
     }
 
-    // Indicateur de dash ou état.
-    const QRectF dashRect(inner.left(), gauge.bottom() + 3, inner.width(), 14);
     QString text;
     QColor color;
     const QString status = statusText(s.status);
     if (!status.isEmpty()) {
         text = status;
-        color = QColor(230, 110, 100);
+        color = Theme::kDanger;
     } else if (state.duel.sideOf(index) >= 0) {
         text = tr("DUEL !");
-        color = QColor(255, 210, 90);
+        color = Theme::kWarning;
     } else if (s.isSlowed()) {
         text = tr("Gelée (%1 s)").arg(s.slowTimer, 0, 'f', 1);
-        color = QColor(155, 231, 255);
+        color = QColor(0x8f, 0xf3, 0xff);
     } else if (s.isDisarmed()) {
         text = tr("Sonnée : ni dash ni coup spécial (%1 s)").arg(s.disarmTimer, 0, 'f', 1);
-        color = QColor(255, 179, 71);
+        color = Theme::kAccentBright;
     } else if (state.phase == MatchPhase::Aiming) {
         text = state.aimed.value(index) ? tr("Prêt à lancer") : tr("Vise…");
-        color = state.aimed.value(index) ? QColor(120, 230, 150) : QColor(170, 170, 180);
+        color = state.aimed.value(index) ? Theme::kAccent : Theme::kMuted;
     } else if (s.isBoosted()) {
         text = tr("DASH !");
-        color = QColor(255, 220, 90);
+        color = Theme::kCyan;
     } else if (s.dashCooldown > 0.0) {
         text = tr("Dash dans %1 s").arg(s.dashCooldown, 0, 'f', 1);
-        color = QColor(170, 170, 180);
+        color = Theme::kMuted;
     } else if (s.spin <= state.config.dashCost) {
         text = tr("Dash impossible");
-        color = QColor(170, 90, 90);
+        color = Theme::kDanger;
     } else {
         text = local ? tr("Dash prêt (%1)").arg(Controls::instance().text(Action::Dash))
                      : tr("Dash prêt");
-        color = QColor(120, 230, 150);
+        color = Theme::kAccent;
     }
+    QFont f = Theme::displayFont(12);
+    f.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
+    p.setFont(f);
     p.setPen(color);
-    p.drawText(dashRect, align, p.fontMetrics().elidedText(text, Qt::ElideRight,
-                                                            int(dashRect.width())));
+    const double right = row.width() * (move && state.config.specialsEnabled ? 0.38 : 1.0);
+    p.drawText(QRectF(row.right() - right, row.top(), right, row.height()),
+               Qt::AlignRight | Qt::AlignVCenter,
+               QFontMetrics(f).elidedText(text.toUpper(), Qt::ElideRight, int(right)));
+    p.restore();
 }
 
 void ArenaWidget::paintOverlay(QPainter &p)
 {
     const MatchState &state = m_session->state();
-    const QRectF area(0, kHudHeight, width(), height() - kHudHeight);
-    QFont big = font();
-    big.setBold(true);
-
-    auto banner = [&](const QString &text, double sizeFactor, const QColor &color, double dy) {
-        big.setPointSizeF(font().pointSizeF() * sizeFactor);
-        p.setFont(big);
-        const QRectF r = area.translated(0, dy);
-        p.setPen(QColor(0, 0, 0, 170));
-        p.drawText(r.translated(2, 2), Qt::AlignCenter, text);
-        p.setPen(color);
-        p.drawText(r, Qt::AlignCenter, text);
-    };
+    const QRectF area(0, kTopBar, width(), height() - kTopBar - kBottomHud);
+    const QPointF c = area.center();
 
     switch (state.phase) {
     case MatchPhase::Aiming: {
@@ -886,89 +1096,126 @@ void ArenaWidget::paintOverlay(QPainter &p)
             const int ready = static_cast<int>(std::count(state.aimed.begin(), state.aimed.end(), true));
             hint = tr("En attente des autres joueurs (%1/%2)").arg(ready).arg(state.playerCount());
         } else {
-            const Controls &c = Controls::instance();
+            const Controls &controls = Controls::instance();
             hint = tr("Direction : souris ou %1 %2  ·  Force : distance ou %3 %4  ·  Lancer : %5")
-                       .arg(Controls::codeText(c.binding(Action::SteerLeft, 0)),
-                            Controls::codeText(c.binding(Action::SteerRight, 0)),
-                            Controls::codeText(c.binding(Action::SteerUp, 0)),
-                            Controls::codeText(c.binding(Action::SteerDown, 0)),
-                            c.text(Action::Dash));
+                       .arg(Controls::codeText(controls.binding(Action::SteerLeft, 0)),
+                            Controls::codeText(controls.binding(Action::SteerRight, 0)),
+                            Controls::codeText(controls.binding(Action::SteerUp, 0)),
+                            Controls::codeText(controls.binding(Action::SteerDown, 0)),
+                            controls.text(Action::Dash));
         }
-        QFont f = font();
-        f.setBold(true);
-        f.setPointSizeF(font().pointSizeF() * 1.15);
+        const QFont f = Theme::bodyFont(16, QFont::Bold);
+        const double w = std::min(width() - 40.0, QFontMetrics(f).horizontalAdvance(hint) + 60.0);
+        const QRectF box(width() / 2.0 - w / 2.0, area.top() + 6, w, 34);
+        p.fillPath(Theme::chamfer(box, 10), withAlpha(Theme::kPanel, 0.92));
+        p.setPen(QPen(Theme::kCyan, 1.3));
+        p.setBrush(Qt::NoBrush);
+        p.drawPath(Theme::chamfer(box, 10));
         p.setFont(f);
-        const QRectF box(width() / 2.0 - 330, area.top() + 4, 660, 30);
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0, 0, 0, 150));
-        p.drawRoundedRect(box, 8, 8);
-        p.setPen(Qt::white);
-        p.drawText(box, Qt::AlignCenter, hint);
+        p.setPen(Theme::kText);
+        p.drawText(box, Qt::AlignCenter, QFontMetrics(f).elidedText(hint, Qt::ElideRight, int(w - 20)));
         break;
     }
     case MatchPhase::Countdown: {
         const int n = std::max(1, static_cast<int>(std::ceil(state.countdown)));
-        banner(QString::number(n), 5.0, QColor(255, 255, 255), 0);
+        chromaText(p, area, Qt::AlignCenter, QString::number(n), Theme::displayFont(150, true),
+                   Qt::white, 7);
         break;
     }
     case MatchPhase::Fighting:
         if (m_flash > 0.0) {
             p.save();
             p.setOpacity(std::min(1.0, m_flash * 2.0));
-            banner(tr("Partez !"), 4.0, QColor(255, 220, 90), 0);
+            const QRectF r(c.x() - 330, c.y() - 55, 660, 110);
+            band(p, r, Theme::kAccent, false);
+            chromaText(p, r, Qt::AlignCenter, tr("Partez !").toUpper(), Theme::displayFont(64, true),
+                       Qt::white, 5);
             p.restore();
         }
         if (m_duelResultTimer > 0.0) {
             p.save();
             p.setOpacity(std::min(1.0, m_duelResultTimer * 1.5));
-            banner(m_duelResult, 2.6, m_duelResultColor, -120);
+            const QRectF r(c.x() - 300, c.y() - 170, 600, 70);
+            band(p, r, m_duelResultColor, false);
+            chromaText(p, r, Qt::AlignCenter, m_duelResult.toUpper(), Theme::displayFont(38, true),
+                       m_duelResultColor, 3);
             p.restore();
         }
         break;
     case MatchPhase::Finished: {
-        p.fillRect(area, QColor(0, 0, 0, 120));
+        p.fillRect(area, QColor(5, 4, 15, 150));
         const int winner = state.winner;
         const int local = m_session->localPlayer();
         const QString title = winner == local ? tr("Victoire !")
                             : winner < 0      ? tr("Match nul")
                                               : tr("Défaite…");
-        const QColor color = winner == local ? QColor(120, 230, 150)
-                           : winner < 0      ? QColor(230, 230, 230)
-                                             : QColor(240, 110, 90);
-        banner(title, 3.6, color, -70);
+        const QColor color = winner == local ? Theme::kAccent
+                           : winner < 0      ? Theme::kText
+                                             : Theme::kDanger;
+        double y = c.y() - 150;
+        if (state.playerCount() > 2)
+            y -= 40;
+        chromaText(p, QRectF(0, y, width(), 110), Qt::AlignCenter, title.toUpper(),
+                   Theme::displayFont(std::min(96.0, width() / 9.0), true),
+                   winner == local ? QColor(Qt::white) : color, 6);
+        y += 112;
+        const QString reason = endReasonText(state.endReason, state.playerCount());
+        if (!reason.isEmpty()) {
+            QFont f = Theme::displayFont(15);
+            f.setLetterSpacing(QFont::AbsoluteSpacing, 3.0);
+            const double w = QFontMetrics(f).horizontalAdvance(reason.toUpper()) + 80;
+            const QRectF r(c.x() - w / 2.0, y, w, 38);
+            band(p, r, color, true);
+            p.setFont(f);
+            p.setPen(winner < 0 ? Theme::kVoid : QColor(0x03, 0x14, 0x0a));
+            p.drawText(r, Qt::AlignCenter, reason.toUpper());
+            y += 54;
+        }
+        auto line = [&](const QString &text, const QFont &font, const QColor &col) {
+            p.setFont(font);
+            p.setPen(col);
+            p.drawText(QRectF(0, y, width(), 30), Qt::AlignCenter, text);
+            y += 32;
+        };
         if (winner >= 0 && winner != local)
-            banner(tr("%1 remporte le combat").arg(state.names.value(winner)), 1.3,
-                   slotColor(winner), -20);
-        banner(endReasonText(state.endReason, state.playerCount()), 1.1, QColor(235, 235, 240),
-               14);
+            line(tr("%1 remporte le combat").arg(state.names.value(winner)),
+                 Theme::displayFont(20), slotColor(winner));
         if (state.series) {
             MatchSeries after = *state.series;
             after.recordRound(winner, state.endReason);
             const int gained = winner >= 0 ? after.score[winner] - state.series->score[winner] : 0;
-            QString line = tr("Score du match : %1 – %2").arg(after.score[0]).arg(after.score[1]);
+            QString text = tr("Score du match : %1 – %2").arg(after.score[0]).arg(after.score[1]);
             if (gained > 0)
-                line += tr("  (+%n pt(s) pour %1)", nullptr, gained).arg(
-                    winner == local ? tr("vous") : state.names.value(winner));
-            banner(line, 1.2, Theme::kAccent, 52);
+                text += tr("  (+%n pt(s) pour %1)", nullptr, gained)
+                            .arg(winner == local ? tr("vous") : state.names.value(winner));
+            line(text, Theme::displayFont(18), Theme::kAccent);
             if (after.isOver()) {
                 const bool won = after.winner() == local;
-                banner(won ? tr("Match remporté !") : tr("Match perdu"), 1.6,
-                       won ? QColor(120, 230, 150) : QColor(240, 110, 90), 92);
+                line(won ? tr("Match remporté !") : tr("Match perdu"), Theme::displayFont(26, true),
+                     won ? Theme::kAccent : Theme::kDanger);
             } else {
-                banner(tr("Manche suivante dans quelques secondes…"), 1.0, QColor(200, 204, 214),
-                       90);
+                line(tr("Manche suivante dans quelques secondes…"), Theme::bodyFont(17), Theme::kMuted);
             }
         }
 
         if (state.playerCount() > 2) {
-            QStringList lines;
+            // Classement de la mêlée.
+            const double w = std::min(440.0, width() - 40.0);
+            const QRectF panel(c.x() - w / 2.0, y + 4, w, 18 + 30.0 * state.ranking.size());
+            Theme::paintPanel(p, panel, Theme::kCyan, 14);
             for (int rank = 0; rank < state.ranking.size(); ++rank) {
                 const int idx = state.ranking.at(rank);
-                lines << QStringLiteral("%1. %2 (%3)")
-                             .arg(rank + 1)
-                             .arg(state.names.value(idx), state.spinners[idx].top.name());
+                const QRectF row(panel.left() + 22, panel.top() + 10 + rank * 30, w - 44, 28);
+                p.setFont(Theme::displayFont(18));
+                p.setPen(rank == 0 ? Theme::kWarning : Theme::kMuted);
+                p.drawText(row, Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("%1.").arg(rank + 1));
+                p.setPen(slotColor(idx));
+                p.drawText(row.adjusted(40, 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter,
+                           (idx == local ? tr("Vous") : state.names.value(idx)).toUpper());
+                p.setFont(Theme::bodyFont(15, QFont::DemiBold));
+                p.setPen(Theme::kMuted);
+                p.drawText(row, Qt::AlignRight | Qt::AlignVCenter, state.spinners[idx].top.name());
             }
-            banner(lines.join('\n'), 1.0, QColor(220, 222, 230), 40 + 12 * lines.size());
         }
         break;
     }
@@ -983,15 +1230,14 @@ void ArenaWidget::paintTutorial(QPainter &p)
         return;
 
     // Bulle au-dessus de la toupie désignée (ou au centre), avec une pointe.
-    QFont f = font();
-    f.setPointSizeF(font().pointSizeF() * 1.05);
+    const QFont f = Theme::bodyFont(17, QFont::DemiBold);
     p.setFont(f);
-    const double bubbleWidth = std::min(420.0, width() - 40.0);
+    const double bubbleWidth = std::min(440.0, width() - 40.0);
     const QString text = tutorial->bubble();
     const QRectF textRect = p.fontMetrics().boundingRect(
-        QRect(0, 0, int(bubbleWidth - 32), 1000), Qt::TextWordWrap, text);
-    const double footer = tutorial->isPaused() ? 22.0 : 0.0;
-    const QSizeF size(bubbleWidth, textRect.height() + 28 + footer);
+        QRect(0, 0, int(bubbleWidth - 40), 1000), Qt::TextWordWrap, text);
+    const double footer = tutorial->isPaused() ? 24.0 : 0.0;
+    const QSizeF size(bubbleWidth, textRect.height() + 30 + footer);
     const int target = tutorial->bubbleTarget();
     // Sans toupie désignée (dernière bulle) : sous le bandeau de victoire.
     QPointF anchor = center() + QPointF(0, height() * 0.2);
@@ -1001,40 +1247,40 @@ void ArenaWidget::paintTutorial(QPainter &p)
                                                                : s.position);
     }
     const double radius = state.config.topRadius * scale();
-    const bool below = target >= 0 && anchor.y() - radius - 16 - size.height() < kHudHeight;
+    const bool below = target >= 0 && anchor.y() - radius - 40 - size.height() < kTopBar;
     QRectF box(anchor.x() - size.width() / 2.0,
-               below ? anchor.y() + radius + 16 : anchor.y() - radius - 16 - size.height(),
+               below ? anchor.y() + radius + 18 : anchor.y() - radius - 40 - size.height(),
                size.width(), size.height());
     if (target < 0)
         box.moveCenter(anchor);
     box.moveLeft(std::clamp(box.left(), 10.0, width() - box.width() - 10.0));
 
-    QPainterPath path;
-    path.addRoundedRect(box, 12, 12);
+    QPainterPath path = Theme::chamfer(box, 16);
     if (target >= 0) {
-        const double x = std::clamp(anchor.x(), box.left() + 24, box.right() - 24);
+        const double x = std::clamp(anchor.x(), box.left() + 30, box.right() - 30);
         const double edge = below ? box.top() : box.bottom();
-        const double tip = below ? anchor.y() + radius + 2 : anchor.y() - radius - 2;
+        const double tip = below ? anchor.y() + radius + 4 : anchor.y() - radius - 4;
         QPolygonF tail;
-        tail << QPointF(x - 10, edge) << QPointF(x, tip) << QPointF(x + 10, edge);
+        tail << QPointF(x - 11, edge) << QPointF(x, tip) << QPointF(x + 11, edge);
         path.addPolygon(tail);
         path.setFillRule(Qt::WindingFill);
+        path = path.simplified();
     }
-    p.setPen(QPen(Theme::kAccent, 2.0));
-    QColor fill = Theme::kPanel;
-    fill.setAlpha(240);
-    p.setBrush(fill);
-    p.drawPath(path.simplified());
-    p.setPen(QColor(235, 238, 242));
-    p.drawText(box.adjusted(16, 14, -16, -14 - footer), Qt::TextWordWrap, text);
+    p.fillPath(path, withAlpha(QColor(0x0b, 0x09, 0x30), 0.96));
+    p.setPen(QPen(Theme::kCyan, 1.6));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(path);
+    p.fillRect(QRectF(box.left(), box.top() + 18, 4, 36), Theme::kCyan);
+    p.setFont(f);
+    p.setPen(Theme::kText);
+    p.drawText(box.adjusted(20, 15, -20, -15 - footer), Qt::TextWordWrap, text);
     if (tutorial->isPaused()) {
-        QFont small = font();
-        small.setPointSizeF(font().pointSizeF() * 0.85);
-        small.setBold(true);
+        QFont small = Theme::displayFont(12);
+        small.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
         p.setFont(small);
         p.setPen(Theme::kAccent);
-        p.drawText(box.adjusted(16, 0, -16, -10), Qt::AlignBottom | Qt::AlignRight,
-                   tr("⏸ Jeu en pause"));
+        p.drawText(box.adjusted(20, 0, -20, -12), Qt::AlignBottom | Qt::AlignRight,
+                   tr("Jeu en pause").toUpper());
     }
 }
 
@@ -1046,19 +1292,20 @@ void ArenaWidget::paintDuel(QPainter &p)
     const Duel &duel = state.duel;
     const int local = m_session->localPlayer();
     const int mine = duel.sideOf(local);
-    const double big = std::min(560.0, width() - 80.0);
+    const double big = std::min(640.0, width() - 120.0);
     const double small = big * 0.6;
+    const double bottom = height() - kBottomHud - 18;
 
     if (mine >= 0) {
         // Ma barre en bas, celle de l'adversaire juste au-dessus en plus petit.
-        const QRectF mineRect(width() / 2.0 - big / 2.0, height() - 58, big, 26);
-        const QRectF otherRect(width() / 2.0 - small / 2.0, mineRect.top() - 46, small, 13);
+        const QRectF mineRect(width() / 2.0 - big / 2.0, bottom - 34, big, 34);
+        const QRectF otherRect(width() / 2.0 - small / 2.0, mineRect.top() - 66, small, 16);
         const int other = mine == 0 ? duel.second : duel.first;
         paintDuelBar(p, otherRect, other, duel.sides[1 - mine], false);
         paintDuelBar(p, mineRect, local, duel.sides[mine], true);
     } else {
         for (int k = 0; k < 2; ++k) {
-            const QRectF rect(width() / 2.0 - small / 2.0, height() - 40 - (1 - k) * 46, small, 13);
+            const QRectF rect(width() / 2.0 - small / 2.0, bottom - 16 - (1 - k) * 52, small, 16);
             paintDuelBar(p, rect, k == 0 ? duel.first : duel.second, duel.sides[k], false);
         }
     }
@@ -1069,53 +1316,60 @@ void ArenaWidget::paintDuelBar(QPainter &p, const QRectF &rect, int spinner, con
 {
     const MatchState &state = m_session->state();
     const double half = rect.width() / 2.0;
-    const double radius = rect.height() / 2.0;
+    const double slant = rect.height() * 0.5;
 
     // Libellé au-dessus de la barre.
-    QFont f = font();
-    f.setBold(true);
-    f.setPointSizeF(font().pointSizeF() * (local ? 1.1 : 0.85));
-    p.setFont(f);
-    const QRectF label(rect.left() - 40, rect.top() - (local ? 24 : 18), rect.width() + 80,
-                       local ? 22 : 16);
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0, 0, 0, 150));
-    p.drawRoundedRect(label.adjusted(30, 0, -30, 0), 6, 6);
-    p.setPen(slotColor(spinner));
+    QFont f = Theme::displayFont(local ? 15 : 12);
+    f.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
     QString text = local ? tr("DUEL ! %1 quand le curseur est dans le vert")
                                .arg(Controls::instance().text(Action::Dash))
                          : tr("Duel — %1").arg(state.names.value(spinner));
     if (side.done)
         text = local ? tr("Série réussie ! En attente de l'adversaire…")
                      : tr("%1 : série réussie").arg(state.names.value(spinner));
-    p.drawText(label, Qt::AlignCenter, text);
+    const double labelWidth = QFontMetrics(f).horizontalAdvance(text.toUpper()) + 40;
+    const QRectF label(rect.center().x() - labelWidth / 2.0, rect.top() - (local ? 32 : 24),
+                       labelWidth, local ? 24 : 18);
+    p.fillPath(Theme::chamfer(label, 6), withAlpha(Theme::kField, 0.9));
+    p.setFont(f);
+    p.setPen(slotColor(spinner));
+    p.drawText(label, Qt::AlignCenter, text.toUpper());
 
     // Fond rouge, zone verte centrale.
-    p.setPen(QPen(QColor(0, 0, 0, 160), 1.5));
-    p.setBrush(QColor(200, 58, 58));
-    p.drawRoundedRect(rect, radius, radius);
+    QLinearGradient red(rect.topLeft(), rect.topRight());
+    red.setColorAt(0.0, QColor(0x5a, 0x0f, 0x2a));
+    red.setColorAt(0.5, Theme::kDanger);
+    red.setColorAt(1.0, QColor(0x5a, 0x0f, 0x2a));
+    const QPainterPath bar = Theme::skewed(rect, slant);
+    p.fillPath(bar, red);
+    p.setPen(QPen(QColor(0xff, 0x7a, 0x9b), 1.2));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(bar);
     const double zone = side.done ? half : side.zone * half;
     const QRectF green(rect.center().x() - zone, rect.top(), 2.0 * zone, rect.height());
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(84, 214, 110));
-    p.drawRoundedRect(green, radius, radius);
+    QLinearGradient g(green.topLeft(), green.topRight());
+    g.setColorAt(0.0, Theme::kAccent);
+    g.setColorAt(1.0, Theme::kAccentBright);
+    p.fillPath(Theme::skewed(green, std::min(slant, zone)), g);
 
     // Curseur.
     const double x = rect.center().x() + std::clamp(side.cursor, -1.0, 1.0) * half;
-    QColor glow = Qt::white;
-    glow.setAlpha(90);
-    p.setPen(QPen(glow, local ? 9.0 : 6.0, Qt::SolidLine, Qt::RoundCap));
-    p.drawLine(QPointF(x, rect.top() - 4), QPointF(x, rect.bottom() + 4));
-    p.setPen(QPen(Qt::white, local ? 3.0 : 2.0, Qt::SolidLine, Qt::RoundCap));
-    p.drawLine(QPointF(x, rect.top() - 4), QPointF(x, rect.bottom() + 4));
+    const double grow = local ? 12.0 : 7.0;
+    const double w = local ? 9.0 : 6.0;
+    p.fillRect(QRectF(x - w, rect.top() - grow, 2 * w, rect.height() + 2 * grow), QColor(255, 255, 255, 50));
+    p.setPen(QPen(QColor(0x05, 0x04, 0x0f), 1.5));
+    p.setBrush(Qt::white);
+    p.drawPolygon(QPolygonF{QPointF(x - w, rect.top() - grow), QPointF(x + w, rect.top() - grow),
+                            QPointF(x + w * 0.4, rect.bottom() + grow), QPointF(x - w * 0.4, rect.bottom() + grow)});
 
-    // Série finale : une pastille par réussite à taille minimale.
-    const double dot = local ? 7.0 : 4.5;
+    // Série finale : un losange par réussite à taille minimale.
+    const double dot = local ? 8.0 : 5.0;
     for (int k = 0; k < state.config.duelStreak; ++k) {
-        const QPointF c(rect.right() + 14 + k * (dot * 2.6), rect.center().y());
-        p.setPen(QPen(QColor(84, 214, 110), 1.5));
-        p.setBrush(k < side.streak ? QColor(84, 214, 110) : Qt::NoBrush);
-        p.drawEllipse(c, dot, dot);
+        const QPointF c(rect.right() + 22 + k * (dot * 2.8), rect.center().y());
+        p.setPen(QPen(Theme::kAccent, 1.5));
+        p.setBrush(k < side.streak ? QBrush(Theme::kAccent) : QBrush(Qt::NoBrush));
+        p.drawPolygon(QPolygonF{c + QPointF(0, -dot), c + QPointF(dot, 0), c + QPointF(0, dot),
+                                c + QPointF(-dot, 0)});
     }
 }
 

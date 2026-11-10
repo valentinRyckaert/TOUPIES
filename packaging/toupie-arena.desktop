@@ -1,7 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Toupie Arena
-Comment=Combats de toupies en 2D, en solo ou en réseau local
+Name=Top Arena
+Comment=Combats de toupies en 2D, en solo contre des bots ou en réseau local
+Comment[en]=2D spinning top battles, solo against bots or over a local network
 Exec=toupie_arena
 Icon=toupie-arena
 Categories=Game;ArcadeGame;

@@ -1,4 +1,5 @@
 #include "ui/BuilderPage.h"
+#include "ui/Theme.h"
 
 #include "core/PartCatalog.h"
 #include "core/TopRepository.h"
@@ -28,7 +29,7 @@ QString partLabel(const Part &part)
 {
     if (part.kind == PartKind::Bolt) {
         const auto move = SpecialMove::find(part.special);
-        return QStringLiteral("%1  — coup spécial : %2").arg(part.name, move ? move->name : part.special);
+        return BuilderPage::tr("%1  — coup spécial : %2").arg(part.name, move ? move->name : part.special);
     }
     QString label = QStringLiteral("%1  (%2 / %3 / %4)")
                         .arg(part.name)
@@ -55,7 +56,10 @@ BuilderPage::BuilderPage(const PartCatalog &catalog, TopRepository &repository, 
     savedLayout->addWidget(m_list);
     auto *listButtons = new QHBoxLayout;
     auto *newButton = new QPushButton(tr("Nouvelle"), savedBox);
+    newButton->setProperty("glyph", QStringLiteral("plus"));
     m_deleteButton = new QPushButton(tr("Supprimer"), savedBox);
+    m_deleteButton->setProperty("variant", QStringLiteral("danger"));
+    m_deleteButton->setProperty("glyph", QStringLiteral("trash"));
     listButtons->addWidget(newButton);
     listButtons->addWidget(m_deleteButton);
     savedLayout->addLayout(listButtons);
@@ -66,12 +70,7 @@ BuilderPage::BuilderPage(const PartCatalog &catalog, TopRepository &repository, 
     auto *editor = new QVBoxLayout;
     root->addLayout(editor, 1);
 
-    auto *title = new QLabel(tr("Assembler une toupie"), this);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
-    titleFont.setBold(true);
-    title->setFont(titleFont);
-    title->setObjectName(QStringLiteral("title"));
+    auto *title = Theme::createTitle(tr("Assembler une toupie"), this);
     editor->addWidget(title);
 
     auto *help = new QLabel(
@@ -117,7 +116,11 @@ BuilderPage::BuilderPage(const PartCatalog &catalog, TopRepository &repository, 
 
     auto *buttons = new QHBoxLayout;
     auto *backButton = new QPushButton(tr("Retour au menu"), this);
+    backButton->setProperty("variant", QStringLiteral("ghost"));
+    backButton->setProperty("glyph", QStringLiteral("back"));
     auto *saveButton = new QPushButton(tr("Enregistrer"), this);
+    saveButton->setProperty("variant", QStringLiteral("primary"));
+    saveButton->setProperty("glyph", QStringLiteral("save"));
     saveButton->setDefault(true);
     buttons->addWidget(backButton);
     buttons->addStretch();

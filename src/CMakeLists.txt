@@ -60,6 +60,8 @@ target_link_libraries(toupie_net PUBLIC toupie_core Qt6::Network)
 add_library(toupie_ui STATIC
     ui/Theme.h
     ui/Theme.cpp
+    ui/Language.h
+    ui/Language.cpp
     ui/Widgets.h
     ui/Widgets.cpp
     ui/Controls.h
@@ -102,15 +104,36 @@ add_library(toupie_ui STATIC
     ui/MainWindow.cpp
 )
 target_link_libraries(toupie_ui PUBLIC toupie_net Qt6::Widgets)
+# Traductions (le français est la langue source). Après un changement de textes :
+#   lupdate src -ts src/i18n/toparena_en.ts -locations none
+find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
+qt_add_translations(toupie_ui
+    TS_FILES i18n/toparena_en.ts
+    RESOURCE_PREFIX "/i18n"
+)
+# Polices de la charte (licence SIL OFL, voir ui/fonts/OFL-*.txt)
+qt_add_resources(toupie_ui "fonts"
+    PREFIX "/fonts"
+    BASE ui/fonts
+    FILES
+        ui/fonts/ChakraPetch-SemiBold.ttf
+        ui/fonts/ChakraPetch-Bold.ttf
+        ui/fonts/ChakraPetch-BoldItalic.ttf
+        ui/fonts/Rajdhani-Medium.ttf
+        ui/fonts/Rajdhani-SemiBold.ttf
+        ui/fonts/Rajdhani-Bold.ttf
+)
 
-# Application
+# Application. Exécutable, identifiants et dossier de données gardent leur nom
+# d'origine (toupie_arena) : les mises à jour automatiques des versions déjà
+# installées relancent ce fichier.
 qt_add_executable(toupie_arena main.cpp)
 target_link_libraries(toupie_arena PRIVATE toupie_ui)
 target_compile_definitions(toupie_arena PRIVATE TOUPIE_VERSION="${TOUPIE_VERSION}")
 set_target_properties(toupie_arena PROPERTIES
     WIN32_EXECUTABLE ON
     MACOSX_BUNDLE ON
-    MACOSX_BUNDLE_BUNDLE_NAME "Toupie Arena"
+    MACOSX_BUNDLE_BUNDLE_NAME "Top Arena"
     MACOSX_BUNDLE_GUI_IDENTIFIER "fr.toupiearena.game"
 )
 

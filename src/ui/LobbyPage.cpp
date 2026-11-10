@@ -1,4 +1,5 @@
 #include "ui/LobbyPage.h"
+#include "ui/Theme.h"
 
 #include "core/PartCatalog.h"
 #include "core/TopRepository.h"
@@ -56,12 +57,7 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
 {
     auto *root = new QVBoxLayout(this);
 
-    m_title = new QLabel(this);
-    QFont titleFont = m_title->font();
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
-    titleFont.setBold(true);
-    m_title->setFont(titleFont);
-    m_title->setObjectName(QStringLiteral("title"));
+    m_title = Theme::createTitle(QString(), this);
     root->addWidget(m_title);
     m_subtitle = new QLabel(this);
     m_subtitle->setWordWrap(true);
@@ -155,6 +151,8 @@ LobbyPage::LobbyPage(TopRepository &repository, QWidget *parent)
 
     auto *buttons = new QHBoxLayout;
     auto *leaveButton = new QPushButton(tr("Quitter le lobby"), this);
+    leaveButton->setProperty("variant", QStringLiteral("danger"));
+    leaveButton->setProperty("glyph", QStringLiteral("quit"));
     m_readyButton = new QPushButton(tr("Je suis prêt"), this);
     m_readyButton->setCheckable(true);
     m_startButton = new QPushButton(tr("Lancer la partie"), this);

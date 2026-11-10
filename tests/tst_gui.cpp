@@ -8,6 +8,7 @@
 #include "ui/BuilderPage.h"
 #include "ui/Controls.h"
 #include "ui/HelpPage.h"
+#include "ui/Language.h"
 #include "ui/SettingsPage.h"
 #include "ui/LanMenuPage.h"
 #include "ui/LobbyPage.h"
@@ -57,6 +58,7 @@ private slots:
     void initTestCase();
     void menuNavigation();
     void soloMatchRunsToTheEnd();
+    void soloMeleeAgainstSeveralBots();
     void builderSavesTopWithBolt();
     void lanLobbyStartsMatchWithHostRules();
     void soloTournamentOpensMatch();
@@ -64,6 +66,7 @@ private slots:
     void controlsAreRebindableAndSaved();
     void reboundKeyIsUsedInBattle();
     void tutorialWalksThroughEveryAction();
+    void englishTranslationKeepsGameName();
 };
 
 void TestGui::initTestCase()
@@ -106,7 +109,7 @@ void TestGui::soloMatchRunsToTheEnd()
     const QList<Top> presets = PartCatalog::instance().presets();
     MatchRules rules;
     rules.timeLimit = 8;      // Partie courte.
-    emit window.findChild<SetupPage *>()->fightRequested(presets.at(0), presets.at(2),
+    emit window.findChild<SetupPage *>()->fightRequested(presets.at(0), {presets.at(2)},
                                                          Difficulty::Hard,
                                                          QStringLiteral("glace"), rules);
     auto *battle = window.findChild<BattlePage *>();
@@ -142,6 +145,37 @@ void TestGui::soloMatchRunsToTheEnd()
     // Revanche : la même session repart en phase de visée.
     QTest::keyClick(arena, Qt::Key_R);
     QCOMPARE(battle->session()->state().phase, MatchPhase::Aiming);
+}
+
+void TestGui::soloMeleeAgainstSeveralBots()
+{
+    MainWindow window;
+    window.show();
+    auto *setup = window.findChild<SetupPage *>();
+    auto *battle = window.findChild<BattlePage *>();
+    auto *arena = window.findChild<ArenaWidget *>();
+
+    // Trois bots : mêlée à quatre toupies, numérotées.
+    emit window.findChild<MenuPage *>()->playRequested();
+    setup->findChild<QPushButton *>(QStringLiteral("bots3"))->click();
+    QCOMPARE(setup->botCount(), 3);
+    buttonStartingWith(setup, QStringLiteral("Combattre"))->click();
+    QCOMPARE(currentPage(window), battle);
+    QCOMPARE(battle->session()->state().playerCount(), 4);
+    QCOMPARE(battle->session()->state().names.value(3), QStringLiteral("Bot 3"));
+    // Les bots visent d'office : le lancer du joueur suffit à démarrer.
+    arena->setFocus();
+    QTest::keyClick(arena, Qt::Key_Return);
+    QTRY_COMPARE_WITH_TIMEOUT(battle->session()->state().phase, MatchPhase::Fighting, 5000);
+    QTest::qWait(500);
+    QVERIFY(battle->session()->state().spinners[3].status != Spinner::Status::Waiting);
+
+    // Deux bots : trois toupies.
+    emit battle->setupRequested();
+    QCOMPARE(currentPage(window), setup);
+    setup->setBotCount(2);
+    buttonStartingWith(setup, QStringLiteral("Combattre"))->click();
+    QCOMPARE(battle->session()->state().playerCount(), 3);
 }
 
 void TestGui::builderSavesTopWithBolt()
@@ -222,7 +256,7 @@ void TestGui::soloTournamentOpensMatch()
     emit window.findChild<MenuPage *>()->tournamentRequested();
     auto *setup = qobject_cast<TournamentSetupPage *>(currentPage(window));
     QVERIFY(setup);
-    buttonStartingWith(setup, QStringLiteral("🏆  Tournoi solo"))->click();
+    buttonStartingWith(setup, QStringLiteral("Tournoi solo"))->click();
     buttonStartingWith(setup, QStringLiteral("Lancer le tournoi"))->click();
     auto *hub = qobject_cast<TournamentPage *>(currentPage(window));
     QVERIFY(hub);
@@ -286,7 +320,7 @@ void TestGui::reboundKeyIsUsedInBattle()
     QVERIFY(qobject_cast<SettingsPage *>(currentPage(window)));
 
     const QList<Top> presets = PartCatalog::instance().presets();
-    emit window.findChild<SetupPage *>()->fightRequested(presets.at(0), presets.at(1),
+    emit window.findChild<SetupPage *>()->fightRequested(presets.at(0), {presets.at(1)},
                                                          Difficulty::Easy, QString(), {});
     auto *battle = window.findChild<BattlePage *>();
     auto *arena = window.findChild<ArenaWidget *>();
@@ -379,6 +413,23 @@ void TestGui::tutorialWalksThroughEveryAction()
     QVERIFY(tutorial->state().endReason == Battle::EndReason::RingOut);
     QCOMPARE(tutorial->step(), Step::Done);
     QVERIFY(!tutorial->bubble().isEmpty());
+}
+
+void TestGui::englishTranslationKeepsGameName()
+{
+    Language::setCurrent(QStringLiteral("en"));
+    Language::install(*qApp);
+    QCOMPARE(Language::current(), QStringLiteral("en"));
+    QCOMPARE(toString(TopType::Endurance), QStringLiteral("Stamina"));
+    {
+        MainWindow window;
+        QCOMPARE(window.windowTitle(), QStringLiteral("Top Arena")); // Jamais traduit.
+        QVERIFY(buttonStartingWith(window.findChild<MenuPage *>(), QStringLiteral("Play vs bots")));
+    }
+    // Retour au français : les traductions installées sont retirées.
+    Language::setCurrent(QStringLiteral("fr"));
+    Language::install(*qApp);
+    QCOMPARE(toString(TopType::Endurance), QStringLiteral("Endurance"));
 }
 
 QTEST_MAIN(TestGui)
