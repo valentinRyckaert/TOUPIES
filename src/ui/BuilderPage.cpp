@@ -60,7 +60,7 @@ QString partDetail(const Part &part)
         return QStringLiteral("%1 · %2").arg(move->name, move->hitsEveryone() ? PartSlot::tr("anneau")
                                                                                : PartSlot::tr("vague"));
     }
-    return QStringLiteral("A %1 · D %2 · E %3")
+    return PartSlot::tr("A %1 · D %2 · E %3")
         .arg(part.stats.attack)
         .arg(part.stats.defense)
         .arg(part.stats.endurance);
@@ -538,7 +538,7 @@ protected:
             for (const QPointF &q : shape)
                 p.drawEllipse(q, 5, 5);
             p.setFont(Theme::displayFont(16));
-            const QString names[3] = {tr("ATT %1"), tr("DÉF %1"), tr("END %1")};
+            const QString names[3] = {BuilderPage::tr("ATT %1"), BuilderPage::tr("DÉF %1"), BuilderPage::tr("END %1")};
             const QPointF at[3] = {pt(0, 1) - QPointF(0, 18), pt(1, 1) + QPointF(6, 26), pt(2, 1) + QPointF(-6, 26)};
             for (int i = 0; i < 3; ++i) {
                 p.setPen(colors[i]);
@@ -550,7 +550,7 @@ protected:
         double y = height() - kBottom;
         p.setFont(smallCaps());
         p.setPen(Theme::kMuted);
-        p.drawText(QRectF(0, y, w, 20), Qt::AlignLeft | Qt::AlignVCenter, tr("Type obtenu"));
+        p.drawText(QRectF(0, y, w, 20), Qt::AlignLeft | Qt::AlignVCenter, BuilderPage::tr("Type obtenu"));
         QFont big = Theme::displayFont(38);
         big.setLetterSpacing(QFont::AbsoluteSpacing, 3.0);
         p.setFont(big);
@@ -559,14 +559,14 @@ protected:
         p.setFont(Theme::bodyFont(17, QFont::DemiBold));
         p.setPen(Theme::kMuted);
         const int best = std::max({st.attack, st.defense, st.endurance});
-        const QString bestName = best == st.attack    ? tr("Attaque")
-                               : best == st.defense   ? tr("Défense")
-                                                      : tr("Endurance");
+        const QString bestName = best == st.attack    ? BuilderPage::tr("Attaque")
+                               : best == st.defense   ? BuilderPage::tr("Défense")
+                                                      : BuilderPage::tr("Endurance");
         p.drawText(QRectF(0, y + 66, w, 22), Qt::AlignLeft | Qt::AlignVCenter,
-                   m_top.type() == TopType::Balance ? tr("Stats équilibrées : aucune ne domine")
-                                                    : tr("Stat la plus élevée : %1 %2").arg(bestName).arg(best));
+                   m_top.type() == TopType::Balance ? BuilderPage::tr("Stats équilibrées : aucune ne domine")
+                                                    : BuilderPage::tr("Stat la plus élevée : %1 %2").arg(bestName).arg(best));
         y += 104;
-        const QString labels[3] = {tr("Attaque"), tr("Défense"), tr("Endurance")};
+        const QString labels[3] = {BuilderPage::tr("Attaque"), BuilderPage::tr("Défense"), BuilderPage::tr("Endurance")};
         for (int i = 0; i < 3; ++i) {
             Theme::paintStatBar(p, QRectF(0, y, w, 36), labels[i], values[i], maxStat(), colors[i]);
             y += 48;
@@ -575,11 +575,11 @@ protected:
                          + PartCatalog::budget(PartKind::Tip);
         p.setFont(smallCaps());
         p.setPen(Theme::kMuted);
-        p.drawText(QRectF(0, y, w, 20), Qt::AlignLeft | Qt::AlignVCenter, tr("Budget"));
+        p.drawText(QRectF(0, y, w, 20), Qt::AlignLeft | Qt::AlignVCenter, BuilderPage::tr("Budget"));
         p.setFont(Theme::displayFont(16));
         p.setPen(Theme::kAccent);
         p.drawText(QRectF(0, y, w, 20), Qt::AlignRight | Qt::AlignVCenter,
-                   tr("%1 / %2 PTS").arg(st.total()).arg(budget));
+                   BuilderPage::tr("%1 / %2 PTS").arg(st.total()).arg(budget));
         Theme::paintStatBar(p, QRectF(0, y + 26, w, 8), QString(), st.total(), budget, Theme::kAccent);
     }
 

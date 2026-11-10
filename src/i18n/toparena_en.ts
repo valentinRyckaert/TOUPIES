@@ -99,10 +99,6 @@
         <translation>YOU</translation>
     </message>
     <message>
-        <source>Manche %1 · %2 – %3</source>
-        <translation>Round %1 · %2 – %3</translation>
-    </message>
-    <message>
         <source>Mêlée à %1</source>
         <translation>Free-for-all (%1)</translation>
     </message>
@@ -121,10 +117,6 @@
     <message>
         <source>%1 — utilisé</source>
         <translation>%1 — used</translation>
-    </message>
-    <message>
-        <source>%1 : %2 (coûte ¼ de l&apos;endurance)</source>
-        <translation>%1: %2 (costs ¼ of stamina)</translation>
     </message>
     <message>
         <source>DUEL !</source>
@@ -149,6 +141,30 @@
     <message>
         <source>DASH !</source>
         <translation>DASH!</translation>
+    </message>
+    <message>
+        <source>Manche %1</source>
+        <translation>Round %1</translation>
+    </message>
+    <message>
+        <source>Combat</source>
+        <translation>Battle</translation>
+    </message>
+    <message>
+        <source>Coup spécial · utilisé</source>
+        <translation>Special move · used</translation>
+    </message>
+    <message>
+        <source>Coup spécial · coûte ¼ de l&apos;endurance</source>
+        <translation>Special move · costs ¼ of stamina</translation>
+    </message>
+    <message>
+        <source>Endurance</source>
+        <translation>Stamina</translation>
+    </message>
+    <message>
+        <source>%1 disponible</source>
+        <translation>%1 ready</translation>
     </message>
     <message>
         <source>Dash dans %1 s</source>
@@ -249,16 +265,20 @@
         <translation>Change tops</translation>
     </message>
     <message>
-        <source>Coup spécial (E)</source>
-        <translation>Special move (E)</translation>
+        <source>Échap</source>
+        <translation>Esc</translation>
     </message>
     <message>
-        <source>Coup spécial (%1)</source>
-        <translation>Special move (%1)</translation>
+        <source>%1 %2 %3 %4 piloter · %5 dash</source>
+        <translation>%1 %2 %3 %4 steer · %5 dash</translation>
     </message>
     <message>
-        <source>Menu (Échap)</source>
-        <translation>Menu (Esc)</translation>
+        <source> · %1 coup spécial</source>
+        <translation> · %1 special move</translation>
+    </message>
+    <message>
+        <source>Menu</source>
+        <translation>Menu</translation>
     </message>
     <message>
         <source>Revanche (%1)</source>
@@ -297,8 +317,8 @@
         <translation>LAN game</translation>
     </message>
     <message>
-        <source>Quitter le tutoriel (Échap)</source>
-        <translation>Quit tutorial (Esc)</translation>
+        <source>Quitter le tutoriel</source>
+        <translation>Quit tutorial</translation>
     </message>
     <message>
         <source>Tutoriel</source>
@@ -336,20 +356,12 @@
         <translation>Build a top</translation>
     </message>
     <message>
-        <source>Une toupie = un boulon + une roue métallique + une partie intermédiaire + une pointe. Ses stats sont la somme de celles des pièces (attaque / défense / endurance) ; toutes les pièces d&apos;un même emplacement ont le même total de points. La roue fixe le sens de rotation, le boulon (sans stats) donne le coup spécial.</source>
-        <translation>A top = a bolt + a metal wheel + a core + a tip. Its stats are the sum of its parts&apos; stats (attack / defense / stamina); all parts in the same slot have the same point total. The wheel sets the spin direction, and the bolt (no stats) grants the special move.</translation>
-    </message>
-    <message>
         <source>Nom de la toupie</source>
         <translation>Top name</translation>
     </message>
     <message>
         <source>Nom</source>
         <translation>Name</translation>
-    </message>
-    <message>
-        <source>Pièce</source>
-        <translation>Part</translation>
     </message>
     <message>
         <source>Attaque</source>
@@ -364,20 +376,76 @@
         <translation>Stamina</translation>
     </message>
     <message>
-        <source>Retour au menu</source>
-        <translation>Back to menu</translation>
-    </message>
-    <message>
         <source>Enregistrer</source>
         <translation>Save</translation>
     </message>
     <message>
-        <source>Total</source>
-        <translation>Total</translation>
+        <source>ATT %1</source>
+        <translation>ATK %1</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Coup spécial — %1&lt;/b&gt; : %2</source>
-        <translation>&lt;b&gt;Special move — %1&lt;/b&gt;: %2</translation>
+        <source>DÉF %1</source>
+        <translation>DEF %1</translation>
+    </message>
+    <message>
+        <source>END %1</source>
+        <translation>STA %1</translation>
+    </message>
+    <message>
+        <source>Type obtenu</source>
+        <translation>Resulting type</translation>
+    </message>
+    <message>
+        <source>Stats équilibrées : aucune ne domine</source>
+        <translation>Balanced stats: none dominates</translation>
+    </message>
+    <message>
+        <source>Stat la plus élevée : %1 %2</source>
+        <translation>Highest stat: %1 %2</translation>
+    </message>
+    <message>
+        <source>Budget</source>
+        <translation>Budget</translation>
+    </message>
+    <message>
+        <source>%1 / %2 PTS</source>
+        <translation>%1 / %2 PTS</translation>
+    </message>
+    <message>
+        <source>Menu</source>
+        <translation>Menu</translation>
+    </message>
+    <message>
+        <source>Échap</source>
+        <translation>Esc</translation>
+    </message>
+    <message>
+        <source>Atelier</source>
+        <translation>Workshop</translation>
+    </message>
+    <message>
+        <source>Établi</source>
+        <translation>Workbench</translation>
+    </message>
+    <message>
+        <source>Aperçu en rotation</source>
+        <translation>Spinning preview</translation>
+    </message>
+    <message>
+        <source>Statistiques</source>
+        <translation>Stats</translation>
+    </message>
+    <message>
+        <source>TOTAL</source>
+        <translation>TOTAL</translation>
+    </message>
+    <message>
+        <source>%1 PTS</source>
+        <translation>%1 PTS</translation>
+    </message>
+    <message>
+        <source>Coup spécial — %1</source>
+        <translation>Special move — %1</translation>
     </message>
     <message>
         <source>Donnez un nom à votre toupie.</source>
@@ -416,10 +484,6 @@
     <message>
         <source>« %1 » supprimée.</source>
         <translation>“%1” deleted.</translation>
-    </message>
-    <message>
-        <source>%1  — coup spécial : %2</source>
-        <translation>%1  — special move: %2</translation>
     </message>
 </context>
 <context>
@@ -952,6 +1016,10 @@
         <translation>Leave the tournament? It will be lost.</translation>
     </message>
     <message>
+        <source>Quitter le tournoi en réseau ?</source>
+        <translation>Leave the LAN tournament?</translation>
+    </message>
+    <message>
         <source>Création du lobby impossible</source>
         <translation>Could not create lobby</translation>
     </message>
@@ -1343,6 +1411,33 @@ Download and install it? The game will restart on the new version.</translation>
     <message>
         <source>Brise Éternelle</source>
         <translation>Eternal Breeze</translation>
+    </message>
+</context>
+<context>
+    <name>toupie::PartSlot</name>
+    <message>
+        <source>anneau</source>
+        <translation>ring</translation>
+    </message>
+    <message>
+        <source>vague</source>
+        <translation>wave</translation>
+    </message>
+    <message>
+        <source>A %1 · D %2 · E %3</source>
+        <translation>A %1 · D %2 · S %3</translation>
+    </message>
+    <message>
+        <source>‹ › ou molette : pièce précédente / suivante · clic : toutes les pièces</source>
+        <translation>‹ › or mouse wheel: previous / next part · click: every part</translation>
+    </message>
+    <message>
+        <source>Roue</source>
+        <translation>Wheel</translation>
+    </message>
+    <message>
+        <source>Intermédiaire</source>
+        <translation>Core</translation>
     </message>
 </context>
 <context>
@@ -1922,6 +2017,58 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>#</translation>
     </message>
     <message>
+        <source>J%1</source>
+        <translation>D%1</translation>
+    </message>
+    <message>
+        <source>Finale</source>
+        <translation>Final</translation>
+    </message>
+    <message>
+        <source>Demi</source>
+        <translation>Semi</translation>
+    </message>
+    <message>
+        <source>Quart</source>
+        <translation>Quarter</translation>
+    </message>
+    <message>
+        <source>8e</source>
+        <translation>R16</translation>
+    </message>
+    <message>
+        <source>16e</source>
+        <translation>R32</translation>
+    </message>
+    <message>
+        <source>Champion</source>
+        <translation>Champion</translation>
+    </message>
+    <message>
+        <source>Exempt</source>
+        <translation>Bye</translation>
+    </message>
+    <message>
+        <source>À déterminer</source>
+        <translation>To be decided</translation>
+    </message>
+    <message>
+        <source>À jouer</source>
+        <translation>To play</translation>
+    </message>
+    <message>
+        <source>Abandonner</source>
+        <translation>Forfeit</translation>
+    </message>
+    <message>
+        <source>Échap</source>
+        <translation>Esc</translation>
+    </message>
+    <message>
+        <source>Tableau</source>
+        <translation>Bracket</translation>
+    </message>
+    <message>
         <source>Participant</source>
         <translation>Participant</translation>
     </message>
@@ -1954,8 +2101,44 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Ready — play the match</translation>
     </message>
     <message>
-        <source>Quitter le tournoi</source>
-        <translation>Leave tournament</translation>
+        <source>Tournoi terminé</source>
+        <translation>Tournament over</translation>
+    </message>
+    <message>
+        <source>Tournoi · %1</source>
+        <translation>Tournament · %1</translation>
+    </message>
+    <message>
+        <source>%1 participants</source>
+        <translation>%1 players</translation>
+    </message>
+    <message>
+        <source>Classique · %1 points</source>
+        <translation>Classic · %1 points</translation>
+    </message>
+    <message>
+        <source>Express · %1 manches</source>
+        <translation>Express · %1 rounds</translation>
+    </message>
+    <message>
+        <source>Classement</source>
+        <translation>Standings</translation>
+    </message>
+    <message>
+        <source>TOUR %1 / %2</source>
+        <translation>ROUND %1 / %2</translation>
+    </message>
+    <message>
+        <source>%1 / %2</source>
+        <translation>%1 / %2</translation>
+    </message>
+    <message>
+        <source>Premier à %1 points · stadium %2</source>
+        <translation>First to %1 points · %2 stadium</translation>
+    </message>
+    <message>
+        <source>Premier à %1 manches · stadium %2</source>
+        <translation>First to %1 rounds · %2 stadium</translation>
     </message>
     <message>
         <source>Retour au lobby</source>
@@ -1978,10 +2161,6 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>%1 (%2)</translation>
     </message>
     <message>
-        <source>%1 · match %2</source>
-        <translation>%1 · match %2</translation>
-    </message>
-    <message>
         <source>Tournoi terminé : vous êtes champion·ne !</source>
         <translation>Tournament over: you are the champion!</translation>
     </message>
@@ -1990,36 +2169,16 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Tournament over — champion: %1</translation>
     </message>
     <message>
-        <source>%1 · %2 participants · stadium %3</source>
-        <translation>%1 · %2 participants · stadium %3</translation>
-    </message>
-    <message>
-        <source>%1 — exempt(e) ce tour</source>
-        <translation>%1 — bye this round</translation>
-    </message>
-    <message>
-        <source>%1   %2 – %3   %4   (en cours)</source>
-        <translation>%1   %2 – %3   %4   (in progress)</translation>
-    </message>
-    <message>
-        <source>%1   contre   %2</source>
-        <translation>%1   vs   %2</translation>
-    </message>
-    <message>
         <source>Choisir l&apos;ordre de mes toupies et jouer…</source>
         <translation>Choose my top order and play…</translation>
     </message>
     <message>
+        <source>%1 · bot %2</source>
+        <translation>%1 · %2 bot</translation>
+    </message>
+    <message>
         <source>Contre %1 — en attente de votre adversaire…</source>
         <translation>Vs %1 — waiting for your opponent…</translation>
-    </message>
-    <message>
-        <source>%1 : vous affrontez %2.</source>
-        <translation>%1: you face %2.</translation>
-    </message>
-    <message>
-        <source>Le tournoi est terminé.</source>
-        <translation>The tournament is over.</translation>
     </message>
     <message>
         <source>Vous suivez le tournoi.</source>
