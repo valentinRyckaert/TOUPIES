@@ -115,6 +115,7 @@ QWidget *transparentScroll(QScrollArea *scroll, QWidget *content)
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     scroll->setStyleSheet(QStringLiteral("QScrollArea, QScrollArea > QWidget > QWidget { background: transparent; }"));
     return scroll;
 }
@@ -146,7 +147,8 @@ public:
     }
 
     QSize sizeHint() const override { return {columns() * 380 + 150, 50 + firstRound() * 210}; }
-    QSize minimumSizeHint() const override { return {columns() * 175 + 120, 50 + firstRound() * 112}; }
+    // Cases lisibles (pas moins de 190 px) : au-delà, le tableau défile dans les deux sens.
+    QSize minimumSizeHint() const override { return {columns() * 220 + 130, 50 + firstRound() * 112}; }
 
 protected:
     void paintEvent(QPaintEvent *) override
