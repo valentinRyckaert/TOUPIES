@@ -384,6 +384,10 @@
         <translation>ATK %1</translation>
     </message>
     <message>
+        <source>Tous les coups spéciaux</source>
+        <translation>All special moves</translation>
+    </message>
+    <message>
         <source>DÉF %1</source>
         <translation>DEF %1</translation>
     </message>
@@ -1196,6 +1200,109 @@ Download and install it? The game will restart on the new version.</translation>
     </message>
 </context>
 <context>
+    <name>toupie::MovesBoard</name>
+    <message>
+        <source>Gros recul : éjecte une cible déjà au bord</source>
+        <translation>Big knockback: knocks out a target already at the edge</translation>
+    </message>
+    <message>
+        <source>Portée courte</source>
+        <translation>Short range</translation>
+    </message>
+    <message>
+        <source>Les plus lourds dégâts (24)</source>
+        <translation>The heaviest damage (24)</translation>
+    </message>
+    <message>
+        <source>Aucun effet, presque aucun recul, esquivable de loin</source>
+        <translation>No effect, almost no knockback, dodgeable from afar</translation>
+    </message>
+    <message>
+        <source>3 s gelée : ralentie, sans pilotage, usée ×3</source>
+        <translation>Frozen for 3 s: slowed, no steering, worn ×3</translation>
+    </message>
+    <message>
+        <source>Dégâts moyens</source>
+        <translation>Average damage</translation>
+    </message>
+    <message>
+        <source>Aspire violemment tout le monde vers le centre</source>
+        <translation>Violently pulls everyone towards the centre</translation>
+    </message>
+    <message>
+        <source>Dégâts modérés</source>
+        <translation>Moderate damage</translation>
+    </message>
+    <message>
+        <source>Téléporte la cible près du bord, lancée vers l’extérieur</source>
+        <translation>Teleports the target near the edge, flung outwards</translation>
+    </message>
+    <message>
+        <source>Lente, facile à esquiver</source>
+        <translation>Slow, easy to dodge</translation>
+    </message>
+    <message>
+        <source>Rend 60 % de l’endurance volée</source>
+        <translation>Gives back 60% of the stolen stamina</translation>
+    </message>
+    <message>
+        <source>Dégâts modérés, peu de recul</source>
+        <translation>Moderate damage, little knockback</translation>
+    </message>
+    <message>
+        <source>Blesse et bloque dash + coup spécial 6 s</source>
+        <translation>Hurts and blocks dash + special move for 6 s</translation>
+    </message>
+    <message>
+        <source>Portée très courte</source>
+        <translation>Very short range</translation>
+    </message>
+    <message>
+        <source>6 S</source>
+        <translation>6 S</translation>
+    </message>
+    <message>
+        <source>+60 %</source>
+        <translation>+60%</translation>
+    </message>
+    <message>
+        <source>Anneau</source>
+        <translation>Ring</translation>
+    </message>
+    <message>
+        <source>Vague</source>
+        <translation>Wave</translation>
+    </message>
+    <message>
+        <source>Dégâts</source>
+        <translation>Damage</translation>
+    </message>
+    <message>
+        <source>Recul</source>
+        <translation>Knockback</translation>
+    </message>
+    <message>
+        <source>Portée</source>
+        <translation>Range</translation>
+    </message>
+    <message>
+        <source>Coûte ¼ de l’endurance du moment · une fois par partie</source>
+        <translation>Costs ¼ of current stamina · once per game</translation>
+    </message>
+    <message>
+        <source>Coups spéciaux</source>
+        <translation>Special moves</translation>
+    </message>
+    <message>
+        <source>Sept signatures visuelles</source>
+        <translation>Seven visual signatures</translation>
+    </message>
+    <message>
+        <source>Vague = projectile qui file vers l’adversaire le plus proche (esquivable). Anneau = onde qui s’élargit autour du lanceur.</source>
+        <translation>Wave = projectile that flies towards the nearest opponent (dodgeable). Ring = wave that widens around the caster.</translation>
+    </message>
+</context>
+<context>
     <name>toupie::Part</name>
     <message>
         <source>Roue métallique</source>
@@ -1814,8 +1921,8 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Volcano</translation>
     </message>
     <message>
-        <source>Petit cratère aux pentes très raides, sans rebord, entouré de lave. Les chocs et les dashs y sont plus puissants.</source>
-        <translation>Small crater with very steep slopes and no rim, surrounded by lava. Hits and dashes are more powerful here.</translation>
+        <source>Cratère aux pentes très raides, sans rebord, entouré de lave. Les chocs et les dashs y sont plus puissants.</source>
+        <translation>Crater with very steep slopes and no rim, surrounded by lava. Hits and dashes are more powerful here.</translation>
     </message>
     <message>
         <source>Caldeira</source>
@@ -2013,10 +2120,6 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Rounds and results</translation>
     </message>
     <message>
-        <source>#</source>
-        <translation>#</translation>
-    </message>
-    <message>
         <source>J%1</source>
         <translation>D%1</translation>
     </message>
@@ -2127,6 +2230,10 @@ Download and install it? The game will restart on the new version.</translation>
     <message>
         <source>TOUR %1 / %2</source>
         <translation>ROUND %1 / %2</translation>
+    </message>
+    <message>
+        <source>%1 · %2</source>
+        <translation>%1 · %2</translation>
     </message>
     <message>
         <source>%1 / %2</source>
