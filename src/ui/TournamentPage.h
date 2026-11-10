@@ -6,7 +6,6 @@
 class QGroupBox;
 class QPushButton;
 class QScrollArea;
-class QTableWidget;
 
 namespace toupie {
 
@@ -46,7 +45,8 @@ private:
     QGroupBox *m_boardBox = nullptr;
     QScrollArea *m_bracketScroll = nullptr;
     QWidget *m_bracket = nullptr;
-    QTableWidget *m_standings = nullptr;
+    QScrollArea *m_standingsScroll = nullptr;
+    QWidget *m_standings = nullptr;
     QGroupBox *m_matchBox = nullptr;
     QWidget *m_matchCard = nullptr;
     QPushButton *m_ready = nullptr;

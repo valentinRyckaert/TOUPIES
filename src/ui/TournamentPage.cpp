@@ -8,13 +8,11 @@
 
 #include <QGroupBox>
 #include <QHBoxLayout>
-#include <QHeaderView>
 #include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QShortcut>
-#include <QTableWidget>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -464,6 +462,94 @@ private:
     QList<Row> m_rows;
 };
 
+// --- Classement de la ligue -----------------------------------------------------------
+
+class StandingsList : public QWidget
+{
+public:
+    struct Row
+    {
+        Standing standing;
+        QString name;
+        std::optional<Top> top;
+        bool you = false;
+    };
+
+    explicit StandingsList(QWidget *parent)
+        : QWidget(parent)
+    {
+    }
+
+    void setRows(const QList<Row> &rows)
+    {
+        m_rows = rows;
+        setMinimumHeight(kHeader + int(m_rows.size()) * kPitch);
+        updateGeometry();
+        update();
+    }
+
+    QSize sizeHint() const override { return {700, kHeader + int(m_rows.size()) * kPitch}; }
+    QSize minimumSizeHint() const override { return {460, kHeader + int(m_rows.size()) * kPitch}; }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        const double w = width() - 4;
+        // Colonnes chiffrées, alignées à droite : joués, victoires, défaites, points, différence.
+        const QString heads[5] = {TournamentPage::tr("J"), TournamentPage::tr("V"), TournamentPage::tr("D"),
+                                  TournamentPage::tr("Pts"), TournamentPage::tr("Diff.")};
+        const double col = std::min(70.0, w * 0.09);
+        auto colRect = [&](int i, double top, double h) { return QRectF(w - 24 - (5 - i) * col, top, col, h); };
+        p.setFont(smallCaps());
+        p.setPen(Theme::kMuted);
+        p.drawText(QRectF(24, 0, 60, kHeader - 8), Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("#"));
+        p.drawText(QRectF(84, 0, 300, kHeader - 8), Qt::AlignLeft | Qt::AlignVCenter, TournamentPage::tr("Participant"));
+        for (int i = 0; i < 5; ++i)
+            p.drawText(colRect(i, 0, kHeader - 8), Qt::AlignRight | Qt::AlignVCenter, heads[i]);
+
+        for (int i = 0; i < m_rows.size(); ++i) {
+            const Row &row = m_rows.at(i);
+            const Standing &st = row.standing;
+            const QRectF r(2, kHeader + i * double(kPitch), w, kPitch - 10);
+            const QPainterPath card = Theme::chamfer(r, 12, 0, 12, 0);
+            p.fillPath(card, row.you ? QColor(0x12, 0x30, 0x1f) : QColor(0x0e, 0x0b, 0x30));
+            p.setPen(QPen(row.you ? Theme::kAccent : i == 0 ? withAlpha(Theme::kWarning, 160) : Theme::kBorder,
+                          row.you || i == 0 ? 1.6 : 1.0));
+            p.drawPath(card);
+            // Rang : or, argent et bronze pour le podium.
+            const QColor podium[3] = {Theme::kWarning, QColor(0xc9, 0xd8, 0xff), QColor(0xff, 0x9a, 0x5c)};
+            p.setFont(display(20));
+            p.setPen(i < 3 ? podium[i] : Theme::kDim);
+            p.drawText(QRectF(r.left() + 20, r.top(), 50, r.height()), Qt::AlignLeft | Qt::AlignVCenter,
+                       QString::number(i + 1));
+            if (row.top)
+                TopPainter::paint(p, *row.top, QPointF(r.left() + 100, r.center().y()), 16, i);
+            p.setFont(display(16, 1.0));
+            p.setPen(Theme::kText);
+            const QRectF name(r.left() + 126, r.top(), colRect(0, 0, 0).left() - r.left() - 136, r.height());
+            p.drawText(name, Qt::AlignLeft | Qt::AlignVCenter,
+                       p.fontMetrics().elidedText(row.name.toUpper(), Qt::ElideRight, int(name.width())));
+            const int diff = st.points - st.against;
+            const QString values[5] = {QString::number(st.played), QString::number(st.won), QString::number(st.lost),
+                                       QString::number(st.points),
+                                       diff > 0 ? QStringLiteral("+%1").arg(diff) : QString::number(diff)};
+            for (int c = 0; c < 5; ++c) {
+                p.setFont(display(c == 3 ? 20 : 16));
+                p.setPen(c == 3 ? Theme::kCyan : c == 4 ? (diff > 0 ? Theme::kAccent : diff < 0 ? Theme::kDanger : Theme::kMuted)
+                                                        : Theme::kMuted);
+                p.drawText(colRect(c, r.top(), r.height()), Qt::AlignRight | Qt::AlignVCenter, values[c]);
+            }
+        }
+    }
+
+private:
+    static constexpr int kHeader = 34;
+    static constexpr int kPitch = 60;
+    QList<Row> m_rows;
+};
+
 } // namespace
 
 // --- Page -----------------------------------------------------------------------------
@@ -503,16 +589,9 @@ TournamentPage::TournamentPage(QWidget *parent)
     m_bracketScroll = new QScrollArea(m_boardBox);
     m_bracket = new Bracket(m_bracketScroll);
     board->addWidget(transparentScroll(m_bracketScroll, m_bracket));
-    m_standings = new QTableWidget(0, 7, m_boardBox);
-    m_standings->setHorizontalHeaderLabels(
-        {tr("#"), tr("Participant"), tr("J"), tr("V"), tr("D"), tr("Pts"), tr("Diff.")});
-    m_standings->verticalHeader()->setVisible(false);
-    m_standings->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_standings->setSelectionMode(QAbstractItemView::NoSelection);
-    m_standings->setFocusPolicy(Qt::NoFocus);
-    m_standings->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    m_standings->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    board->addWidget(m_standings);
+    m_standingsScroll = new QScrollArea(m_boardBox);
+    m_standings = new StandingsList(m_standingsScroll);
+    board->addWidget(transparentScroll(m_standingsScroll, m_standings));
     body->addWidget(m_boardBox, 125); // Proportions de la maquette : 1250 / 560.
 
     auto *side = new QVBoxLayout;
@@ -608,7 +687,7 @@ void TournamentPage::rebuild()
 
     // Tableau (élimination directe) ou classement (ligue).
     m_bracketScroll->setVisible(knockout);
-    m_standings->setVisible(!knockout);
+    m_standingsScroll->setVisible(!knockout);
     m_boardBox->setTitle(knockout ? tr("Tableau") : tr("Classement"));
     m_boardBox->setProperty("index", knockout ? tr("TOUR %1 / %2").arg(current + 1).arg(t.roundCount())
                                               : t.roundName(current).toUpper());
@@ -616,21 +695,14 @@ void TournamentPage::rebuild()
     if (knockout) {
         static_cast<Bracket *>(m_bracket)->setTournament(t, local, m_controller);
     } else {
-        const QList<Standing> table = t.standings();
-        m_standings->setRowCount(static_cast<int>(table.size()));
-        for (int row = 0; row < table.size(); ++row) {
-            const Standing &s = table.at(row);
-            const QStringList cells{QString::number(row + 1), participantLabel(s.participant),
-                                    QString::number(s.played), QString::number(s.won),
-                                    QString::number(s.lost), QString::number(s.points),
-                                    QString::number(s.points - s.against)};
-            for (int col = 0; col < cells.size(); ++col) {
-                auto *item = new QTableWidgetItem(cells.at(col));
-                if (s.participant == local)
-                    item->setForeground(Theme::kAccent);
-                m_standings->setItem(row, col, item);
-            }
+        QList<StandingsList::Row> rows;
+        for (const Standing &s : t.standings()) {
+            const Participant &p = t.participants().at(s.participant);
+            rows.append({s, p.isBot() ? tr("%1 · %2").arg(p.name, toString(p.level)) : p.name,
+                         p.tops.isEmpty() ? std::nullopt : std::optional<Top>(p.tops.first()),
+                         s.participant == local});
         }
+        static_cast<StandingsList *>(m_standings)->setRows(rows);
     }
 
     // Tours et résultats : matchs joués et matchs du tour courant.
