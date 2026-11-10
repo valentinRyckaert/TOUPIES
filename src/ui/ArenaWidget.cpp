@@ -405,7 +405,7 @@ void ArenaWidget::focusOutEvent(QFocusEvent *event)
 // Repères
 // ---------------------------------------------------------------------------
 
-double ArenaWidget::scale() const
+double ArenaWidget::unitScale(const QSizeF &arena)
 {
     // Une seule échelle pour tous les stadiums (de même surface) : le plus large tient
     // dans la vue, et les autres gardent à l'écran la taille qu'ils ont en jeu.
@@ -415,13 +415,18 @@ double ArenaWidget::scale() const
             size = std::max(size, stadium.size);
         return size;
     }();
-    double radius = largest;
+    const double available = std::min(arena.width(), arena.height() - kTopBar - kBottomHud);
+    return available / 2.0 * 0.95 / largest;
+}
+
+double ArenaWidget::scale() const
+{
+    double base = 1.0; // Rayon du stadium classique dans ces règles.
     if (m_session) {
         const MatchState &state = m_session->state();
-        radius *= state.config.stadiumRadius / std::max(0.1, state.stadium.size);
+        base = state.config.stadiumRadius / std::max(0.1, state.stadium.size);
     }
-    const double available = std::min<double>(width(), height() - kTopBar - kBottomHud);
-    return available / 2.0 * 0.95 / std::max(0.1, radius);
+    return unitScale(size()) / std::max(0.1, base);
 }
 
 QPointF ArenaWidget::center() const
@@ -963,27 +968,20 @@ void ArenaWidget::paintHud(QPainter &p)
         p.drawText(QRectF(0, tab.bottom() + 2, width(), 20), Qt::AlignCenter, m_caption);
     }
 
-    // Fiches des toupies en bas ; en duel, le coup spécial se place entre les deux.
+    // Fiches des toupies en bas.
     const double cardHeight = kBottomHud - 12;
     const double top = height() - kBottomHud + 4;
     const int local = m_session->localPlayer();
     const bool special = state.config.specialsEnabled && local >= 0 && local < count;
-    const double duelCard = std::min(600.0, (width() - 4 * margin) * 0.34);
-    const bool between = count <= 2 && duelCard >= 340.0;
-    m_specialRect = {};
     QRectF localCard;
     if (count <= 2) {
-        const double cardWidth = between ? duelCard : std::min(430.0, (width() - 3 * margin) / 2.0);
+        const double cardWidth = std::min(600.0, (width() - 3 * margin) / 2.0);
         const QRectF left(margin, top, cardWidth, cardHeight);
         paintSpinnerHud(p, 0, left, false);
         const QRectF right(width() - margin - cardWidth, top, cardWidth, cardHeight);
         if (count == 2)
             paintSpinnerHud(p, 1, right, true);
         localCard = local == 1 ? right : left;
-        if (special && between) {
-            const double w = std::min(500.0, right.left() - left.right() - 2 * margin);
-            m_specialRect = QRectF(width() / 2.0 - w / 2.0, top + cardHeight - 72, w, 72);
-        }
     } else {
         const double cardWidth = (width() - (count + 1) * margin) / count;
         for (int i = 0; i < count; ++i) {
@@ -993,10 +991,10 @@ void ArenaWidget::paintHud(QPainter &p)
                 localCard = card;
         }
     }
-    if (special && m_specialRect.isNull()) {
-        const double w = std::min(500.0, width() - 2 * margin);
-        m_specialRect = QRectF(width() / 2.0 - w / 2.0, top - 84, w, 72);
-    }
+    // Coup spécial en haut à gauche, sous les boutons de la page : dans ce coin, ni le
+    // stadium, ni l'aide de visée, ni les jauges de duel ne passent.
+    m_specialRect = special ? QRectF(margin, kTopBar + 48, std::min(440.0, width() / 2.0 - 160 - 2 * margin), 64)
+                            : QRectF();
     if (special)
         paintSpecial(p, m_specialRect);
 
@@ -1055,13 +1053,13 @@ void ArenaWidget::paintSpecial(QPainter &p, const QRectF &r)
     p.setFont(small);
     p.setPen(QColor(255, 255, 255, 190));
     const QString caption = s.specialUsed ? tr("Coup spécial · utilisé") : tr("Coup spécial · coûte ¼ de l'endurance");
-    p.drawText(QRectF(text.left(), r.top() + 12, text.width(), 18), Qt::AlignLeft | Qt::AlignVCenter,
+    p.drawText(QRectF(text.left(), r.top() + r.height() * 0.15, text.width(), 18), Qt::AlignLeft | Qt::AlignVCenter,
                QFontMetrics(small).elidedText(caption.toUpper(), Qt::ElideRight, int(text.width())));
     QFont name = Theme::displayFont(20);
     name.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
     p.setFont(name);
     p.setPen(Qt::white);
-    p.drawText(QRectF(text.left(), r.top() + 30, text.width(), 30), Qt::AlignLeft | Qt::AlignVCenter,
+    p.drawText(QRectF(text.left(), r.top() + r.height() * 0.4, text.width(), 30), Qt::AlignLeft | Qt::AlignVCenter,
                QFontMetrics(name).elidedText(move->name.toUpper(), Qt::ElideRight, int(text.width())));
     p.fillPath(Theme::chamfer(cap, 5, 0, 5, 0), withAlpha(Theme::kField, 0.9));
     p.setPen(QPen(Theme::kBorderBright, 1.0));

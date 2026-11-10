@@ -38,6 +38,9 @@ public:
     static QColor slotColor(int slot);
 
     QSize sizeHint() const override { return {760, 760}; }
+    /// Pixels par unité de monde pour un stadium classique de rayon 1 dans une arène de
+    /// cette taille (même échelle pour tous les stadiums, qui ont la même surface).
+    static double unitScale(const QSizeF &arena);
     /// Légende sous l'onglet du haut (bilan des victoires, mode de jeu…).
     void setCaption(const QString &caption);
 
