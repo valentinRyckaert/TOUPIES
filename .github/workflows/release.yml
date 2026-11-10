@@ -91,8 +91,8 @@ jobs:
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt \
             --desktop-file packaging/toupie-arena.desktop \
             --icon-file packaging/toupie-arena.svg --output appimage
-          mv Toupie_Arena*.AppImage ToupieArena-${{ github.ref_name }}-linux-x86_64.AppImage
-          ./ToupieArena-*.AppImage --smoke-test
+          mv Top_Arena*.AppImage TopArena-${{ github.ref_name }}-linux-x86_64.AppImage
+          ./TopArena-*.AppImage --smoke-test
 
       - name: Paquet Windows (zip)
         if: runner.os == 'Windows'
@@ -103,23 +103,23 @@ jobs:
           Copy-Item build/toupie_arena.exe dist/
           windeployqt --release --no-translations --no-opengl-sw dist/toupie_arena.exe
           ./dist/toupie_arena.exe --smoke-test | Out-Null
-          Compress-Archive -Path dist/* -DestinationPath "ToupieArena-${{ github.ref_name }}-windows-x64.zip"
+          Compress-Archive -Path dist/* -DestinationPath "TopArena-${{ github.ref_name }}-windows-x64.zip"
 
       - name: Paquet macOS (dmg)
         if: runner.os == 'macOS'
         run: |
           macdeployqt build/src/toupie_arena.app -dmg
           ./build/src/toupie_arena.app/Contents/MacOS/toupie_arena --smoke-test
-          mv build/src/toupie_arena.dmg "ToupieArena-${{ github.ref_name }}-macos.dmg"
+          mv build/src/toupie_arena.dmg "TopArena-${{ github.ref_name }}-macos.dmg"
 
       - name: Archive du paquet
         uses: actions/upload-artifact@v4
         with:
           name: package-${{ matrix.name }}
           path: |
-            ToupieArena-*.AppImage
-            ToupieArena-*.zip
-            ToupieArena-*.dmg
+            TopArena-*.AppImage
+            TopArena-*.zip
+            TopArena-*.dmg
           if-no-files-found: error
 
   publish:

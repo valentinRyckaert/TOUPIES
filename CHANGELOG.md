@@ -1,8 +1,26 @@
 # Changelog
 
-Toutes les évolutions notables de Toupie Arena. Le format suit
+Toutes les évolutions notables de Top Arena (anciennement Toupie Arena). Le format suit
 [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet respecte le
 [versionnage sémantique](https://semver.org/lang/fr/).
+
+## [Non publié]
+
+### Nouveautés
+
+- **Le jeu s'appelle désormais Top Arena.** Les toupies sauvegardées, les paramètres et les
+  mises à jour automatiques ne changent pas (identifiants et exécutable conservés).
+- **Solo contre 1 à 3 bots** : avec 2 ou 3 bots, le combat est une mêlée à 3 ou 4 toupies.
+  Chaque bot a sa toupie (choisie ou au hasard) ; ils partagent la difficulté.
+- **Traduction anglaise** : langue au choix dans les Paramètres (par défaut celle du système),
+  le jeu redémarre pour l'appliquer. Noms des pièces, toupies, stadiums et coups traduits.
+- **Nouvelle charte « Holo Combat »** sur tout le jeu : fond holographique, coins coupés,
+  polices Chakra Petch et Rajdhani (licence OFL, embarquées), menu animé avec le logo,
+  préparation du combat en cartes (camps, VS, stadiums), interface de combat refaite (fiches
+  des toupies, chrono, manche), toupies redessinées (une silhouette par roue, motifs des
+  parties intermédiaires, emblème du coup spécial sur le boulon), stadiums détaillés (matière
+  et nom de code propres) et effet visuel propre à chaque coup spécial ; toupies gelées ou
+  sonnées signalées sur l'arène.
 
 ## [1.2.1] — 2026-11-05
 
