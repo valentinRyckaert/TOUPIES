@@ -130,70 +130,141 @@ QColor hsl(int hue, double s, double l, double a = 1.0)
     return c;
 }
 
-QPainterPath glyphPath(const QString &special)
+QPolygonF polygon(std::initializer_list<QPointF> points)
+{
+    return QPolygonF(points);
+}
+
+/// Bande d'anneau entre les rayons r1 et r2 (degrés, sens de Qt).
+QPainterPath arcBand(double r1, double r2, double start, double span)
 {
     QPainterPath p;
-    if (special == QLatin1String("onde")) {
-        p.addEllipse(QPointF(0, 0), 0.25, 0.25);
-        const QRectF ring(-0.65, -0.65, 1.3, 1.3);
-        for (int k = 0; k < 4; ++k) {
-            p.arcMoveTo(ring, 45 + 90 * k - 28);
-            p.arcTo(ring, 45 + 90 * k - 28, 56);
+    const QRectF outer(-r2, -r2, 2 * r2, 2 * r2), inner(-r1, -r1, 2 * r1, 2 * r1);
+    p.arcMoveTo(outer, start);
+    p.arcTo(outer, start, span);
+    p.arcTo(inner, start + span, -span);
+    p.closeSubpath();
+    return p;
+}
+
+/// Emblème abstrait de chaque coup (formes pleines dans [-1, 1]²), sauf la lance.
+QPainterPath emblemPath(const QString &special)
+{
+    QPainterPath p;
+    p.setFillRule(Qt::WindingFill);
+    if (special == QLatin1String("onde")) { // Ondes en croissants autour d'un noyau.
+        p.addEllipse(QPointF(0, 0), 0.2, 0.2);
+        p.addPath(arcBand(0.36, 0.52, 110, 290));
+        p.addPath(arcBand(0.66, 0.78, -40, 240));
+        p.addPath(arcBand(0.88, 0.97, 150, 130));
+    } else if (special == QLatin1String("givre")) { // Cristal : six losanges inégaux.
+        for (int k = 0; k < 6; ++k) {
+            const double a = k * M_PI / 3 - M_PI / 2, len = k % 2 ? 0.62 : 1.0, w = k % 2 ? 0.13 : 0.17;
+            const QPointF d(std::cos(a), std::sin(a)), n(-d.y(), d.x());
+            QPainterPath shard;
+            shard.addPolygon(polygon({d * 0.1, d * len * 0.55 + n * w, d * len, d * len * 0.55 - n * w}));
+            shard.closeSubpath();
+            p = p.united(shard);
         }
-    } else if (special == QLatin1String("lance")) {
-        p.addPolygon(QPolygonF{{0, -0.95}, {0.3, -0.38}, {0.11, -0.42}, {0.11, 0.62}, {0.26, 0.9},
-                               {-0.26, 0.9}, {-0.11, 0.62}, {-0.11, -0.42}, {-0.3, -0.38}, {0, -0.95}});
-    } else if (special == QLatin1String("givre")) {
+    } else if (special == QLatin1String("vortex")) { // Trois lames en spirale.
         for (int k = 0; k < 3; ++k) {
-            const double a = k * M_PI / 3 - M_PI / 2;
-            const QPointF d(std::cos(a), std::sin(a));
-            const QPointF n(-d.y(), d.x());
-            p.moveTo(-d * 0.9);
-            p.lineTo(d * 0.9);
-            for (double s : {1.0, -1.0}) {
-                p.moveTo(d * s * 0.75 + n * 0.22);
-                p.lineTo(d * s * 0.52);
-                p.lineTo(d * s * 0.75 - n * 0.22);
+            QPolygonF blade;
+            constexpr int kSteps = 24;
+            for (int i = 0; i <= kSteps; ++i) { // Bord extérieur…
+                const double t = double(i) / kSteps, a = k * kTau / 3 + t * 2.3;
+                blade << QPointF(std::cos(a), std::sin(a)) * (0.12 + 0.86 * t);
             }
+            for (int i = kSteps; i >= 0; --i) { // … puis intérieur, effilé aux deux bouts.
+                const double t = double(i) / kSteps, a = k * kTau / 3 + t * 2.3 - 0.25 * std::sin(M_PI * t);
+                blade << QPointF(std::cos(a), std::sin(a)) * (0.12 + 0.86 * t - 0.32 * std::sin(M_PI * t));
+            }
+            p.addPolygon(blade);
+            p.closeSubpath();
         }
-    } else if (special == QLatin1String("vortex")) {
-        p.moveTo(0, 0);
-        p.cubicTo(0.15, -0.05, 0.2, 0.18, 0.05, 0.25);
-        p.cubicTo(-0.2, 0.35, -0.4, 0.05, -0.3, -0.2);
-        p.cubicTo(-0.15, -0.55, 0.35, -0.55, 0.52, -0.15);
-        p.cubicTo(0.7, 0.3, 0.35, 0.75, -0.1, 0.75);
-        p.cubicTo(-0.6, 0.75, -0.92, 0.3, -0.85, -0.2);
-    } else if (special == QLatin1String("distorsion")) {
-        p.moveTo(-0.9, 0);
-        p.cubicTo(-0.5, -0.55, 0.5, -0.55, 0.9, 0);
-        p.cubicTo(0.5, 0.55, -0.5, 0.55, -0.9, 0);
-        p.addEllipse(QPointF(0, 0), 0.22, 0.22);
-        p.moveTo(-0.6, -0.72);
-        p.lineTo(-0.05, -0.72);
-        p.moveTo(0.1, -0.72);
-        p.lineTo(0.35, -0.72);
-        p.moveTo(-0.3, 0.72);
-        p.lineTo(0.6, 0.72);
-    } else if (special == QLatin1String("siphon")) {
-        p.moveTo(0, -0.9);
-        p.cubicTo(0.35, -0.35, 0.6, 0, 0.6, 0.3);
-        p.arcTo(QRectF(-0.6, -0.3, 1.2, 1.2), 0, -180);
-        p.cubicTo(-0.6, 0, -0.35, -0.35, 0, -0.9);
-        p.moveTo(-0.25, 0.1);
-        p.lineTo(-0.12, 0.45);
-        p.lineTo(0, 0.1);
-        p.lineTo(0.12, 0.45);
-        p.lineTo(0.25, 0.1);
-    } else if (special == QLatin1String("seisme")) {
-        p.addPolygon(QPolygonF{{-0.95, 0.55}, {-0.45, -0.25}, {-0.15, 0.15}, {0.2, -0.6}, {0.95, 0.55}, {-0.95, 0.55}});
-        p.moveTo(-0.55, 0.55);
-        p.lineTo(-0.25, 0.2);
-        p.lineTo(0.05, 0.4);
-        p.lineTo(0.2, 0.05);
+    } else if (special == QLatin1String("distorsion")) { // Œil découpé en bandes décalées.
+        QPainterPath eye(QPointF(-0.95, 0));
+        eye.cubicTo(-0.45, -0.95, 0.45, -0.95, 0.95, 0);
+        eye.cubicTo(0.45, 0.95, -0.45, 0.95, -0.95, 0);
+        QPainterPath pupil;
+        pupil.addEllipse(QPointF(0, 0), 0.3, 0.3);
+        eye = eye.subtracted(pupil);
+        const double cuts[4] = {-0.8, -0.2, 0.16, 0.8}, shifts[3] = {-0.18, 0.14, -0.08};
+        for (int i = 0; i < 3; ++i) {
+            QPainterPath band;
+            band.addRect(QRectF(-1.2, cuts[i] + 0.035, 2.4, cuts[i + 1] - cuts[i] - 0.07));
+            p.addPath(eye.intersected(band).translated(shifts[i], 0));
+        }
+        p.addEllipse(QPointF(0.14, 0), 0.13, 0.13);
+    } else if (special == QLatin1String("siphon")) { // Deux crocs et une goutte.
+        for (double side : {-1.0, 1.0}) {
+            QPainterPath fang(QPointF(side * 0.78, -0.62));
+            fang.cubicTo(side * 0.72, -0.05, side * 0.45, 0.45, side * 0.16, 0.85);
+            fang.cubicTo(side * 0.28, 0.35, side * 0.34, -0.15, side * 0.36, -0.62);
+            fang.closeSubpath();
+            p.addPath(fang);
+        }
+        QPainterPath drop(QPointF(0, -0.72));
+        drop.cubicTo(0.12, -0.5, 0.2, -0.34, 0.2, -0.22);
+        drop.arcTo(QRectF(-0.2, -0.42, 0.4, 0.4), 0, -180);
+        drop.cubicTo(-0.2, -0.34, -0.12, -0.5, 0, -0.72);
+        p.addPath(drop);
+    } else if (special == QLatin1String("seisme")) { // Plaques séparées par une faille.
+        p.addPolygon(polygon({{-0.95, 0.62}, {-0.55, -0.3}, {-0.16, -0.02}, {-0.34, 0.62}}));
+        p.closeSubpath();
+        p.addPolygon(polygon({{-0.22, 0.62}, {0.0, -0.8}, {0.36, -0.12}, {0.16, 0.62}}));
+        p.closeSubpath();
+        p.addPolygon(polygon({{0.28, 0.62}, {0.47, 0.02}, {0.95, 0.62}}));
+        p.closeSubpath();
     } else {
         p.addEllipse(QPointF(0, 0), 0.4, 0.4);
     }
     return p;
+}
+
+/// Lance d'acier : dague à lame biseautée (une face claire, une sombre), arête et éclat.
+void paintDagger(QPainter &p, const QColor &color, double line)
+{
+    const QPen edge(QColor(0x14, 0x18, 0x40), line);
+    QLinearGradient light(-0.18, -0.9, 0.0, 0.4);
+    light.setColorAt(0.0, Qt::white);
+    light.setColorAt(1.0, QColor(0xb8, 0xc6, 0xff));
+    QLinearGradient dark(0.0, -0.9, 0.18, 0.4);
+    dark.setColorAt(0.0, QColor(0xa8, 0xb4, 0xf0));
+    dark.setColorAt(1.0, QColor(0x3a, 0x45, 0x90));
+    p.setPen(Qt::NoPen);
+    p.setBrush(light);
+    p.drawPolygon(polygon({{0, -0.98}, {0, 0.36}, {-0.13, 0.36}, {-0.18, -0.22}}));
+    p.setBrush(dark);
+    p.drawPolygon(polygon({{0, -0.98}, {0.18, -0.22}, {0.13, 0.36}, {0, 0.36}}));
+    p.setBrush(Qt::NoBrush);
+    p.setPen(edge);
+    p.drawPolygon(polygon({{0, -0.98}, {0.18, -0.22}, {0.13, 0.36}, {-0.13, 0.36}, {-0.18, -0.22}}));
+    p.setPen(QPen(QColor(255, 255, 255, 230), line * 0.8, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(QPointF(0, -0.9), QPointF(0, 0.3)); // Arête.
+
+    // Garde incurvée, poignée et pommeau, teintés de la couleur du coup.
+    QPainterPath guard(QPointF(-0.5, 0.3));
+    guard.quadTo(0, 0.5, 0.5, 0.3);
+    guard.lineTo(0.46, 0.42);
+    guard.quadTo(0, 0.6, -0.46, 0.42);
+    guard.closeSubpath();
+    QLinearGradient tint(0, 0.3, 0, 0.6);
+    tint.setColorAt(0.0, color.lighter(130));
+    tint.setColorAt(1.0, color.darker(160));
+    p.setPen(edge);
+    p.setBrush(tint);
+    p.drawPath(guard);
+    p.setBrush(QColor(0x26, 0x2a, 0x5a));
+    p.drawRect(QRectF(-0.07, 0.5, 0.14, 0.28));
+    p.setBrush(tint);
+    p.drawPolygon(polygon({{0, 0.76}, {0.12, 0.88}, {0, 1.0}, {-0.12, 0.88}}));
+
+    // Éclat à quatre branches près de la pointe.
+    p.setPen(Qt::NoPen);
+    p.setBrush(Qt::white);
+    const QPointF g(-0.08, -0.58);
+    p.drawPolygon(polygon({g + QPointF(0, -0.2), g + QPointF(0.035, -0.035), g + QPointF(0.2, 0), g + QPointF(0.035, 0.035),
+                           g + QPointF(0, 0.2), g + QPointF(-0.035, 0.035), g + QPointF(-0.2, 0), g + QPointF(-0.035, -0.035)}));
 }
 
 void paintMiddle(QPainter &p, const Part &middle, double R, double rot)
@@ -466,11 +537,24 @@ void paintEmblem(QPainter &painter, const QString &special, QPointF center, doub
 {
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing);
-    const QPainterPath path
-        = QTransform::fromTranslate(center.x(), center.y()).scale(size, size).map(glyphPath(special));
-    painter.setBrush(Qt::NoBrush);
-    painter.setPen(QPen(color, penWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter.drawPath(path);
+    painter.translate(center);
+    painter.scale(size, size);
+    const double line = std::max(0.5, penWidth * 0.5) / size; // Liseré en pixels.
+    if (special == QLatin1String("lance")) {
+        paintDagger(painter, color, line);
+    } else {
+        // Forme pleine : dégradé de la couleur, liseré plus sombre.
+        QLinearGradient fill(-1, -1, 1, 1);
+        fill.setColorAt(0.0, color.lighter(115));
+        QColor deep = color.darker(140);
+        deep.setAlphaF(0.9);
+        fill.setColorAt(1.0, deep);
+        painter.setBrush(fill);
+        QColor rim = color.darker(220);
+        rim.setAlphaF(0.7);
+        painter.setPen(QPen(rim, line, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter.drawPath(emblemPath(special));
+    }
     painter.restore();
 }
 
