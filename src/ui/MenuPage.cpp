@@ -4,6 +4,7 @@
 #include "game/Battle.h"
 #include "game/BotController.h"
 #include "game/Stadium.h"
+#include "ui/ArenaWidget.h"
 #include "ui/StadiumPainter.h"
 #include "ui/Theme.h"
 #include "ui/TopPainter.h"
@@ -152,7 +153,8 @@ protected:
         p.setRenderHint(QPainter::Antialiasing);
         const QPointF c(width() / 2.0, height() / 2.0);
         const double k = scale();
-        if (m_cache.size() != size() * devicePixelRatioF()) {
+        if (m_cache.size() != size() * devicePixelRatioF() || m_cacheScale != k) {
+            m_cacheScale = k;
             m_cache = QPixmap(size() * devicePixelRatioF());
             m_cache.setDevicePixelRatio(devicePixelRatioF());
             m_cache.fill(Qt::transparent);
@@ -195,12 +197,13 @@ protected:
 private:
     double scale() const
     {
-        // Même échelle quel que soit le stadium (ils ont tous la même surface).
-        double largest = 1.0;
-        for (const Stadium &stadium : Stadium::all())
-            largest = std::max(largest, stadium.size);
+        // L'échelle de l'arène d'un vrai combat dans cette fenêtre : le stadium et les
+        // toupies du menu ont la même taille qu'en jeu. La page de combat occupe la même
+        // place que le menu, moins sa barre du bas (commandes, revanche).
+        constexpr int kBattleBar = 48;
+        const QSize page = parentWidget()->size();
         const double base = m_battle->config().stadiumRadius / std::max(0.1, m_battle->stadium().size);
-        return std::min(width(), height()) / 2.0 * 0.9 / (base * largest);
+        return ArenaWidget::unitScale(QSizeF(page.width(), page.height() - kBattleBar)) / std::max(0.1, base);
     }
 
     void restart()
@@ -226,6 +229,7 @@ private:
     std::unique_ptr<Battle> m_battle;
     std::vector<BotController> m_bots;
     QPixmap m_cache;
+    double m_cacheScale = 0.0;
     QElapsedTimer m_clock;
     double m_pause = 0.0;
     int m_timer = 0;
