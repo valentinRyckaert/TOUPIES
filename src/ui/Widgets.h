@@ -8,6 +8,8 @@
 #include <optional>
 
 class QDialog;
+class QHBoxLayout;
+class QLabel;
 class QPushButton;
 class QToolButton;
 
@@ -28,6 +30,28 @@ private:
     QString m_title;
     QToolButton *m_toggle = nullptr;
     QWidget *m_content = nullptr;
+};
+
+/// Barre du haut d'un écran : bouton retour, « /// TITRE », sous-titre et filet ;
+/// row() accueille d'autres éléments à droite (puces…).
+class TopBar : public QWidget
+{
+    Q_OBJECT
+
+public:
+    TopBar(QPushButton *back, const QString &title, const QString &subtitle, QWidget *parent = nullptr);
+
+    void setTitle(const QString &title);
+    void setSubtitle(const QString &subtitle);
+    QHBoxLayout *row() const { return m_row; }
+
+protected:
+    void paintEvent(QPaintEvent *event) override;
+
+private:
+    QHBoxLayout *m_row = nullptr;
+    QLabel *m_title = nullptr;
+    QLabel *m_subtitle = nullptr;
 };
 
 /// Fenêtre surgissante (non bloquante) qui accueille `content` ; elle reste

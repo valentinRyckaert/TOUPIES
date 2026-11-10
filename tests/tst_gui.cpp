@@ -187,9 +187,12 @@ void TestGui::builderSavesTopWithBolt()
     auto *name = builder->findChild<QLineEdit *>();
     QVERIFY(name);
     name->setText(QStringLiteral("Test CI"));
-    const QList<QComboBox *> combos = builder->findChildren<QComboBox *>();
-    QCOMPARE(combos.size(), 4); // Boulon, roue, intermédiaire, pointe.
-    combos.first()->setCurrentIndex(3);
+    const QList<PartSlot *> slotCards = builder->findChildren<PartSlot *>();
+    QCOMPARE(slotCards.size(), 4); // Boulon, roue, intermédiaire, pointe.
+    QVERIFY(slotCards.first()->kind() == PartKind::Bolt);
+    slotCards.first()->setIndex(3);
+    slotCards.at(1)->setIndex(-1); // En boucle : dernière roue.
+    QCOMPARE(slotCards.at(1)->part().id, PartCatalog::instance().parts(PartKind::Wheel).last().id);
     buttonStartingWith(builder, QStringLiteral("Enregistrer"))->click();
 
     TopRepository repository(PartCatalog::instance());
@@ -197,6 +200,7 @@ void TestGui::builderSavesTopWithBolt()
     QVERIFY(repository.contains(QStringLiteral("Test CI")));
     const Top &saved = repository.customTops().first();
     QCOMPARE(saved.bolt().id, PartCatalog::instance().parts(PartKind::Bolt).at(3).id);
+    QCOMPARE(saved.wheel().id, PartCatalog::instance().parts(PartKind::Wheel).last().id);
 }
 
 void TestGui::lanLobbyStartsMatchWithHostRules()

@@ -6,6 +6,7 @@
 #include <QFontDatabase>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPainter>
 #include <QPalette>
 #include <QProxyStyle>
@@ -130,6 +131,11 @@ QFont labelFont(const QWidget *w)
     return font;
 }
 
+double keycapWidth(const QString &key)
+{
+    return std::max(26, QFontMetrics(displayFont(12)).horizontalAdvance(key) + 14);
+}
+
 double buttonCut(const QRectF &r)
 {
     return std::clamp(r.height() * 0.3, 6.0, 16.0);
@@ -196,14 +202,19 @@ public:
     int pixelMetric(PixelMetric metric, const QStyleOption *opt, const QWidget *w) const override
     {
         switch (metric) {
+        case PM_SmallIconSize:
+            if (qobject_cast<const QMenu *>(w))
+                return 40; // Listes illustrées (pièces de l'atelier).
+            break;
         case PM_IndicatorWidth:
         case PM_IndicatorHeight:
         case PM_ExclusiveIndicatorWidth:
         case PM_ExclusiveIndicatorHeight:
             return 18;
         default:
-            return QProxyStyle::pixelMetric(metric, opt, w);
+            break;
         }
+        return QProxyStyle::pixelMetric(metric, opt, w);
     }
 
     QSize sizeFromContents(ContentsType type, const QStyleOption *opt, const QSize &size,
@@ -219,6 +230,8 @@ public:
             }
             if (w && !w->property("glyph").toString().isEmpty())
                 s.rwidth() += 28;
+            if (w && !w->property("key").toString().isEmpty())
+                s.rwidth() += keycapWidth(w->property("key").toString()) + 18;
             if (isMenuButton(w))
                 return {std::max(s.width() + 90, 380), std::max(s.height(), 54)};
             if (variantOf(w, opt) == Variant::Card)
@@ -421,10 +434,22 @@ private:
                                              : kText;
         if (!enabled) // Le fond est déjà estompé : encre foncée sur vert, gris sinon.
             color = v == Variant::Primary ? QColor(0x03, 0x14, 0x0a, 200) : kDim;
-        const QRect r = b->rect;
+        QRect r = b->rect;
         const double cut = buttonCut(r);
         p->save();
         p->setRenderHint(QPainter::Antialiasing);
+        if (const QString key = w ? w->property("key").toString() : QString(); !key.isEmpty()) {
+            // Touche associée (« Échap »), à droite du libellé.
+            const double kw = keycapWidth(key);
+            const QRectF cap(r.right() - cut - 10 - kw, r.center().y() - 12, kw, 24);
+            p->fillPath(chamfer(cap, 5, 0, 5, 0), v == Variant::Primary ? QColor(3, 20, 10, 90) : alpha(kField, 230));
+            p->setPen(QPen(v == Variant::Primary ? QColor(0x03, 0x14, 0x0a) : kBorderBright, 1.0));
+            p->drawPath(chamfer(cap, 5, 0, 5, 0));
+            p->setFont(displayFont(12));
+            p->setPen(v == Variant::Primary ? QColor(0x03, 0x14, 0x0a) : kCyan);
+            p->drawText(cap, Qt::AlignCenter, key);
+            r.setRight(int(cap.left()) - 4);
+        }
         p->setPen(color);
 
         if (v == Variant::Card) {
@@ -537,7 +562,10 @@ private:
         p->save();
         p->setRenderHint(QPainter::Antialiasing);
         const QRectF frame = QRectF(box->rect).adjusted(1, 1, -1, -1);
-        paintPanel(*p, frame, kCyan, 18.0);
+        // Propriétés facultatives : « accent » (couleur du panneau), « index » (repère à droite).
+        const QVariant accentProperty = w ? w->property("accent") : QVariant();
+        const QColor accent = accentProperty.isValid() ? accentProperty.value<QColor>() : kCyan;
+        paintPanel(*p, frame, accent, 18.0);
         const QRect label = subControlRect(CC_GroupBox, box, SC_GroupBoxLabel, w);
         if (!box->text.isEmpty()) {
             p->setFont(groupTitleFont());
@@ -548,7 +576,15 @@ private:
             const double y = label.bottom() + 7.0;
             p->setPen(QPen(kBorder, 1.0));
             p->drawLine(QPointF(frame.left() + 30, y), QPointF(frame.right() - 18, y));
-            paintSlashes(*p, QPointF(frame.left() + 30, y - 3), 6, kCyan);
+            paintSlashes(*p, QPointF(frame.left() + 30, y - 3), 6, accent);
+            if (const QString index = w ? w->property("index").toString() : QString(); !index.isEmpty()) {
+                QFont f = displayFont(12);
+                f.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+                p->setFont(f);
+                p->setPen(accent);
+                p->drawText(QRectF(label.right(), label.top(), frame.right() - 22 - label.right(), label.height()),
+                            Qt::AlignRight | Qt::AlignVCenter, index);
+            }
         }
         if (box->subControls & SC_GroupBoxCheckBox) {
             QStyleOptionButton check;
@@ -567,6 +603,9 @@ QString styleSheet()
 QPushButton { font-family: "@display"; font-size: 10pt; font-weight: bold; }
 QPushButton#menu { font-size: 12pt; }
 QComboBox, QLineEdit { font-weight: 600; }
+QMenu { background-color: @panel; color: @text; border: 1px solid @borderBright; padding: 4px; }
+QMenu::item { padding: 6px 28px 6px 8px; }
+QMenu::item:selected { background-color: #1b2a60; color: @accent; }
 QToolTip { background-color: @panelAlt; color: @text; border: 1px solid @cyan; padding: 6px; }
 QDialog { background-color: @bg; }
 
@@ -823,6 +862,35 @@ void paintTag(QPainter &p, const QRectF &r, const QString &text, const QColor &c
     p.restore();
 }
 
+void paintStatBar(QPainter &p, const QRectF &rect, const QString &label, int value, int segments,
+                  const QColor &color)
+{
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing);
+    const double textHeight = label.isEmpty() ? 0.0 : rect.height() * 0.5;
+    if (!label.isEmpty()) {
+        QFont small = bodyFont(13, QFont::Bold);
+        small.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
+        small.setCapitalization(QFont::AllUppercase);
+        p.setFont(small);
+        p.setPen(kMuted);
+        const QRectF text(rect.left(), rect.top(), rect.width(), textHeight);
+        p.drawText(text, Qt::AlignLeft | Qt::AlignBottom, label);
+        p.setFont(displayFont(15));
+        p.setPen(color);
+        p.drawText(text, Qt::AlignRight | Qt::AlignBottom, QString::number(value));
+    }
+    const double gap = 3.0;
+    const double y = rect.top() + (label.isEmpty() ? 0.0 : textHeight + 4);
+    const double h = label.isEmpty() ? rect.height() : std::max(6.0, rect.height() - textHeight - 6);
+    const double w = (rect.width() - (segments - 1) * gap) / segments;
+    const int on = qBound(0, value, segments);
+    for (int i = 0; i < segments; ++i)
+        p.fillPath(skewed(QRectF(rect.left() + i * (w + gap), y, w + 3, h), 3),
+                   i < on ? color : alpha(kBorder, 140));
+    p.restore();
+}
+
 QPainterPath iconPath(const QString &name)
 {
     QPainterPath p;
@@ -888,6 +956,12 @@ QPainterPath iconPath(const QString &name)
         poly({{18, 6}, {6, 18}});
     } else if (name == QLatin1String("back")) {
         poly({{15, 5}, {8, 12}, {15, 19}});
+    } else if (name == QLatin1String("next")) {
+        poly({{9, 5}, {16, 12}, {9, 19}});
+    } else if (name == QLatin1String("timer")) {
+        p.addEllipse(QPointF(12, 13.5), 7.5, 7.5);
+        poly({{12, 9.5}, {12, 13.5}, {14.5, 15}});
+        poly({{9.5, 2.5}, {14.5, 2.5}});
     } else if (name == QLatin1String("plus")) {
         poly({{12, 5}, {12, 19}});
         poly({{5, 12}, {19, 12}});

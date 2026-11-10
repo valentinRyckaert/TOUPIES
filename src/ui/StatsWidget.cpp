@@ -17,35 +17,6 @@ int maxStat()
     return value;
 }
 
-/// Barre de stat segmentée : libellé, valeur et segments inclinés.
-void drawBar(QPainter &p, const QRectF &rect, const QString &label, int value, const QColor &color)
-{
-    QFont small = Theme::bodyFont(13, QFont::Bold);
-    small.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
-    small.setCapitalization(QFont::AllUppercase);
-    p.setFont(small);
-    p.setPen(Theme::kMuted);
-    const double textHeight = rect.height() * 0.5;
-    p.drawText(QRectF(rect.left(), rect.top(), rect.width(), textHeight),
-               Qt::AlignLeft | Qt::AlignBottom, label);
-    p.setFont(Theme::displayFont(15));
-    p.setPen(color);
-    p.drawText(QRectF(rect.left(), rect.top(), rect.width(), textHeight),
-               Qt::AlignRight | Qt::AlignBottom, QString::number(value));
-
-    const int segments = maxStat();
-    const double gap = 3.0;
-    const double y = rect.top() + textHeight + 4;
-    const double h = std::max(6.0, rect.height() - textHeight - 6);
-    const double w = (rect.width() - (segments - 1) * gap) / segments;
-    const int on = qBound(0, value, segments);
-    for (int i = 0; i < segments; ++i) {
-        QColor c = i < on ? color : Theme::kBorder;
-        if (i >= on)
-            c.setAlpha(140);
-        p.fillPath(Theme::skewed(QRectF(rect.left() + i * (w + gap), y, w + 3, h), 3), c);
-    }
-}
 } // namespace
 
 StatsWidget::StatsWidget(QWidget *parent)
@@ -162,13 +133,13 @@ void StatsWidget::paintEvent(QPaintEvent *)
     y += 30;
 
     const double line = std::max(30.0, (height() - y - 4) / 3.0);
-    drawBar(p, QRectF(left, y, width, line - 4), tr("Attaque"), stats.attack,
+    Theme::paintStatBar(p, QRectF(left, y, width, line - 4), tr("Attaque"), stats.attack, maxStat(),
             TopPainter::typeColor(TopType::Attack));
     y += line;
-    drawBar(p, QRectF(left, y, width, line - 4), tr("Défense"), stats.defense,
+    Theme::paintStatBar(p, QRectF(left, y, width, line - 4), tr("Défense"), stats.defense, maxStat(),
             TopPainter::typeColor(TopType::Defense));
     y += line;
-    drawBar(p, QRectF(left, y, width, line - 4), tr("Endurance"), stats.endurance,
+    Theme::paintStatBar(p, QRectF(left, y, width, line - 4), tr("Endurance"), stats.endurance, maxStat(),
             TopPainter::typeColor(TopType::Endurance));
 }
 

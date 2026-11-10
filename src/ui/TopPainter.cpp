@@ -10,6 +10,7 @@
 #include <QTransform>
 #include <QtMath>
 
+#include <array>
 #include <cmath>
 #include <functional>
 
@@ -298,9 +299,9 @@ void paintMiddle(QPainter &p, const Part &middle, double R, double rot)
     p.drawEllipse(QPointF(0, 0), R, R);
 }
 
-void paintBolt(QPainter &p, const Top &top, double R, double rot)
+void paintBolt(QPainter &p, const QString &special, double R, double rot)
 {
-    const QColor col = moveColor(top.special());
+    const QColor col = moveColor(special);
     QPolygonF octagon;
     for (int i = 0; i < 8; ++i) {
         const double a = i * kTau / 8 + M_PI / 8 + rot;
@@ -325,7 +326,7 @@ void paintBolt(QPainter &p, const Top &top, double R, double rot)
         // L'emblème tourne avec la toupie (seul le reflet, plus bas, reste fixe).
         p.save();
         p.rotate(qRadiansToDegrees(rot));
-        paintEmblem(p, top.special(), QPointF(0, 0), R * 0.5, Qt::white, std::max(0.8, R * 0.08));
+        paintEmblem(p, special, QPointF(0, 0), R * 0.5, Qt::white, std::max(0.8, R * 0.08));
         p.restore();
     }
     p.setPen(Qt::NoPen);
@@ -335,6 +336,106 @@ void paintBolt(QPainter &p, const Top &top, double R, double rot)
     p.rotate(-35);
     p.drawEllipse(QPointF(0, 0), R * 0.26, R * 0.12);
     p.restore();
+}
+
+
+QLinearGradient horizontal(double left, double right, std::initializer_list<std::pair<double, unsigned>> stops)
+{
+    QLinearGradient g(left, 0, right, 0);
+    for (const auto &[at, rgb] : stops)
+        g.setColorAt(at, QColor::fromRgb(rgb));
+    return g;
+}
+
+/// Pointe vue de profil : collerette métallique puis embout propre à chaque pointe ;
+/// `y` est le haut de la collerette, `W` sa largeur.
+void paintTip(QPainter &p, const QString &id, double cx, double y, double W)
+{
+    const double s = W / 2.0;
+    const QLinearGradient metal = horizontal(cx - s, cx + s, {{0.0, 0x5c649e}, {0.45, 0xeef2ff}, {1.0, 0x3a3f72}});
+    const QLinearGradient rubber = horizontal(cx - s, cx + s, {{0.0, 0x3a0f2a}, {0.5, 0xff3d6e}, {1.0, 0x3a0f2a}});
+    auto poly = [&](std::initializer_list<QPointF> pts) {
+        QPolygonF q;
+        for (const QPointF &pt : pts)
+            q << QPointF(cx + pt.x() * s, y + pt.y() * s);
+        return q;
+    };
+    auto ball = [&](double cy, double r, bool shaded) {
+        QRadialGradient g(QPointF(cx - r * 0.3, cy - r * 0.4), r * 1.4);
+        g.setColorAt(0.0, Qt::white);
+        if (shaded)
+            g.setColorAt(0.5, QColor(0x8e, 0x98, 0xc8));
+        g.setColorAt(1.0, QColor(0x2a, 0x2f, 0x60));
+        p.setBrush(g);
+        p.drawEllipse(QPointF(cx, cy), r, r);
+    };
+    p.setPen(QPen(QColor(0x05, 0x04, 0x0f), std::max(0.6, W * 0.017)));
+    p.setBrush(metal);
+    p.drawPolygon(poly({{-1, 0}, {1, 0}, {0.8, 0.35}, {-0.8, 0.35}})); // Collerette.
+    if (id == QLatin1String("P1")) {
+        p.drawPolygon(poly({{-0.55, 0.35}, {0.55, 0.35}, {0.18, 1.1}, {-0.18, 1.1}}));
+    } else if (id == QLatin1String("P2")) {
+        p.setBrush(rubber);
+        p.drawPolygon(poly({{-0.7, 0.35}, {0.7, 0.35}, {0.62, 0.95}, {-0.62, 0.95}}));
+    } else if (id == QLatin1String("P3")) {
+        p.drawPolygon(poly({{-0.35, 0.35}, {0.35, 0.35}, {0, 1.45}}));
+    } else if (id == QLatin1String("P4")) {
+        ball(y + s * 0.82, s * 0.5, true);
+    } else if (id == QLatin1String("P5")) {
+        p.drawPolygon(poly({{-0.6, 0.35}, {0.6, 0.35}, {0.85, 0.9}, {-0.85, 0.9}}));
+    } else if (id == QLatin1String("P6")) {
+        p.drawPolygon(poly({{-0.45, 0.35}, {0.45, 0.35}, {0.05, 1.3}, {-0.05, 1.3}}));
+    } else if (id == QLatin1String("P7")) {
+        p.setBrush(rubber);
+        p.drawPolygon(poly({{-0.7, 0.35}, {0.7, 0.35}, {0.6, 0.8}, {-0.6, 0.8}}));
+        p.setBrush(QColor(0xff, 0x3d, 0x6e));
+        for (int i = -2; i <= 2; ++i)
+            p.drawPolygon(poly({{i * 0.25 - 0.08, 0.8}, {i * 0.25 + 0.08, 0.8}, {i * 0.25, 1.05}}));
+    } else if (id == QLatin1String("P8")) {
+        QPainterPath dome(QPointF(cx - s * 0.75, y + s * 0.35));
+        dome.arcTo(QRectF(cx - s * 0.75, y - s * 0.35, s * 1.5, s * 1.4), 180, 180);
+        dome.closeSubpath();
+        p.drawPath(dome);
+    } else if (id == QLatin1String("P9")) {
+        p.drawPolygon(poly({{-0.45, 0.35}, {0.45, 0.35}, {0.3, 0.6}, {-0.3, 0.6}}));
+        ball(y + s * 0.85, s * 0.3, false);
+    } else { // Sabot (et pointe inconnue)
+        p.drawPolygon(poly({{-0.6, 0.35}, {0.6, 0.35}, {0.5, 0.8}, {0.25, 1.05}, {-0.25, 1.05}, {-0.5, 0.8}}));
+    }
+    p.setPen(QPen(QColor(255, 255, 255, 100), 1.0));
+    p.drawLine(QPointF(cx - s * 0.9, y + s * 0.06), QPointF(cx + s * 0.9, y + s * 0.06));
+}
+
+/// Roue seule vue du dessus (carte de l'atelier), centrée sur l'origine.
+void paintWheel(QPainter &p, const Part &wheel, double R)
+{
+    const bool mirror = wheel.spin == SpinDirection::CounterClockwise;
+    const QColor accent = hsl(wheel.hue, 0.95, 0.6);
+    const QTransform t = QTransform().rotateRadians(-M_PI / 2).scale(R, R);
+    const QPainterPath silhouette = t.map(unitWheel(wheel.id, mirror, 1.0));
+    QRadialGradient metal(QPointF(-R * 0.3, -R * 0.4), R * 1.6);
+    metal.setColorAt(0.0, QColor(0xf4, 0xf7, 0xff));
+    metal.setColorAt(0.5, QColor(0x9a, 0xa4, 0xd8));
+    metal.setColorAt(1.0, QColor(0x1d, 0x21, 0x50));
+    p.setBrush(metal);
+    p.setPen(QPen(QColor(0x05, 0x04, 0x0f), std::max(0.6, R * 0.03)));
+    p.drawPath(silhouette);
+    QLinearGradient tint(QPointF(-R, -R), QPointF(R, R));
+    tint.setColorAt(0.0, hsl(wheel.hue, 0.95, 0.6, 0.85));
+    tint.setColorAt(0.5, hsl(wheel.hue, 0.8, 0.22, 0.6));
+    tint.setColorAt(1.0, hsl(wheel.hue, 0.95, 0.6, 0.9));
+    p.fillPath(silhouette, tint);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(QColor(255, 255, 255, 115), 1.0));
+    p.drawPath(t.map(unitWheel(wheel.id, mirror, 0.86)));
+    p.setBrush(QColor(0x0a, 0x08, 0x26));
+    p.setPen(QPen(accent, std::max(1.0, R * 0.045)));
+    p.drawEllipse(QPointF(0, 0), R * 0.6, R * 0.6);
+    QPen dashed(QColor(0x3a, 0x2f, 0x8f), 1.0);
+    dashed.setDashPattern({3, 3});
+    p.setPen(dashed);
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(QPointF(0, 0), R * 0.25, R * 0.25);
 }
 
 } // namespace
@@ -453,7 +554,7 @@ void paint(QPainter &painter, const Top &top, QPointF center, double radius, dou
 
     paintMiddle(painter, top.middle(), radius * 0.6, angle);
     if (top.bolt().isValid())
-        paintBolt(painter, top, radius * 0.34, angle);
+        paintBolt(painter, top.special(), radius * 0.34, angle);
     painter.restore();
 }
 
@@ -484,6 +585,107 @@ void paintSpinArrow(QPainter &painter, SpinDirection direction, QPointF center, 
     painter.setPen(Qt::NoPen);
     painter.drawPolygon(head);
     painter.restore();
+}
+
+void paintPart(QPainter &painter, const Part &part, QPointF center, double radius)
+{
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.translate(center);
+    switch (part.kind) {
+    case PartKind::Bolt: {
+        QRadialGradient glow(QPointF(0, 0), radius * 1.2);
+        QColor c = moveColor(part.special);
+        c.setAlpha(90);
+        glow.setColorAt(0.5, c);
+        c.setAlpha(0);
+        glow.setColorAt(1.0, c);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(glow);
+        painter.drawEllipse(QPointF(0, 0), radius * 1.2, radius * 1.2);
+        paintBolt(painter, part.special, radius, 0.0);
+        break;
+    }
+    case PartKind::Wheel:
+        paintWheel(painter, part, radius);
+        break;
+    case PartKind::Middle:
+        paintMiddle(painter, part, radius, 0.0);
+        break;
+    case PartKind::Tip:
+        paintTip(painter, part.id, 0.0, -radius * 0.7, radius * 1.9);
+        break;
+    }
+    painter.restore();
+}
+
+std::array<QPointF, 4> paintProfile(QPainter &p, const Top &top, QPointF origin, double W)
+{
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing);
+    const double cx = origin.x(), gap = W * 0.16;
+    double y = origin.y();
+    std::array<QPointF, 4> anchors;
+    const auto anchor = [&anchors](PartKind kind, QPointF at) { anchors[static_cast<int>(kind)] = at; };
+    const QPen edge(QColor(0x05, 0x04, 0x0f), 1.0);
+    const QLinearGradient metal = horizontal(cx - W * 0.5, cx + W * 0.5,
+                                             {{0.0, 0x3a3f72}, {0.35, 0xeef2ff}, {0.6, 0x9aa4d8}, {1.0, 0x262a5a}});
+
+    // Boulon : dôme métallique et pastille de la couleur du coup.
+    QPainterPath dome(QPointF(cx - W * 0.16, y + W * 0.12));
+    dome.quadTo(QPointF(cx - W * 0.15, y), QPointF(cx, y));
+    dome.quadTo(QPointF(cx + W * 0.15, y), QPointF(cx + W * 0.16, y + W * 0.12));
+    dome.closeSubpath();
+    p.setPen(edge);
+    p.setBrush(metal);
+    p.drawPath(dome);
+    const QColor move = moveColor(top.special());
+    QRadialGradient glow(QPointF(cx, y + W * 0.05), W * 0.12);
+    glow.setColorAt(0.0, move);
+    glow.setColorAt(1.0, QColor(move.red(), move.green(), move.blue(), 0));
+    p.setPen(Qt::NoPen);
+    p.setBrush(glow);
+    p.drawEllipse(QPointF(cx, y + W * 0.05), W * 0.12, W * 0.06);
+    p.setBrush(move);
+    p.drawEllipse(QPointF(cx, y + W * 0.05), W * 0.07, W * 0.03);
+    anchor(PartKind::Bolt, QPointF(cx, y + W * 0.03));
+    y += W * 0.12 + gap;
+
+    // Roue : bandeau dont la largeur suit le profil de la silhouette.
+    const Part &wheel = top.wheel();
+    const Profile r = wheelProfile(wheel.id);
+    double lo = 1.0, hi = 0.0;
+    for (int i = 0; i <= 40; ++i) {
+        lo = std::min(lo, r(i * M_PI / 40));
+        hi = std::max(hi, r(i * M_PI / 40));
+    }
+    const double rim = W * 0.14;
+    const QPolygonF band{{cx - W * 0.42, y}, {cx + W * 0.42, y}, {cx + W * 0.5 * hi, y + rim * 0.35},
+                         {cx + W * 0.5 * lo, y + rim}, {cx - W * 0.5 * lo, y + rim}, {cx - W * 0.5 * hi, y + rim * 0.35}};
+    p.setPen(edge);
+    p.setBrush(metal);
+    p.drawPolygon(band);
+    p.setPen(Qt::NoPen);
+    p.setBrush(hsl(wheel.hue, 0.95, 0.6, 0.45));
+    p.drawPolygon(band);
+    p.setPen(QPen(QColor(255, 255, 255, 150), 1.0));
+    p.drawLine(QPointF(cx - W * 0.42, y + 2), QPointF(cx + W * 0.42, y + 2));
+    p.fillRect(QRectF(cx - W * 0.3, y + rim * 0.45, W * 0.6, rim * 0.18), hsl(wheel.hue, 0.95, 0.6, 0.9));
+    anchor(PartKind::Wheel, QPointF(cx + W * 0.375, y + rim * 0.2));
+    y += rim + gap;
+
+    // Partie intermédiaire : disque bombé et liseré de sa teinte.
+    p.setPen(edge);
+    p.setBrush(horizontal(cx - W * 0.3, cx + W * 0.3, {{0.0, 0x141038}, {0.5, 0x3b3490}, {1.0, 0x141038}}));
+    p.drawPolygon(QPolygonF{{cx - W * 0.3, y}, {cx + W * 0.3, y}, {cx + W * 0.26, y + W * 0.09}, {cx - W * 0.26, y + W * 0.09}});
+    p.fillRect(QRectF(cx - W * 0.27, y + W * 0.035, W * 0.54, W * 0.02), hsl(top.middle().hue, 0.95, 0.62));
+    anchor(PartKind::Middle, QPointF(cx - W * 0.28, y + W * 0.045));
+    y += W * 0.09 + gap;
+
+    paintTip(p, top.tip().id, cx, y, W * 0.24);
+    anchor(PartKind::Tip, QPointF(cx + W * 0.06, y + W * 0.1));
+    p.restore();
+    return anchors;
 }
 
 } // namespace toupie::TopPainter

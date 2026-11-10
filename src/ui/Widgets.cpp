@@ -1,10 +1,12 @@
 #include "ui/Widgets.h"
+#include "ui/Theme.h"
 
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
+#include <QPainter>
 #include <QPushButton>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -42,6 +44,55 @@ void SidePanel::setExpanded(bool expanded)
 bool SidePanel::isExpanded() const
 {
     return m_content->isVisible();
+}
+
+TopBar::TopBar(QPushButton *back, const QString &title, const QString &subtitle, QWidget *parent)
+    : QWidget(parent)
+{
+    m_row = new QHBoxLayout(this);
+    m_row->setContentsMargins(0, 0, 0, 22); // Le filet passe sous la rangée.
+    m_row->setSpacing(10);
+    back->setParent(this);
+    m_row->addWidget(back);
+    m_row->addSpacing(70); // Place des « /// ».
+    m_title = Theme::createTitle(title, this);
+    m_row->addWidget(m_title);
+    m_row->addSpacing(18);
+    m_subtitle = new QLabel(subtitle, this);
+    m_subtitle->setObjectName(QStringLiteral("muted"));
+    m_subtitle->setFont(Theme::bodyFont(19, QFont::Medium));
+    m_row->addWidget(m_subtitle);
+    m_row->addStretch();
+}
+
+void TopBar::setTitle(const QString &title)
+{
+    m_title->setText(title);
+}
+
+void TopBar::setSubtitle(const QString &subtitle)
+{
+    m_subtitle->setText(subtitle);
+}
+
+void TopBar::paintEvent(QPaintEvent *)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QRect title = m_title->geometry();
+    // « /// » vertes, hautes comme les capitales du titre.
+    QPen pen(Theme::kAccent, 3.0);
+    p.setPen(pen);
+    const double h = 26, top = title.center().y() - h / 2;
+    for (int i = 0; i < 3; ++i) {
+        const double x = title.left() - 50 + i * 12;
+        p.drawLine(QPointF(x, top + h), QPointF(x + 9, top));
+    }
+    const double y = height() - 1.5;
+    p.setPen(QPen(Theme::kBorder, 1.0));
+    p.drawLine(QPointF(0, y), QPointF(width(), y));
+    p.setPen(QPen(Theme::kCyan, 2.0));
+    p.drawLine(QPointF(0, y), QPointF(std::min(380.0, width() * 0.25), y));
 }
 
 QDialog *createPopup(QWidget *parent, const QString &title, QWidget *content)

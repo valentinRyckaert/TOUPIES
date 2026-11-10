@@ -59,8 +59,12 @@ void paintPanel(QPainter &painter, const QRectF &rect, const QColor &accent, dou
 /// Étiquette inclinée (type de toupie, forme d'un coup…).
 void paintTag(QPainter &painter, const QRectF &rect, const QString &text, const QColor &color);
 
+/// Barre de stat segmentée (segments inclinés) ; avec un libellé, celui-ci et la valeur
+/// occupent la moitié haute de `rect`.
+void paintStatBar(QPainter &painter, const QRectF &rect, const QString &label, int value,
+                  int segments, const QColor &color);
 /// Icône vectorielle de la charte (grille 24 × 24, à tracer) : play, lan, trophy, build,
-/// tuto, gear, help, update, quit, back, plus, trash, save, sliders, check, lock, user.
+/// tuto, gear, help, update, quit, back, next, timer, plus, trash, save, sliders, check, lock, user.
 /// Un bouton l'affiche si sa propriété « glyph » porte ce nom.
 QPainterPath iconPath(const QString &name);
 void paintIcon(QPainter &painter, const QString &name, const QRectF &rect, const QColor &color);
