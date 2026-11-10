@@ -52,6 +52,7 @@ private slots:
     void botKeepsSpecialForLater();
     void stadiumGeometry();
     void stadiumsAreDistinct();
+    void stadiumsShareClassicArea();
     void topFallsOffStadiumWithoutRim();
     void fourPlayerMatchProducesRanking();
     void forfeitEliminatesPlayer();
@@ -254,6 +255,23 @@ void TestBattle::stadiumGeometry()
     QVERIFY(ellipse.level({0.9, 0.0}) < 1.0);
     QVERIFY(ellipse.level({0.0, 0.6}) > 1.0);
     QCOMPARE(ellipse.innerRadius(), 0.5);
+}
+
+void TestBattle::stadiumsShareClassicArea()
+{
+    // Aire du contour (formule du lacet) : tous les stadiums ont celle du classique.
+    auto area = [](const Stadium &stadium) {
+        const QList<Vec2> points = stadium.geometry(stadium.apply(BattleConfig{})).outline(2048);
+        double sum = 0.0;
+        for (int i = 0; i < points.size(); ++i) {
+            const Vec2 a = points.at(i), b = points.at((i + 1) % points.size());
+            sum += a.x * b.y - b.x * a.y;
+        }
+        return std::abs(sum) / 2.0;
+    };
+    const double classic = area(Stadium::classic());
+    for (const Stadium &stadium : Stadium::all())
+        QVERIFY2(std::abs(area(stadium) / classic - 1.0) < 0.005, qPrintable(stadium.id));
 }
 
 void TestBattle::stadiumsAreDistinct()

@@ -407,9 +407,21 @@ void ArenaWidget::focusOutEvent(QFocusEvent *event)
 
 double ArenaWidget::scale() const
 {
-    const double radius = m_session ? m_session->state().geometry.radius : 1.0;
+    // Une seule échelle pour tous les stadiums (de même surface) : le plus large tient
+    // dans la vue, et les autres gardent à l'écran la taille qu'ils ont en jeu.
+    static const double largest = [] {
+        double size = 1.0;
+        for (const Stadium &stadium : Stadium::all())
+            size = std::max(size, stadium.size);
+        return size;
+    }();
+    double radius = largest;
+    if (m_session) {
+        const MatchState &state = m_session->state();
+        radius *= state.config.stadiumRadius / std::max(0.1, state.stadium.size);
+    }
     const double available = std::min<double>(width(), height() - kTopBar - kBottomHud);
-    return available / 2.0 * 0.88 / std::max(0.1, radius);
+    return available / 2.0 * 0.95 / std::max(0.1, radius);
 }
 
 QPointF ArenaWidget::center() const

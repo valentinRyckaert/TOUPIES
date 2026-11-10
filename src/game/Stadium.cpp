@@ -9,6 +9,13 @@ namespace toupie {
 
 namespace {
 constexpr double kPi = 3.14159265358979323846;
+
+/// Échelle d'un polygone régulier (rayon circonscrit 1) pour qu'il ait la
+/// surface du cercle de rayon 1 du stadium classique.
+double sameAreaAsCircle(int sides)
+{
+    return std::sqrt(kPi / (sides / 2.0 * std::sin(2.0 * kPi / sides)));
+}
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +218,7 @@ QList<Stadium> &Stadium::registry()
             "pointe.");
         concrete.shape = Kind::Polygon;
         concrete.sides = 8;
+        concrete.size = sameAreaAsCircle(concrete.sides);
         concrete.rimHeight = 2.0;
         concrete.friction = 0.85;
         concrete.speed = 1.05;
@@ -255,6 +263,7 @@ QList<Stadium> &Stadium::registry()
             "rotation et les chocs repoussent moins, mais ils frappent plus fort.");
         ice.shape = Kind::Ellipse;
         ice.aspect = 0.8;
+        ice.size = 1.0 / std::sqrt(ice.aspect); // Surface du cercle classique.
         ice.rimHeight = 1.87;
         ice.friction = 0.99;
         ice.slope = 0.75;
@@ -279,6 +288,7 @@ QList<Stadium> &Stadium::registry()
             "rotation, mais un dash bien placé frappe très fort.");
         sand.shape = Kind::Polygon;
         sand.sides = 6;
+        sand.size = sameAreaAsCircle(sand.sides);
         sand.rimHeight = 1.5;
         sand.friction = 1.3;
         sand.speed = 0.9;
@@ -298,9 +308,8 @@ QList<Stadium> &Stadium::registry()
         volcano.name = QCoreApplication::translate("toupie::Stadium", "Volcan");
         volcano.description = QCoreApplication::translate(
             "toupie::Stadium",
-            "Petit cratère aux pentes très raides, sans rebord, entouré de lave. Les chocs "
+            "Cratère aux pentes très raides, sans rebord, entouré de lave. Les chocs "
             "et les dashs y sont plus puissants.");
-        volcano.size = 0.85;
         volcano.knockback = 0.89;
         volcano.hasRim = false;
         volcano.slope = 1.82;
