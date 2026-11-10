@@ -50,6 +50,9 @@ TournamentSettingsWidget::TournamentSettingsWidget(QWidget *parent)
 
     auto *countRow = new QHBoxLayout;
     m_participants = new QComboBox(this);
+    // La liste change avec le format : la largeur suit (« 32 » comme « 4 »).
+    m_participants->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_participants->setMinimumWidth(90);
     m_leagueCount = new QSpinBox(this);
     m_leagueCount->setRange(Tournament::kMinParticipants, Tournament::kMaxParticipants);
     m_leagueCount->setMinimumWidth(90);
