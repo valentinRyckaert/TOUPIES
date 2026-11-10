@@ -201,7 +201,7 @@ void paintDirt(QPainter &p, const QPainterPath &floor, QPointF c, double R, QRan
     p.setClipPath(floor);
     for (int k = 0; k < 7; ++k) {
         const QPainterPath path = crack(rng, c, R, k * kTau / 7 + rng.bounded(0.4), 0.12, 0.06, 0.5);
-        Theme::strokeGlow(p, path, rgb(0xb8ff2e, 230), 1.5);
+        p.strokePath(path, QPen(rgb(0x2a1a0e, 150), 1.2)); // Discrète : à peine plus sombre que le sol.
     }
     p.setPen(QPen(QColor(0x8a, 0x6a, 0x44), 1.0));
     p.setBrush(QColor(0x2a, 0x1a, 0x0e));
@@ -355,7 +355,7 @@ void paintVolcano(QPainter &p, const QPainterPath &floor, QPointF c, double R, Q
     p.strokePath(contours, QPen(rgb(0xff6a3d, 90), 0.9));
     for (int k = 0; k < 9; ++k) {
         const QPainterPath lava = crack(rng, c, R, k * kTau / 9 + rng.bounded(0.3), 0.1, 0.07, 0.6);
-        Theme::strokeGlow(p, lava, rgb(0xffc23d), 1.4);
+        p.strokePath(lava, QPen(rgb(0x8a2a1e, 110), 1.2)); // Discrète : braise sourde, pas de halo.
     }
     p.setPen(Qt::NoPen);
     for (int i = 0; i < 22; ++i) {
