@@ -94,7 +94,7 @@ protected:
     }
 };
 
-/// Démonstration en fond de menu : un vrai combat entre deux bots (toupies et
+/// Démonstration en fond de menu : un vrai combat entre deux bots normaux (toupies et
 /// stadium tirés au hasard) ; dès qu'il se termine, un autre commence.
 /// La simulation ne tourne que menu affiché, et le stadium est mis en cache :
 /// chaque image ne redessine que deux toupies et leurs coups spéciaux.
@@ -218,8 +218,8 @@ private:
         const Stadium &stadium = stadiums.at(pickStadium(m_rng));
         m_battle = std::make_unique<Battle>(QList<Top>{tops.at(a), tops.at(b)}, stadium, stadium.apply(BattleConfig{}),
                                             static_cast<std::uint32_t>(m_rng()));
-        m_bots = {BotController(0, Difficulty::Hard, static_cast<std::uint32_t>(m_rng())),
-                  BotController(1, Difficulty::Hard, static_cast<std::uint32_t>(m_rng()))};
+        m_bots = {BotController(0, Difficulty::Normal, static_cast<std::uint32_t>(m_rng())),
+                  BotController(1, Difficulty::Normal, static_cast<std::uint32_t>(m_rng()))};
         m_battle->launch({m_bots[0].chooseLaunchAngle(*m_battle), m_bots[1].chooseLaunchAngle(*m_battle)},
                          {m_bots[0].chooseLaunchPower(*m_battle), m_bots[1].chooseLaunchPower(*m_battle)});
         m_cache = QPixmap();
