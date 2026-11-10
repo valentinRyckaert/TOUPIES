@@ -3,6 +3,8 @@
 #include "game/Battle.h"
 #include "game/SpecialMove.h"
 
+#include <QCoreApplication>
+
 #include <algorithm>
 #include <cmath>
 
@@ -12,11 +14,11 @@ QString toString(Difficulty difficulty)
 {
     switch (difficulty) {
     case Difficulty::Easy:
-        return QStringLiteral("Facile");
+        return QCoreApplication::translate("toupie::Difficulty", "Facile");
     case Difficulty::Normal:
-        return QStringLiteral("Normal");
+        return QCoreApplication::translate("toupie::Difficulty", "Normal");
     case Difficulty::Hard:
-        return QStringLiteral("Difficile");
+        return QCoreApplication::translate("toupie::Difficulty", "Difficile");
     }
     return {};
 }

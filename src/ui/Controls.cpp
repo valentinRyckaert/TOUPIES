@@ -98,28 +98,28 @@ QString Controls::actionName(Action action)
 {
     switch (action) {
     case Action::SteerLeft:
-        return QCoreApplication::translate("Controls", "Gauche (pilotage, direction)");
+        return QCoreApplication::translate("toupie::Controls", "Gauche (pilotage, direction)");
     case Action::SteerRight:
-        return QCoreApplication::translate("Controls", "Droite (pilotage, direction)");
+        return QCoreApplication::translate("toupie::Controls", "Droite (pilotage, direction)");
     case Action::SteerUp:
-        return QCoreApplication::translate("Controls", "Haut (pilotage, force +)");
+        return QCoreApplication::translate("toupie::Controls", "Haut (pilotage, force +)");
     case Action::SteerDown:
-        return QCoreApplication::translate("Controls", "Bas (pilotage, force −)");
+        return QCoreApplication::translate("toupie::Controls", "Bas (pilotage, force −)");
     case Action::Dash:
-        return QCoreApplication::translate("Controls", "Dash / appui en duel");
+        return QCoreApplication::translate("toupie::Controls", "Dash / appui en duel");
     case Action::Special:
-        return QCoreApplication::translate("Controls", "Coup spécial");
+        return QCoreApplication::translate("toupie::Controls", "Coup spécial");
     case Action::Launch:
-        return QCoreApplication::translate("Controls", "Lancer la toupie");
+        return QCoreApplication::translate("toupie::Controls", "Lancer la toupie");
     case Action::Rematch:
-        return QCoreApplication::translate("Controls", "Revanche / retour au lobby");
+        return QCoreApplication::translate("toupie::Controls", "Revanche / retour au lobby");
     }
     return {};
 }
 
 QString Controls::codeText(int code)
 {
-    auto tr = [](const char *text) { return QCoreApplication::translate("Controls", text); };
+    auto tr = [](const char *text) { return QCoreApplication::translate("toupie::Controls", text); };
     switch (code) {
     case 0:
         return tr("—");
@@ -168,13 +168,13 @@ QString Controls::text(Action action) const
         if (code != 0)
             parts << codeText(code);
     }
-    return parts.isEmpty() ? QCoreApplication::translate("Controls", "aucune touche")
+    return parts.isEmpty() ? QCoreApplication::translate("toupie::Controls", "aucune touche")
                            : parts.join(QStringLiteral(" / "));
 }
 
 QString Controls::helpHtml() const
 {
-    auto tr = [](const char *text) { return QCoreApplication::translate("Controls", text); };
+    auto tr = [](const char *text) { return QCoreApplication::translate("toupie::Controls", text); };
     auto key = [this](Action a) { return QStringLiteral("<b>%1</b>").arg(text(a).toHtmlEscaped()); };
     auto row = [](const QString &what, const QString &how) {
         return QStringLiteral("<tr><td style='padding:3px 14px 3px 0'>%1</td><td>%2</td></tr>")

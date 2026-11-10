@@ -1,5 +1,9 @@
 #include "ui/StadiumPainter.h"
 
+#include "ui/Theme.h"
+#include "ui/TopPainter.h"
+
+#include <QCoreApplication>
 #include <QPainter>
 #include <QPainterPath>
 #include <QRadialGradient>
@@ -13,6 +17,8 @@
 namespace toupie {
 
 namespace {
+
+constexpr double kTau = 2.0 * M_PI;
 
 QPainterPath outlinePath(const StadiumGeometry &geometry, QPointF center, double scale,
                          double grow = 0.0)
@@ -33,89 +39,349 @@ QPainterPath outlinePath(const StadiumGeometry &geometry, QPointF center, double
     return path;
 }
 
-QColor rgb(unsigned value)
+QColor rgb(unsigned value, int alpha = 255)
 {
-    return QColor::fromRgb(value);
+    QColor c = QColor::fromRgb(value);
+    c.setAlpha(alpha);
+    return c;
 }
 
-/// Motif de surface propre à chaque stadium (déterministe).
-void paintTexture(QPainter &p, const Stadium &stadium, const QPainterPath &floor, QPointF center,
-                  double radius)
+QPolygonF regular(QPointF c, double r, int n, double rotation)
 {
+    QPolygonF poly;
+    for (int i = 0; i < n; ++i) {
+        const double a = rotation + i * kTau / n;
+        poly << c + QPointF(std::cos(a), std::sin(a)) * r;
+    }
+    return poly;
+}
+
+/// Faille en zigzag depuis le centre (terre, volcan).
+QPainterPath crack(QRandomGenerator &rng, QPointF c, double R, double angle, double from,
+                   double step, double wander)
+{
+    double a = angle, r = R * from;
+    QPainterPath path(c + QPointF(std::cos(a), std::sin(a)) * r);
+    while (r < R * 0.93) {
+        r += R * (step + rng.bounded(step));
+        a += (rng.generateDouble() - 0.5) * wander;
+        path.lineTo(c + QPointF(std::cos(a), std::sin(a)) * std::min(r, R * 0.95));
+    }
+    return path;
+}
+
+void radialFill(QPainter &p, const QPainterPath &path, QPointF c, double R,
+                std::initializer_list<std::pair<double, unsigned>> stops, QPointF focus = {})
+{
+    QRadialGradient g(c, R, c + focus);
+    for (const auto &[at, color] : stops)
+        g.setColorAt(at, rgb(color));
+    p.fillPath(path, g);
+}
+
+void rings(QPainter &p, QPointF c, double R, int n, const QColor &color, double aspect = 1.0)
+{
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(color, 1.0));
+    for (int i = 1; i <= n; ++i) {
+        const double r = R * i / (n + 1);
+        p.drawEllipse(c, r, r * aspect);
+    }
+}
+
+void paintClassic(QPainter &p, const QPainterPath &floor, const StadiumGeometry &g, QPointF c,
+                  double scale, double R)
+{
+    const QPainterPath rim = outlinePath(g, c, scale, R * 0.07);
+    Theme::strokeGlow(p, rim, rgb(0x34d6ff, 150), 2.0);
+    QLinearGradient rimFill(c - QPointF(R, R), c + QPointF(R, R));
+    rimFill.setColorAt(0, rgb(0x3b3490));
+    rimFill.setColorAt(1, rgb(0x0f0c33));
+    p.fillPath(rim, rimFill);
+    // Segments lumineux du rebord.
+    const QRectF arc(c.x() - R * 1.035, c.y() - R * 1.035, R * 2.07, R * 2.07);
+    for (int i = 0; i < 24; ++i) {
+        p.setPen(QPen(i % 3 ? rgb(0x7b3cff, 190) : rgb(0x34d6ff), R * 0.025, Qt::SolidLine, Qt::FlatCap));
+        p.drawArc(arc, int((i * 15 + 1) * 16), 13 * 16);
+    }
+    radialFill(p, floor, c, R, {{0.0, 0x2a3c9e}, {0.55, 0x191660}, {1.0, 0x07061a}});
     p.save();
     p.setClipPath(floor);
-    QRandomGenerator rng(static_cast<quint32>(qHash(stadium.id, 7)));
-    auto randomPoint = [&] {
-        const double a = rng.bounded(2.0 * M_PI);
-        const double r = std::sqrt(rng.bounded(1.0)) * radius;
-        return center + QPointF(std::cos(a), std::sin(a)) * r;
-    };
+    rings(p, c, R, 7, rgb(0x34d6ff, 75));
+    QPainterPath spokes;
+    for (int i = 0; i < 24; ++i) {
+        const QPointF d(std::cos(i * kTau / 24), std::sin(i * kTau / 24));
+        spokes.moveTo(c + d * R * 0.12);
+        spokes.lineTo(c + d * R);
+    }
+    p.strokePath(spokes, QPen(rgb(0x7b3cff, 64), 1.0));
+    QPen dotted(rgb(0x3dff8b, 200), 1.5);
+    dotted.setDashPattern({1.5, 7.0});
+    p.setPen(dotted);
+    p.drawEllipse(c, R * 0.55, R * 0.55);
+    p.restore();
+    QRadialGradient core(c, R * 0.16);
+    core.setColorAt(0, rgb(0x34d6ff, 140));
+    core.setColorAt(1, rgb(0x34d6ff, 0));
+    p.setPen(Qt::NoPen);
+    p.setBrush(core);
+    p.drawEllipse(c, R * 0.16, R * 0.16);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(rgb(0x34d6ff), 2.0));
+    p.drawEllipse(c, R * 0.1, R * 0.1);
+    p.setPen(Qt::NoPen);
+    p.setBrush(rgb(0x34d6ff, 210));
+    p.drawPolygon(regular(c, R * 0.065, 6, 0));
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(rgb(0x05040f), 3.0));
+    p.drawPath(floor);
+}
 
-    if (stadium.id == QLatin1String("beton")) {
-        // Fissures.
-        p.setPen(QPen(QColor(60, 62, 66, 90), 1.2));
-        for (int i = 0; i < 14; ++i) {
-            QPointF a = randomPoint();
-            QPainterPath crack(a);
-            for (int k = 0; k < 4; ++k) {
-                a += QPointF(rng.bounded(radius * 0.16) - radius * 0.08,
-                             rng.bounded(radius * 0.16) - radius * 0.08);
-                crack.lineTo(a);
-            }
-            p.drawPath(crack);
-        }
-    } else if (stadium.id == QLatin1String("terre") || stadium.id == QLatin1String("sable")) {
-        // Grains.
-        const bool sand = stadium.id == QLatin1String("sable");
-        p.setPen(Qt::NoPen);
-        for (int i = 0; i < 420; ++i) {
-            QColor c = sand ? QColor(150, 110, 50) : QColor(70, 45, 20);
-            c.setAlpha(40 + int(rng.bounded(60)));
-            p.setBrush(c);
-            const double size = radius * (0.004 + rng.bounded(0.008));
-            p.drawEllipse(randomPoint(), size, size);
-        }
-        if (sand) {
-            // Ondulations du sable.
-            p.setBrush(Qt::NoBrush);
-            p.setPen(QPen(QColor(255, 245, 210, 70), 2.0));
-            for (int i = 1; i <= 6; ++i)
-                p.drawEllipse(center, radius * i / 7.0, radius * i / 7.5);
-        }
-    } else if (stadium.id == QLatin1String("glace")) {
-        // Reflets.
-        p.setPen(QPen(QColor(255, 255, 255, 140), 2.0, Qt::SolidLine, Qt::RoundCap));
-        for (int i = 0; i < 9; ++i) {
-            const QPointF a = randomPoint();
-            p.drawLine(a, a + QPointF(radius * 0.18, -radius * 0.10));
-        }
-    } else if (stadium.id == QLatin1String("volcan")) {
-        // Veines de lave.
-        p.setPen(QPen(QColor(255, 110, 40, 120), 1.6));
-        for (int i = 0; i < 10; ++i) {
-            QPointF a = randomPoint();
-            QPainterPath vein(a);
-            for (int k = 0; k < 5; ++k) {
-                a += QPointF(rng.bounded(radius * 0.12) - radius * 0.06,
-                             rng.bounded(radius * 0.12) - radius * 0.06);
-                vein.lineTo(a);
-            }
-            p.drawPath(vein);
-        }
-    } else {
-        // Classique : cercles concentriques.
-        p.setBrush(Qt::NoBrush);
-        p.setPen(QPen(QColor(255, 255, 255, 60), 1.0));
-        for (double f : {0.33, 0.66})
-            p.drawEllipse(center, radius * f, radius * f);
+void paintConcrete(QPainter &p, const QPainterPath &floor, const StadiumGeometry &g, QPointF c,
+                   double scale, double R, QRandomGenerator &rng)
+{
+    const QPainterPath wall = outlinePath(g, c, scale, R * 0.16);
+    QLinearGradient wallFill(c - QPointF(R, R), c + QPointF(R, R));
+    wallFill.setColorAt(0, rgb(0x4a4e66));
+    wallFill.setColorAt(0.5, rgb(0x22253a));
+    wallFill.setColorAt(1, rgb(0x14162a));
+    p.fillPath(wall, wallFill);
+    p.setPen(QPen(rgb(0x05040f), 2.0));
+    p.drawPath(wall);
+    // Bandes de sécurité sur le haut mur.
+    QPen stripes(rgb(0x3dff8b, 215), R * 0.1, Qt::CustomDashLine, Qt::FlatCap);
+    stripes.setDashPattern({0.35, 0.45});
+    p.setPen(stripes);
+    p.drawPath(outlinePath(g, c, scale, R * 0.085));
+    Theme::strokeGlow(p, outlinePath(g, c, scale, R * 0.02), rgb(0x3dff8b, 110), 1.5);
+    radialFill(p, floor, c, R, {{0.0, 0x5d6280}, {0.6, 0x2c3048}, {1.0, 0x121426}}, QPointF(-R * 0.1, -R * 0.12));
+    p.save();
+    p.setClipPath(floor);
+    // Dalles de béton et poussière.
+    QPainterPath seams;
+    for (int i = -4; i <= 4; ++i) {
+        seams.moveTo(c.x() + i * R * 0.24, c.y() - R);
+        seams.lineTo(c.x() + i * R * 0.24, c.y() + R);
+        seams.moveTo(c.x() - R, c.y() + i * R * 0.24);
+        seams.lineTo(c.x() + R, c.y() + i * R * 0.24);
+    }
+    p.strokePath(seams, QPen(QColor(11, 12, 24, 150), 2.0));
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(154, 160, 192, 60));
+    for (int i = 0; i < 30; ++i) {
+        const QPointF d((rng.generateDouble() - 0.5) * 1.6, (rng.generateDouble() - 0.5) * 1.6);
+        const double s = 1.0 + rng.bounded(2.0);
+        p.drawEllipse(c + d * R, s, s);
+    }
+    p.save();
+    p.translate(c + QPointF(-R * 0.25, -R * 0.3));
+    p.rotate(-30);
+    p.setBrush(QColor(255, 255, 255, 18));
+    p.drawEllipse(QPointF(0, 0), R * 0.5, R * 0.18);
+    p.restore();
+    p.restore();
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(rgb(0x3dff8b), 2.0));
+    p.drawPolygon(regular(c, R * 0.18, 8, M_PI / 8));
+    p.setPen(QPen(rgb(0x05040f), 3.0));
+    p.drawPath(floor);
+}
+
+void paintDirt(QPainter &p, const QPainterPath &floor, QPointF c, double R, QRandomGenerator &rng)
+{
+    // Pas de rebord : le sol se délite dans le vide.
+    p.setPen(Qt::NoPen);
+    for (int i = 0; i < 44; ++i) {
+        const double a = rng.bounded(kTau), r = R * (0.98 + rng.bounded(0.16));
+        p.setBrush(QColor(74, 53, 36, 100 + int(rng.bounded(130))));
+        p.drawPolygon(regular(c + QPointF(std::cos(a), std::sin(a)) * r, R * (0.012 + rng.bounded(0.028)), 5, rng.bounded(3.0)));
+    }
+    radialFill(p, floor, c, R, {{0.0, 0x6b4a2e}, {0.7, 0x3b2716}, {1.0, 0x1a1008}}, QPointF(-R * 0.04, -R * 0.05));
+    p.save();
+    p.setClipPath(floor);
+    for (int k = 0; k < 7; ++k) {
+        const QPainterPath path = crack(rng, c, R, k * kTau / 7 + rng.bounded(0.4), 0.12, 0.06, 0.5);
+        Theme::strokeGlow(p, path, rgb(0xb8ff2e, 230), 1.5);
+    }
+    p.setPen(QPen(QColor(0x8a, 0x6a, 0x44), 1.0));
+    p.setBrush(QColor(0x2a, 0x1a, 0x0e));
+    for (int i = 0; i < 18; ++i) {
+        const double a = rng.bounded(kTau), r = R * (0.2 + rng.bounded(0.7));
+        p.drawPolygon(regular(c + QPointF(std::cos(a), std::sin(a)) * r, R * (0.016 + rng.bounded(0.034)), 5 + int(rng.bounded(3)), rng.bounded(3.0)));
     }
     p.restore();
+    QRadialGradient core(c, R * 0.2);
+    core.setColorAt(0, rgb(0xb8ff2e, 90));
+    core.setColorAt(1, rgb(0xb8ff2e, 0));
+    p.setPen(Qt::NoPen);
+    p.setBrush(core);
+    p.drawEllipse(c, R * 0.2, R * 0.2);
+    QPen edge(rgb(0xb8ff2e, 130), 1.5);
+    edge.setDashPattern({4.0, 5.0});
+    p.setBrush(Qt::NoBrush);
+    p.setPen(edge);
+    p.drawPath(floor);
+}
+
+void paintIce(QPainter &p, const QPainterPath &floor, const StadiumGeometry &g, QPointF c,
+              double scale, double R, QRandomGenerator &rng)
+{
+    const double aspect = g.kind == StadiumGeometry::Kind::Ellipse ? g.aspect : 1.0;
+    const QPainterPath rim = outlinePath(g, c, scale, R * 0.1);
+    Theme::strokeGlow(p, rim, rgb(0x8ff3ff, 140), 2.0);
+    QLinearGradient rimFill(c - QPointF(R, R), c + QPointF(R, R));
+    rimFill.setColorAt(0, rgb(0xe6fcff));
+    rimFill.setColorAt(0.5, rgb(0x5ab8e0));
+    rimFill.setColorAt(1, rgb(0x1a3a7a));
+    p.fillPath(rim, rimFill);
+    radialFill(p, floor, c, R, {{0.0, 0xc9f6ff}, {0.5, 0x4fa6e8}, {1.0, 0x18286e}}, QPointF(-R * 0.08, -R * 0.1));
+    p.save();
+    p.setClipPath(floor);
+    // Facettes cristallines.
+    QList<QPointF> pts;
+    for (int i = 0; i < 6; ++i)
+        for (int j = 0; j < 12; ++j) {
+            const double r = R * (i + 0.5) / 5.6;
+            const double a = j * kTau / 12 + i * 0.26 + (rng.generateDouble() - 0.5) * 0.2;
+            pts << c + QPointF(std::cos(a) * r, std::sin(a) * r * aspect);
+        }
+    QPainterPath facets;
+    for (int i = 0; i < 5; ++i)
+        for (int j = 0; j < 12; ++j) {
+            facets.moveTo(pts[i * 12 + j]);
+            facets.lineTo(pts[i * 12 + (j + 1) % 12]);
+            facets.lineTo(pts[(i + 1) * 12 + j]);
+            facets.closeSubpath();
+        }
+    p.strokePath(facets, QPen(QColor(255, 255, 255, 85), 0.8));
+    p.setPen(Qt::NoPen);
+    for (int i = 0; i < 9; ++i) {
+        p.setBrush(QColor(255, 255, 255, 14 + int(rng.bounded(16))));
+        p.drawPolygon(QPolygonF{pts[int(rng.bounded(60))], pts[int(rng.bounded(60))], c});
+    }
+    p.save();
+    p.translate(c + QPointF(-R * 0.3, -R * 0.25 * aspect));
+    p.rotate(-18);
+    p.setBrush(QColor(255, 255, 255, 90));
+    p.drawEllipse(QPointF(0, 0), R * 0.35, R * 0.08);
+    p.restore();
+    p.restore();
+    TopPainter::paintEmblem(p, QStringLiteral("givre"), c, R * 0.1, Qt::white, 1.8);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(rgb(0x05040f), 3.0));
+    p.drawPath(floor);
+}
+
+void paintSand(QPainter &p, const QPainterPath &floor, const StadiumGeometry &g, QPointF c,
+               double scale, double R)
+{
+    const QPainterPath wall = outlinePath(g, c, scale, R * 0.14);
+    QLinearGradient wallFill(c - QPointF(R, R), c + QPointF(R, R));
+    wallFill.setColorAt(0, rgb(0xe8b86a));
+    wallFill.setColorAt(0.5, rgb(0x9a6a34));
+    wallFill.setColorAt(1, rgb(0x4a2e18));
+    p.fillPath(wall, wallFill);
+    p.setPen(QPen(rgb(0x05040f), 2.0));
+    p.drawPath(wall);
+    // Glyphes gravés le long du mur.
+    const QPainterPath glyphLine = outlinePath(g, c, scale, R * 0.07);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(rgb(0x7b3cff, 230), 1.5));
+    for (int i = 0; i < 18; ++i) {
+        const QPointF at = glyphLine.pointAtPercent((i + 0.5) / 18.0);
+        p.drawPolygon(regular(at, R * 0.025, 3, i * 1.3));
+    }
+    radialFill(p, floor, c, R, {{0.0, 0xf2c98a}, {0.6, 0xc08a4c}, {1.0, 0x6a4422}}, QPointF(-R * 0.08, -R * 0.1));
+    p.save();
+    p.setClipPath(floor);
+    QPainterPath dunes;
+    for (int i = -9; i <= 9; ++i) {
+        const double y0 = c.y() + i * R * 0.11;
+        dunes.moveTo(c.x() - R, y0);
+        for (int k = 1; k <= 8; ++k) {
+            const double x = c.x() - R + k * R / 4;
+            dunes.quadTo(x - R / 8, y0 + (k % 2 ? -1 : 1) * R * 0.05 + std::sin(i) * 3, x, y0);
+        }
+    }
+    p.strokePath(dunes, QPen(QColor(0x6a, 0x44, 0x22, 130), 1.3));
+    p.restore();
+    p.setPen(QPen(rgb(0x7b3cff, 150), 2.0));
+    p.drawPath(outlinePath(g, c, scale, -R * 0.02));
+    p.setPen(QPen(rgb(0x7b3cff), 2.0));
+    p.drawPolygon(regular(c, R * 0.2, 6, 0));
+    p.setPen(Qt::NoPen);
+    p.setBrush(rgb(0x7b3cff, 200));
+    p.drawPolygon(regular(c, R * 0.1, 3, -M_PI / 2));
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(rgb(0x05040f), 3.0));
+    p.drawPath(floor);
+}
+
+void paintVolcano(QPainter &p, const QPainterPath &floor, QPointF c, double R, QRandomGenerator &rng)
+{
+    QRadialGradient heat(c, R * 1.35);
+    heat.setColorAt(0.7, rgb(0xff3d1f, 70));
+    heat.setColorAt(1.0, rgb(0xff3d1f, 0));
+    p.setPen(Qt::NoPen);
+    p.setBrush(heat);
+    p.drawEllipse(c, R * 1.35, R * 1.35);
+    p.setBrush(rgb(0x2a0e14, 210));
+    for (int i = 0; i < 30; ++i) {
+        const double a = rng.bounded(kTau), r = R * (1.0 + rng.bounded(0.18));
+        p.drawPolygon(regular(c + QPointF(std::cos(a), std::sin(a)) * r, R * (0.015 + rng.bounded(0.03)), 4, rng.bounded(3.0)));
+    }
+    QRadialGradient bowl(c, R);
+    bowl.setColorAt(0.0, rgb(0xff6a3d));
+    bowl.setColorAt(0.25, rgb(0x7a1b2a));
+    bowl.setColorAt(0.6, rgb(0x2a0a1e));
+    bowl.setColorAt(1.0, rgb(0x12040e));
+    p.fillPath(floor, bowl);
+    p.save();
+    p.setClipPath(floor);
+    // Courbes de niveau serrées : la pente est raide.
+    QPainterPath contours;
+    for (int i = 1; i <= 12; ++i) {
+        const double r = R * std::pow(i / 13.0, 0.7);
+        for (int k = 0; k <= 72; ++k) {
+            const double a = k * kTau / 72;
+            const double rr = r * (1 + 0.025 * std::sin(a * 5 + i));
+            const QPointF q = c + QPointF(std::cos(a), std::sin(a)) * rr;
+            if (k == 0)
+                contours.moveTo(q);
+            else
+                contours.lineTo(q);
+        }
+    }
+    p.strokePath(contours, QPen(rgb(0xff6a3d, 90), 0.9));
+    for (int k = 0; k < 9; ++k) {
+        const QPainterPath lava = crack(rng, c, R, k * kTau / 9 + rng.bounded(0.3), 0.1, 0.07, 0.6);
+        Theme::strokeGlow(p, lava, rgb(0xffc23d), 1.4);
+    }
+    p.setPen(Qt::NoPen);
+    for (int i = 0; i < 22; ++i) {
+        const double a = rng.bounded(kTau), r = R * rng.bounded(1.0);
+        p.setBrush(rgb(0xffc23d, 100 + int(rng.bounded(150))));
+        const double s = 1.0 + rng.bounded(2.0);
+        p.drawEllipse(c + QPointF(std::cos(a), std::sin(a)) * r, s, s);
+    }
+    p.restore();
+    QRadialGradient core(c, R * 0.18);
+    core.setColorAt(0.0, rgb(0xfff1c2));
+    core.setColorAt(0.4, rgb(0xffc23d, 200));
+    core.setColorAt(1.0, rgb(0xffc23d, 0));
+    p.setBrush(core);
+    p.drawEllipse(c, R * 0.18, R * 0.18);
 }
 
 QString percent(double multiplier)
 {
     const int value = qRound((multiplier - 1.0) * 100.0);
     return value > 0 ? QStringLiteral("+%1 %").arg(value) : QStringLiteral("%1 %").arg(value);
+}
+
+QString translated(const char *text)
+{
+    return QCoreApplication::translate("toupie::StadiumPainter", text);
 }
 
 } // namespace
@@ -129,41 +395,20 @@ void paint(QPainter &p, const Stadium &stadium, const StadiumGeometry &geometry,
     p.setRenderHint(QPainter::Antialiasing);
     const double radius = geometry.radius * scale;
     const QPainterPath floor = outlinePath(geometry, center, scale);
-
-    if (stadium.hasRim) {
-        // Rebord : bande épaisse autour du sol.
-        const QPainterPath rim = outlinePath(geometry, center, scale, radius * 0.06);
-        p.setPen(Qt::NoPen);
-        p.setBrush(rgb(stadium.rimColor));
-        p.drawPath(rim);
-    } else {
-        // Pas de rebord : halo de « vide » (ou de lave) autour du sol.
-        QColor glow = rgb(stadium.rimColor);
-        for (int i = 4; i >= 1; --i) {
-            glow.setAlpha(28 * (5 - i));
-            p.setPen(Qt::NoPen);
-            p.setBrush(glow);
-            p.drawPath(outlinePath(geometry, center, scale, radius * 0.025 * i));
-        }
-    }
-
-    QRadialGradient bowl(center, radius);
-    bowl.setColorAt(0.0, rgb(stadium.floorCenter));
-    bowl.setColorAt(0.75, rgb(stadium.floorCenter).darker(125));
-    bowl.setColorAt(1.0, rgb(stadium.floorEdge));
-    p.setBrush(bowl);
-    p.setPen(Qt::NoPen);
-    p.drawPath(floor);
-
-    paintTexture(p, stadium, floor, center, radius);
-
-    p.setBrush(Qt::NoBrush);
-    if (stadium.hasRim) {
-        p.setPen(QPen(rgb(stadium.rimColor).darker(140), 2.0));
-    } else {
-        p.setPen(QPen(rgb(stadium.rimColor).lighter(130), 2.0, Qt::DashLine));
-    }
-    p.drawPath(floor);
+    QRandomGenerator rng(static_cast<quint32>(qHash(stadium.id, 7)));
+    const QString &id = stadium.id;
+    if (id == QLatin1String("beton"))
+        paintConcrete(p, floor, geometry, center, scale, radius, rng);
+    else if (id == QLatin1String("terre"))
+        paintDirt(p, floor, center, radius, rng);
+    else if (id == QLatin1String("glace"))
+        paintIce(p, floor, geometry, center, scale, radius, rng);
+    else if (id == QLatin1String("sable"))
+        paintSand(p, floor, geometry, center, scale, radius);
+    else if (id == QLatin1String("volcan"))
+        paintVolcano(p, floor, center, radius, rng);
+    else
+        paintClassic(p, floor, geometry, center, scale, radius);
     p.restore();
 }
 
@@ -172,42 +417,42 @@ QString describeTraits(const Stadium &stadium)
     QStringList traits;
     switch (stadium.shape) {
     case StadiumGeometry::Kind::Circle:
-        traits << QStringLiteral("Cercle");
+        traits << translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "Cercle"));
         break;
     case StadiumGeometry::Kind::Polygon:
-        traits << (stadium.sides == 6 ? QStringLiteral("Hexagone")
-                   : stadium.sides == 8 ? QStringLiteral("Octogone")
-                                        : QStringLiteral("Polygone"));
+        traits << (stadium.sides == 6   ? translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "Hexagone"))
+                   : stadium.sides == 8 ? translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "Octogone"))
+                                        : translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "Polygone")));
         break;
     case StadiumGeometry::Kind::Ellipse:
-        traits << QStringLiteral("Ellipse");
+        traits << translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "Ellipse"));
         break;
     }
     if (stadium.size < 0.99)
-        traits << QStringLiteral("petit");
+        traits << translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "petit"));
     if (!stadium.hasRim)
-        traits << QStringLiteral("sans rebord");
+        traits << translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "sans rebord"));
     else if (stadium.rimHeight > 1.05)
-        traits << QStringLiteral("rebord haut");
+        traits << translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "rebord haut"));
     else if (stadium.rimHeight < 0.95)
-        traits << QStringLiteral("rebord bas");
+        traits << translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "rebord bas"));
     else
-        traits << QStringLiteral("rebord");
+        traits << translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "rebord"));
 
     auto add = [&](const QString &label, double value) {
         if (std::abs(value - 1.0) > 0.01)
             traits << QStringLiteral("%1 %2").arg(label, percent(value));
     };
-    add(QStringLiteral("vitesse"), stadium.speed);
-    add(QStringLiteral("frottement"), stadium.friction);
-    add(QStringLiteral("pente"), stadium.slope);
-    add(QStringLiteral("usure"), stadium.enduranceDrain);
-    add(QStringLiteral("dégâts"), stadium.damage);
-    add(QStringLiteral("recul"), stadium.knockback);
-    add(QStringLiteral("portée du dash"), stadium.dashSpeed);
-    add(QStringLiteral("puissance du dash"), stadium.dashPower);
+    add(translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "vitesse")), stadium.speed);
+    add(translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "frottement")), stadium.friction);
+    add(translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "pente")), stadium.slope);
+    add(translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "usure")), stadium.enduranceDrain);
+    add(translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "dégâts")), stadium.damage);
+    add(translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "recul")), stadium.knockback);
+    add(translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "portée du dash")), stadium.dashSpeed);
+    add(translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "puissance du dash")), stadium.dashPower);
     if (traits.size() == 2)
-        traits << QStringLiteral("aucun modificateur");
+        traits << translated(QT_TRANSLATE_NOOP("toupie::StadiumPainter", "aucun modificateur"));
     return traits.join(QStringLiteral(" · "));
 }
 
@@ -230,30 +475,46 @@ void StadiumWidget::paintEvent(QPaintEvent *)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    const double thumb = qMin(height() - 12.0, 110.0);
-    const QPointF center(6 + thumb / 2.0, height() / 2.0);
+    const double thumb = qMin(height() - 12.0, 120.0);
+    const QPointF center(8 + thumb / 2.0, height() / 2.0);
     BattleConfig config = m_stadium.apply(BattleConfig{});
     const StadiumGeometry geometry = m_stadium.geometry(config);
-    StadiumPainter::paint(p, m_stadium, geometry, center, thumb / 2.0 * 0.85);
+    StadiumPainter::paint(p, m_stadium, geometry, center, thumb / 2.0 * 0.78);
 
-    const QRectF text(thumb + 20, 4, width() - thumb - 24, height() - 8);
-    QFont bold = font();
-    bold.setBold(true);
-    bold.setPointSizeF(bold.pointSizeF() * 1.1);
-    p.setFont(bold);
-    p.setPen(palette().color(QPalette::WindowText));
+    const QRectF text(thumb + 26, 4, width() - thumb - 30, height() - 8);
+    const QColor accent = QColor::fromRgb(m_stadium.accent);
+    QFont title = Theme::displayFont(19);
+    title.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+    p.setFont(title);
+    p.setPen(Theme::kText);
+    const QString name = m_stadium.name.toUpper();
     const double titleHeight = p.fontMetrics().height() + 2;
     p.drawText(QRectF(text.left(), text.top(), text.width(), titleHeight),
-               Qt::AlignLeft | Qt::AlignVCenter, m_stadium.name);
+               Qt::AlignLeft | Qt::AlignVCenter, name);
+    if (!m_stadium.codename.isEmpty()) {
+        QFont code = Theme::displayFont(13);
+        code.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+        const double nameWidth = p.fontMetrics().horizontalAdvance(name);
+        p.setFont(code);
+        p.setPen(accent);
+        p.drawText(QRectF(text.left() + nameWidth + 14, text.top(), text.width(), titleHeight),
+                   Qt::AlignLeft | Qt::AlignVCenter,
+                   QStringLiteral("// %1").arg(m_stadium.codename.toUpper()));
+    }
 
-    p.setFont(font());
+    p.setFont(Theme::bodyFont(15, QFont::Medium));
     QTextOption option;
     option.setWrapMode(QTextOption::WordWrap);
-    const QString body = m_stadium.description + QStringLiteral("\n")
-                       + StadiumPainter::describeTraits(m_stadium);
-    p.drawText(QRectF(text.left(), text.top() + titleHeight, text.width(),
-                      text.height() - titleHeight),
-               body, option);
+    p.setPen(Theme::kMuted);
+    const QRectF body(text.left(), text.top() + titleHeight + 2, text.width(),
+                      text.height() - titleHeight - 26);
+    p.drawText(body, m_stadium.description, option);
+    p.setFont(Theme::bodyFont(14, QFont::Bold));
+    p.setPen(accent);
+    p.drawText(QRectF(text.left(), text.bottom() - 22, text.width(), 22),
+               Qt::AlignLeft | Qt::AlignVCenter,
+               p.fontMetrics().elidedText(StadiumPainter::describeTraits(m_stadium), Qt::ElideRight,
+                                          int(text.width())));
 }
 
 } // namespace toupie

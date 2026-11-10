@@ -1,6 +1,11 @@
 #include "ui/SettingsPage.h"
+#include "ui/Theme.h"
 
 #include "ui/Controls.h"
+#include "ui/Language.h"
+
+#include <QComboBox>
+#include <QMessageBox>
 
 #include <QGridLayout>
 #include <QGroupBox>
@@ -78,13 +83,34 @@ SettingsPage::SettingsPage(QWidget *parent)
     : QWidget(parent)
 {
     auto *root = new QVBoxLayout(this);
-    auto *title = new QLabel(tr("Paramètres"), this);
-    QFont font = title->font();
-    font.setPointSizeF(font.pointSizeF() * 1.6);
-    font.setBold(true);
-    title->setFont(font);
-    title->setObjectName(QStringLiteral("title"));
+    auto *title = Theme::createTitle(tr("Paramètres"), this);
     root->addWidget(title);
+
+    auto *languageBox = new QGroupBox(tr("Langue"), this);
+    auto *languageRow = new QHBoxLayout(languageBox);
+    m_language = new QComboBox(languageBox);
+    for (const QString &code : Language::available())
+        m_language->addItem(Language::nativeName(code), code);
+    m_language->setCurrentIndex(m_language->findData(Language::current()));
+    languageRow->addWidget(m_language);
+    auto *languageHint = new QLabel(tr("Le jeu redémarre pour changer de langue."), languageBox);
+    languageHint->setObjectName(QStringLiteral("hint"));
+    languageRow->addWidget(languageHint, 1);
+    root->addWidget(languageBox);
+    connect(m_language, &QComboBox::activated, this, [this] {
+        const QString code = m_language->currentData().toString();
+        if (code == Language::current())
+            return;
+        if (QMessageBox::question(this, tr("Langue"),
+                                  tr("Redémarrer le jeu maintenant pour passer en %1 ?")
+                                      .arg(Language::nativeName(code)))
+            != QMessageBox::Yes) {
+            m_language->setCurrentIndex(m_language->findData(Language::current()));
+            return;
+        }
+        Language::setCurrent(code);
+        emit restartRequested();
+    });
 
     auto *box = new QGroupBox(tr("Touches et souris"), this);
     auto *grid = new QGridLayout(box);
@@ -128,6 +154,8 @@ SettingsPage::SettingsPage(QWidget *parent)
 
     auto *buttons = new QHBoxLayout;
     auto *back = new QPushButton(tr("Retour au menu"), this);
+    back->setProperty("variant", QStringLiteral("ghost"));
+    back->setProperty("glyph", QStringLiteral("back"));
     auto *reset = new QPushButton(tr("Rétablir les touches par défaut"), this);
     buttons->addWidget(back);
     buttons->addStretch();

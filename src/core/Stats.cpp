@@ -1,5 +1,7 @@
 #include "core/Stats.h"
 
+#include <QCoreApplication>
+
 namespace toupie {
 
 TopType classify(const Stats &stats)
@@ -21,21 +23,21 @@ QString toString(TopType type)
 {
     switch (type) {
     case TopType::Attack:
-        return QStringLiteral("Attaque");
+        return QCoreApplication::translate("toupie::Stats", "Attaque");
     case TopType::Defense:
-        return QStringLiteral("Défense");
+        return QCoreApplication::translate("toupie::Stats", "Défense");
     case TopType::Endurance:
-        return QStringLiteral("Endurance");
+        return QCoreApplication::translate("toupie::Stats", "Endurance");
     case TopType::Balance:
-        return QStringLiteral("Équilibre");
+        return QCoreApplication::translate("toupie::Stats", "Équilibre");
     }
     return {};
 }
 
 QString toString(SpinDirection direction)
 {
-    return direction == SpinDirection::Clockwise ? QStringLiteral("Horaire")
-                                                 : QStringLiteral("Anti-horaire");
+    return direction == SpinDirection::Clockwise ? QCoreApplication::translate("toupie::Stats", "Horaire")
+                                                 : QCoreApplication::translate("toupie::Stats", "Anti-horaire");
 }
 
 } // namespace toupie

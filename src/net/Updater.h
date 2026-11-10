@@ -44,6 +44,9 @@ public:
     /// Remplace l'application par le paquet téléchargé et lance la nouvelle
     /// version ; l'appelant doit ensuite quitter. False en cas d'échec.
     static bool installAndRestart(const QString &package, QString *error);
+    /// Relance le jeu (même exécutable, ou même AppImage) ; il faut ensuite fermer
+    /// l'instance actuelle. Sert notamment au changement de langue.
+    static bool restart(QString *error);
 
 signals:
     void updateAvailable(const toupie::net::UpdateInfo &update);

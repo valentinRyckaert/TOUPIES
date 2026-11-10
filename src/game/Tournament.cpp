@@ -2,6 +2,7 @@
 
 #include "core/PartCatalog.h"
 
+#include <QCoreApplication>
 #include <QJsonArray>
 
 #include <algorithm>
@@ -25,14 +26,14 @@ int nextPowerOfTwo(int n)
 
 QString toString(TournamentFormat format)
 {
-    return format == TournamentFormat::League ? QStringLiteral("Ligue")
-                                              : QStringLiteral("Élimination directe");
+    return format == TournamentFormat::League ? QCoreApplication::translate("toupie::Tournament", "Ligue")
+                                              : QCoreApplication::translate("toupie::Tournament", "Élimination directe");
 }
 
 QString toString(MatchFormat format)
 {
-    return format == MatchFormat::Classic ? QStringLiteral("Classique")
-                                          : QStringLiteral("Express");
+    return format == MatchFormat::Classic ? QCoreApplication::translate("toupie::Tournament", "Classique")
+                                          : QCoreApplication::translate("toupie::Tournament", "Express");
 }
 
 // ---------------------------------------------------------------------------
@@ -233,18 +234,18 @@ int Tournament::roundCount() const
 QString Tournament::roundName(int round) const
 {
     if (m_settings.format == TournamentFormat::League)
-        return QStringLiteral("Journée %1/%2").arg(round + 1).arg(roundCount());
+        return QCoreApplication::translate("toupie::Tournament", "Journée %1/%2").arg(round + 1).arg(roundCount());
     switch (roundCount() - round) {
     case 1:
-        return QStringLiteral("Finale");
+        return QCoreApplication::translate("toupie::Tournament", "Finale");
     case 2:
-        return QStringLiteral("Demi-finales");
+        return QCoreApplication::translate("toupie::Tournament", "Demi-finales");
     case 3:
-        return QStringLiteral("Quarts de finale");
+        return QCoreApplication::translate("toupie::Tournament", "Quarts de finale");
     case 4:
-        return QStringLiteral("Huitièmes de finale");
+        return QCoreApplication::translate("toupie::Tournament", "Huitièmes de finale");
     default:
-        return QStringLiteral("Seizièmes de finale");
+        return QCoreApplication::translate("toupie::Tournament", "Seizièmes de finale");
     }
 }
 
@@ -439,7 +440,7 @@ QList<Participant> addBots(QList<Participant> humans, const TournamentSettings &
     const int tops = MatchSeries::topsFor(settings.matchFormat);
     for (int i = 0; i < settings.bots.size(); ++i) {
         Participant bot;
-        bot.name = QStringLiteral("Bot %1").arg(i + 1);
+        bot.name = QCoreApplication::translate("toupie::Tournament", "Bot %1").arg(i + 1);
         bot.level = settings.bots.at(i);
         for (int k : randomOrder(static_cast<int>(pool.size()), static_cast<std::uint32_t>(rng())))
             if (bot.tops.size() < tops)

@@ -2,6 +2,7 @@
 
 #include "core/Stats.h"
 
+#include <QCoreApplication>
 #include <QString>
 
 namespace toupie {
@@ -30,13 +31,13 @@ inline QString toString(PartKind kind)
 {
     switch (kind) {
     case PartKind::Wheel:
-        return QStringLiteral("Roue métallique");
+        return QCoreApplication::translate("toupie::Part", "Roue métallique");
     case PartKind::Middle:
-        return QStringLiteral("Partie intermédiaire");
+        return QCoreApplication::translate("toupie::Part", "Partie intermédiaire");
     case PartKind::Tip:
-        return QStringLiteral("Pointe");
+        return QCoreApplication::translate("toupie::Part", "Pointe");
     case PartKind::Bolt:
-        return QStringLiteral("Boulon");
+        return QCoreApplication::translate("toupie::Part", "Boulon");
     }
     return {};
 }

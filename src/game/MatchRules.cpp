@@ -1,5 +1,6 @@
 #include "game/MatchRules.h"
 
+#include <QCoreApplication>
 #include <QStringList>
 
 #include <algorithm>
@@ -57,24 +58,24 @@ QString MatchRules::summary() const
     QStringList parts;
     auto percent = [&](const QString &label, double value) {
         if (!same(value, 1.0))
-            parts << QStringLiteral("%1 %2 %").arg(label).arg(qRound(value * 100));
+            parts << QCoreApplication::translate("toupie::MatchRules", "%1 %2 %").arg(label).arg(qRound(value * 100));
     };
-    percent(QStringLiteral("Vitesse"), speed);
-    percent(QStringLiteral("Rebonds"), knockback);
-    percent(QStringLiteral("Usure"), wear);
-    percent(QStringLiteral("Dégâts"), damage);
-    percent(QStringLiteral("Dash"), dashPower);
+    percent(QCoreApplication::translate("toupie::MatchRules", "Vitesse"), speed);
+    percent(QCoreApplication::translate("toupie::MatchRules", "Rebonds"), knockback);
+    percent(QCoreApplication::translate("toupie::MatchRules", "Usure"), wear);
+    percent(QCoreApplication::translate("toupie::MatchRules", "Dégâts"), damage);
+    percent(QCoreApplication::translate("toupie::MatchRules", "Dash"), dashPower);
     if (!same(maxEndurance, 100.0))
-        parts << QStringLiteral("Endurance %1").arg(qRound(maxEndurance));
+        parts << QCoreApplication::translate("toupie::MatchRules", "Endurance %1").arg(qRound(maxEndurance));
     if (timeLimit > 0.0)
-        parts << QStringLiteral("Limite %1 s").arg(qRound(timeLimit));
+        parts << QCoreApplication::translate("toupie::MatchRules", "Limite %1 s").arg(qRound(timeLimit));
     if (steering <= 0.0)
-        parts << QStringLiteral("Sans pilotage");
+        parts << QCoreApplication::translate("toupie::MatchRules", "Sans pilotage");
     else
-        percent(QStringLiteral("Pilotage"), steering);
+        percent(QCoreApplication::translate("toupie::MatchRules", "Pilotage"), steering);
     if (!specials)
-        parts << QStringLiteral("Sans coups spéciaux");
-    return parts.isEmpty() ? QStringLiteral("Règles normales") : parts.join(QStringLiteral(" · "));
+        parts << QCoreApplication::translate("toupie::MatchRules", "Sans coups spéciaux");
+    return parts.isEmpty() ? QCoreApplication::translate("toupie::MatchRules", "Règles normales") : parts.join(QStringLiteral(" · "));
 }
 
 QJsonObject MatchRules::toJson() const

@@ -20,12 +20,7 @@ TournamentPage::TournamentPage(QWidget *parent)
     : QWidget(parent)
 {
     auto *root = new QVBoxLayout(this);
-    m_title = new QLabel(this);
-    QFont titleFont = m_title->font();
-    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.6);
-    titleFont.setBold(true);
-    m_title->setFont(titleFont);
-    m_title->setObjectName(QStringLiteral("title"));
+    m_title = Theme::createTitle(QString(), this);
     root->addWidget(m_title);
     m_subtitle = new QLabel(this);
     m_subtitle->setWordWrap(true);
@@ -63,6 +58,8 @@ TournamentPage::TournamentPage(QWidget *parent)
 
     auto *buttons = new QHBoxLayout;
     m_leave = new QPushButton(tr("Quitter le tournoi"), this);
+    m_leave->setProperty("variant", QStringLiteral("danger"));
+    m_leave->setProperty("glyph", QStringLiteral("quit"));
     m_returnToLobby = new QPushButton(tr("Retour au lobby"), this);
     buttons->addWidget(m_leave);
     buttons->addStretch();
@@ -123,8 +120,8 @@ void TournamentPage::rebuild()
     if (t.isFinished()) {
         const int champion = t.champion();
         m_subtitle->setText(champion == local
-                                ? tr("🏆 Tournoi terminé : vous êtes champion·ne !")
-                                : tr("🏆 Tournoi terminé — champion·ne : %1")
+                                ? tr("Tournoi terminé : vous êtes champion·ne !")
+                                : tr("Tournoi terminé — champion·ne : %1")
                                       .arg(participantLabel(champion)));
     } else {
         m_subtitle->setText(tr("%1 · %2 participants · stadium %3")

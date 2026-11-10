@@ -1,5 +1,7 @@
 #include "game/Stadium.h"
 
+#include <QCoreApplication>
+
 #include <algorithm>
 #include <cmath>
 
@@ -190,16 +192,20 @@ QList<Stadium> &Stadium::registry()
 
         Stadium classic;
         classic.id = QStringLiteral("classique");
-        classic.name = QStringLiteral("Classique");
-        classic.description = QStringLiteral(
+        classic.name = QCoreApplication::translate("toupie::Stadium", "Classique");
+        classic.description = QCoreApplication::translate(
+            "toupie::Stadium",
             "Cuvette circulaire en plastique avec rebord. Le stadium de référence, sans "
             "avantage pour aucun type.");
+        classic.codename = QCoreApplication::translate("toupie::Stadium", "Noyau Holo");
+        classic.accent = 0x34d6ff;
         list.append(classic);
 
         Stadium concrete;
         concrete.id = QStringLiteral("beton");
-        concrete.name = QStringLiteral("Béton");
-        concrete.description = QStringLiteral(
+        concrete.name = QCoreApplication::translate("toupie::Stadium", "Béton");
+        concrete.description = QCoreApplication::translate(
+            "toupie::Stadium",
             "Octogone au sol dur et lisse, entouré d'un très haut rebord. Les toupies vont "
             "un peu plus vite et les chocs sont plus violents, mais la surface râpe la "
             "pointe.");
@@ -214,12 +220,15 @@ QList<Stadium> &Stadium::registry()
         concrete.floorCenter = 0xc4c6c9;
         concrete.floorEdge = 0x73777c;
         concrete.rimColor = 0x3d4045;
+        concrete.codename = QCoreApplication::translate("toupie::Stadium", "Bunker-8");
+        concrete.accent = 0x3dff8b;
         list.append(concrete);
 
         Stadium dirt;
         dirt.id = QStringLiteral("terre");
-        dirt.name = QStringLiteral("Terre");
-        dirt.description = QStringLiteral(
+        dirt.name = QCoreApplication::translate("toupie::Stadium", "Terre");
+        dirt.description = QCoreApplication::translate(
+            "toupie::Stadium",
             "Arène de terre battue sans rebord. Le sol accroche la pointe : la rotation "
             "s'use plus vite et les chocs frappent fort ; les dashs sont un peu plus "
             "courts.");
@@ -233,12 +242,15 @@ QList<Stadium> &Stadium::registry()
         dirt.floorCenter = 0xc39663;
         dirt.floorEdge = 0x6e4b2a;
         dirt.rimColor = 0x2b1b0e;
+        dirt.codename = QCoreApplication::translate("toupie::Stadium", "Fosse Sauvage");
+        dirt.accent = 0xb8ff2e;
         list.append(dirt);
 
         Stadium ice;
         ice.id = QStringLiteral("glace");
-        ice.name = QStringLiteral("Glace");
-        ice.description = QStringLiteral(
+        ice.name = QCoreApplication::translate("toupie::Stadium", "Glace");
+        ice.description = QCoreApplication::translate(
+            "toupie::Stadium",
             "Patinoire elliptique au haut rebord et aux pentes douces. La glace use peu la "
             "rotation et les chocs repoussent moins, mais ils frappent plus fort.");
         ice.shape = Kind::Ellipse;
@@ -254,12 +266,15 @@ QList<Stadium> &Stadium::registry()
         ice.floorCenter = 0xf1f8ff;
         ice.floorEdge = 0x92badb;
         ice.rimColor = 0x4d6f8c;
+        ice.codename = QCoreApplication::translate("toupie::Stadium", "Cryo-Ellipse");
+        ice.accent = 0x8ff3ff;
         list.append(ice);
 
         Stadium sand;
         sand.id = QStringLiteral("sable");
-        sand.name = QStringLiteral("Sable");
-        sand.description = QStringLiteral(
+        sand.name = QCoreApplication::translate("toupie::Stadium", "Sable");
+        sand.description = QCoreApplication::translate(
+            "toupie::Stadium",
             "Hexagone de sable aux rebords très hauts. Le sable ralentit tout et use vite la "
             "rotation, mais un dash bien placé frappe très fort.");
         sand.shape = Kind::Polygon;
@@ -274,12 +289,15 @@ QList<Stadium> &Stadium::registry()
         sand.floorCenter = 0xf2dca4;
         sand.floorEdge = 0xb89455;
         sand.rimColor = 0x7a5c2c;
+        sand.codename = QCoreApplication::translate("toupie::Stadium", "Dune Hexa");
+        sand.accent = 0xffc23d;
         list.append(sand);
 
         Stadium volcano;
         volcano.id = QStringLiteral("volcan");
-        volcano.name = QStringLiteral("Volcan");
-        volcano.description = QStringLiteral(
+        volcano.name = QCoreApplication::translate("toupie::Stadium", "Volcan");
+        volcano.description = QCoreApplication::translate(
+            "toupie::Stadium",
             "Petit cratère aux pentes très raides, sans rebord, entouré de lave. Les chocs "
             "et les dashs y sont plus puissants.");
         volcano.size = 0.85;
@@ -294,6 +312,8 @@ QList<Stadium> &Stadium::registry()
         volcano.floorCenter = 0x6a4741;
         volcano.floorEdge = 0x2a1512;
         volcano.rimColor = 0xff5a1f;
+        volcano.codename = QCoreApplication::translate("toupie::Stadium", "Caldeira");
+        volcano.accent = 0xff6a3d;
         list.append(volcano);
 
         return list;

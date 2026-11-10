@@ -1,5 +1,7 @@
 #include "session/MatchSession.h"
 
+#include <QCoreApplication>
+
 namespace toupie {
 
 MatchSession::MatchSession(QObject *parent)
@@ -36,7 +38,7 @@ void MatchSession::initFromBattle(const Battle &battle, const QStringList &names
         m_state.startPositions.append(battle.startPosition(i));
         m_state.aimed.append(false);
         if (m_state.names.size() <= i)
-            m_state.names.append(QStringLiteral("Joueur %1").arg(i + 1));
+            m_state.names.append(QCoreApplication::translate("toupie::MatchSession", "Joueur %1").arg(i + 1));
     }
     m_impacts.clear();
 }

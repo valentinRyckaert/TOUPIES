@@ -1,4 +1,5 @@
 #include "ui/HelpPage.h"
+#include "ui/Theme.h"
 
 #include "ui/Controls.h"
 
@@ -14,12 +15,7 @@ HelpPage::HelpPage(QWidget *parent)
     : QWidget(parent)
 {
     auto *root = new QVBoxLayout(this);
-    auto *title = new QLabel(tr("Aide — commandes"), this);
-    QFont font = title->font();
-    font.setPointSizeF(font.pointSizeF() * 1.6);
-    font.setBold(true);
-    title->setFont(font);
-    title->setObjectName(QStringLiteral("title"));
+    auto *title = Theme::createTitle(tr("Aide — commandes"), this);
     root->addWidget(title);
 
     auto *scroll = new QScrollArea(this);
@@ -34,6 +30,8 @@ HelpPage::HelpPage(QWidget *parent)
 
     auto *buttons = new QHBoxLayout;
     auto *back = new QPushButton(tr("Retour au menu"), this);
+    back->setProperty("variant", QStringLiteral("ghost"));
+    back->setProperty("glyph", QStringLiteral("back"));
     auto *settings = new QPushButton(tr("Modifier les touches…"), this);
     buttons->addWidget(back);
     buttons->addStretch();
