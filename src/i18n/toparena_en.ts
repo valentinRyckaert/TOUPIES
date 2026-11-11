@@ -648,6 +648,14 @@
         <source>&lt;b&gt;Échap&lt;/b&gt;</source>
         <translation>&lt;b&gt;Esc&lt;/b&gt;</translation>
     </message>
+    <message>
+        <source>Plein écran / fenêtré</source>
+        <translation>Full screen / windowed</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;F11&lt;/b&gt;</source>
+        <translation>&lt;b&gt;F11&lt;/b&gt;</translation>
+    </message>
 </context>
 <context>
     <name>toupie::Difficulty</name>

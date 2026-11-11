@@ -205,6 +205,7 @@ QString Controls::helpHtml() const
     html += section(tr("Fin de combat et menus"));
     html += row(tr("Revanche (solo) / retour au lobby (hôte)"), key(Action::Rematch));
     html += row(tr("Retour au menu / quitter le lobby / abandonner"), tr("<b>Échap</b>"));
+    html += row(tr("Plein écran / fenêtré"), tr("<b>F11</b>"));
     html += QStringLiteral("</table>");
     return html;
 }

@@ -27,6 +27,7 @@
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QRandomGenerator>
+#include <QShortcut>
 #include <QStackedWidget>
 #include <QTimer>
 
@@ -91,6 +92,11 @@ MainWindow::MainWindow(QWidget *parent)
                           static_cast<QWidget *>(m_movesPage)})
         m_stack->addWidget(page);
     setCentralWidget(backdrop);
+    // Le jeu démarre en plein écran (main.cpp) ; F11 bascule, Échap restant le retour.
+    auto *fullScreen = new QShortcut(QKeySequence(Qt::Key_F11), this);
+    fullScreen->setContext(Qt::ApplicationShortcut);
+    connect(fullScreen, &QShortcut::activated, this,
+            [this] { setWindowState(windowState() ^ Qt::WindowFullScreen); });
 
     connect(m_menu, &MenuPage::playRequested, this, &MainWindow::showSetup);
     connect(m_menu, &MenuPage::lanRequested, this, [this] {

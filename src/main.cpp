@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
     toupie::Theme::apply(app);
 
     toupie::MainWindow window;
-    window.show();
+    window.showFullScreen(); // F11 : fenêtré / plein écran.
 
     // Vérification d'intégration (CI) : l'application démarre puis se ferme.
     if (QCoreApplication::arguments().contains(QStringLiteral("--smoke-test")))
