@@ -100,7 +100,8 @@ Profile wheelProfile(const QString &id)
     return [](double t) { return 0.86 + 0.14 * std::pow(std::max(0.0, std::cos(3 * t)), 4); };
 }
 
-/// Contour d'une roue de rayon 1 (mis en cache) ; la roue antihoraire est en miroir.
+/// Contour d'une roue de rayon 1 (mis en cache) ; la roue horaire est en miroir, pour que
+/// le côté tranchant de ses lames soit à l'avant dans le sens de rotation.
 const QPainterPath &unitWheel(const QString &id, bool mirror, double scale)
 {
     static QHash<QString, QPainterPath> cache;
@@ -480,7 +481,7 @@ void paintTip(QPainter &p, const QString &id, double cx, double y, double W)
 /// Roue seule vue du dessus (carte de l'atelier), centrée sur l'origine.
 void paintWheel(QPainter &p, const Part &wheel, double R)
 {
-    const bool mirror = wheel.spin == SpinDirection::CounterClockwise;
+    const bool mirror = wheel.spin == SpinDirection::Clockwise; // Pointes des lames vers l'avant.
     const QColor accent = hsl(wheel.hue, 0.95, 0.6);
     const QTransform t = QTransform().rotateRadians(-M_PI / 2).scale(R, R);
     const QPainterPath silhouette = t.map(unitWheel(wheel.id, mirror, 1.0));
@@ -567,7 +568,7 @@ void paint(QPainter &painter, const Top &top, QPointF center, double radius, dou
 
     const QColor type = typeColor(top.type());
     const Part &wheel = top.wheel();
-    const bool mirror = wheel.spin == SpinDirection::CounterClockwise;
+    const bool mirror = wheel.spin == SpinDirection::Clockwise; // Pointes des lames vers l'avant.
     const QColor accent = hsl(wheel.hue, 0.95, 0.6);
     const QColor deep = hsl(wheel.hue, 0.8, 0.22);
 
