@@ -3,6 +3,7 @@
 #include "core/PartCatalog.h"
 #include "game/Battle.h"
 #include "game/BotController.h"
+#include "game/MatchRules.h"
 #include "game/Stadium.h"
 #include "ui/ArenaWidget.h"
 #include "ui/StadiumPainter.h"
@@ -216,7 +217,9 @@ private:
         if (b == a)
             b = (a + 1) % tops.size();
         const Stadium &stadium = stadiums.at(pickStadium(m_rng));
-        m_battle = std::make_unique<Battle>(QList<Top>{tops.at(a), tops.at(b)}, stadium, stadium.apply(BattleConfig{}),
+        BattleConfig config = stadium.apply(BattleConfig{});
+        config.duelMode = MatchRules{}.duelMode; // Les duels choisis dans les paramètres.
+        m_battle = std::make_unique<Battle>(QList<Top>{tops.at(a), tops.at(b)}, stadium, config,
                                             static_cast<std::uint32_t>(m_rng()));
         m_bots = {BotController(0, Difficulty::Normal, static_cast<std::uint32_t>(m_rng())),
                   BotController(1, Difficulty::Normal, static_cast<std::uint32_t>(m_rng()))};

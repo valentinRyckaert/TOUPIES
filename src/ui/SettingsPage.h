@@ -1,5 +1,7 @@
 #pragma once
 
+#include "game/BattleConfig.h"
+
 #include <QWidget>
 
 #include <array>
@@ -22,6 +24,11 @@ public:
     /// Réaffiche les associations actuelles.
     void refresh();
 
+    /// Applique les préférences enregistrées (type de duel) ; à appeler au démarrage.
+    static void loadPreferences();
+    /// Règle d'un type de duel, avec la touche de dash actuelle.
+    static QString duelDescription(DuelMode mode);
+
 signals:
     void backRequested();
     /// La langue a changé : le jeu doit redémarrer pour l'appliquer.
@@ -31,6 +38,8 @@ private:
     std::array<std::array<QPushButton *, 2>, 8> m_buttons{};
     QLabel *m_status = nullptr;
     QComboBox *m_language = nullptr;
+    QComboBox *m_duels = nullptr;
+    QLabel *m_duelHint = nullptr;
 };
 
 } // namespace toupie

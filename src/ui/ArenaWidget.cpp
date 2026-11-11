@@ -363,7 +363,7 @@ bool ArenaWidget::pressInput(int code, bool autoRepeat)
         case Action::Dash:
             if (phase == MatchPhase::Aiming)
                 confirmLaunch();
-            else
+            else if (!autoRepeat) // Une touche maintenue ne martèle pas une rafale.
                 tryDash();
             break;
         case Action::Rematch:
@@ -1401,6 +1401,10 @@ void ArenaWidget::paintDuel(QPainter &p)
     const double small = big * 0.6;
     const double bottom = height() - kBottomHud - 18;
 
+    if (state.config.duelMode == DuelMode::Rush) {
+        paintRush(p, QRectF(width() / 2.0 - big / 2.0, bottom - 34, big, 30));
+        return;
+    }
     if (mine >= 0) {
         // Ma barre en bas, celle de l'adversaire juste au-dessus en plus petit.
         const QRectF mineRect(width() / 2.0 - big / 2.0, bottom - 34, big, 34);
@@ -1414,6 +1418,70 @@ void ArenaWidget::paintDuel(QPainter &p)
             paintDuelBar(p, rect, k == 0 ? duel.first : duel.second, duel.sides[k], false);
         }
     }
+}
+
+void ArenaWidget::paintRush(QPainter &p, const QRectF &rect)
+{
+    // Tir à la corde : chaque camp à un bout de la barre (le joueur à gauche) ; le
+    // curseur part du milieu et file vers le camp qui se fait distancer.
+    const MatchState &state = m_session->state();
+    const Duel &duel = state.duel;
+    const int mine = duel.sideOf(m_session->localPlayer());
+    const int left = mine >= 0 ? mine : 0;
+    const int spinners[2] = {left == 0 ? duel.first : duel.second, left == 0 ? duel.second : duel.first};
+    const double half = rect.width() / 2.0, slant = rect.height() * 0.5;
+    const double lead = (left == 0 ? duel.rope() : -duel.rope()) / double(std::max(1, state.config.rushLimit));
+    const double remaining = std::max(0.0, state.config.rushDuration - duel.elapsed);
+
+    QFont title = Theme::displayFont(mine >= 0 ? 15 : 12);
+    title.setLetterSpacing(QFont::AbsoluteSpacing, 1.5);
+    const QString text = mine >= 0 ? tr("Rafale ! Martelez %1").arg(Controls::instance().text(Action::Dash))
+                                   : tr("Rafale");
+    const QString line = QStringLiteral("%1  ·  %2 s").arg(text.toUpper()).arg(remaining, 0, 'f', 1);
+    const double labelWidth = QFontMetrics(title).horizontalAdvance(line) + 40;
+    const QRectF label(rect.center().x() - labelWidth / 2.0, rect.top() - 40, labelWidth, 24);
+    p.fillPath(Theme::chamfer(label, 6), withAlpha(Theme::kField, 0.9));
+    p.setFont(title);
+    p.setPen(Theme::kWarning);
+    p.drawText(label, Qt::AlignCenter, line);
+
+    // Deux moitiés aux couleurs des camps, repère central, curseur.
+    const QPainterPath bar = Theme::skewed(rect, slant);
+    for (int k = 0; k < 2; ++k) {
+        const QColor c = slotColor(spinners[k]);
+        QLinearGradient g(rect.topLeft(), rect.topRight());
+        g.setColorAt(k == 0 ? 0.0 : 1.0, withAlpha(c, 0.85));
+        g.setColorAt(0.5, withAlpha(c, 0.2));
+        p.save();
+        p.setClipRect(QRectF(k == 0 ? rect.left() - slant : rect.center().x(), rect.top(), half + slant, rect.height()));
+        p.fillPath(bar, g);
+        p.restore();
+    }
+    p.setPen(QPen(QColor(255, 255, 255, 120), 1.2));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(bar);
+    p.setPen(QPen(Qt::white, 2.0));
+    p.drawLine(QPointF(rect.center().x(), rect.top() - 4), QPointF(rect.center().x(), rect.bottom() + 4));
+    const double x = rect.center().x() + std::clamp(lead, -1.0, 1.0) * half;
+    p.fillRect(QRectF(x - 10, rect.top() - 12, 20, rect.height() + 24), QColor(255, 255, 255, 50));
+    p.setPen(QPen(QColor(0x05, 0x04, 0x0f), 1.5));
+    p.setBrush(Theme::kWarning);
+    p.drawPolygon(QPolygonF{QPointF(x - 9, rect.top() - 12), QPointF(x + 9, rect.top() - 12),
+                            QPointF(x + 4, rect.bottom() + 12), QPointF(x - 4, rect.bottom() + 12)});
+
+    // Noms et appuis aux deux bouts, temps restant au-dessus de la barre.
+    p.setFont(Theme::displayFont(13));
+    for (int k = 0; k < 2; ++k) {
+        const int side = k == 0 ? left : 1 - left;
+        const QString who = spinners[k] == m_session->localPlayer() ? tr("Vous") : state.names.value(spinners[k]);
+        p.setPen(slotColor(spinners[k]));
+        p.drawText(QRectF(k == 0 ? rect.left() : rect.center().x(), rect.bottom() + 8, half, 18),
+                   (k == 0 ? Qt::AlignLeft : Qt::AlignRight) | Qt::AlignVCenter,
+                   QStringLiteral("%1 · %2").arg(who.toUpper()).arg(duel.sides[side].presses));
+    }
+    const double progress = remaining / std::max(0.1, state.config.rushDuration);
+    p.fillRect(QRectF(rect.center().x() - half * progress, rect.top() - 13, rect.width() * progress, 3),
+               Theme::kWarning);
 }
 
 void ArenaWidget::paintDuelBar(QPainter &p, const QRectF &rect, int spinner, const DuelSide &side,

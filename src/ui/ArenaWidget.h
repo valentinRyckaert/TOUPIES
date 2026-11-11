@@ -108,6 +108,8 @@ private:
     void paintTutorial(QPainter &p);
     void paintDuelBar(QPainter &p, const QRectF &rect, int spinner, const DuelSide &side,
                       bool local);
+    /// Duel en rafale : barre de tir à la corde.
+    void paintRush(QPainter &p, const QRectF &rect);
 
     QPointer<MatchSession> m_session;
     MatchPhase m_lastPhase = MatchPhase::Aiming;

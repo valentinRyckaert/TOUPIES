@@ -1,4 +1,6 @@
 #include "ui/SettingsPage.h"
+
+#include "game/MatchRules.h"
 #include "ui/Theme.h"
 
 #include "ui/Controls.h"
@@ -13,6 +15,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QPushButton>
+#include <QSettings>
 #include <QVBoxLayout>
 
 #include <functional>
@@ -92,6 +95,7 @@ SettingsPage::SettingsPage(QWidget *parent)
     for (const QString &code : Language::available())
         m_language->addItem(Language::nativeName(code), code);
     m_language->setCurrentIndex(m_language->findData(Language::current()));
+    m_language->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     languageRow->addWidget(m_language);
     auto *languageHint = new QLabel(tr("Le jeu redémarre pour changer de langue."), languageBox);
     languageHint->setObjectName(QStringLiteral("hint"));
@@ -110,6 +114,27 @@ SettingsPage::SettingsPage(QWidget *parent)
         }
         Language::setCurrent(code);
         emit restartRequested();
+    });
+
+    // --- Duels : préférence globale, valeur par défaut des règles de partie ------------
+    auto *duelBox = new QGroupBox(tr("Duels"), this);
+    auto *duelLayout = new QHBoxLayout(duelBox);
+    m_duels = new QComboBox(duelBox);
+    for (DuelMode mode : {DuelMode::Timing, DuelMode::Rush, DuelMode::None})
+        m_duels->addItem(toString(mode), static_cast<int>(mode));
+    m_duels->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_duels->setMinimumWidth(150);
+    duelLayout->addWidget(m_duels);
+    m_duelHint = new QLabel(duelBox);
+    m_duelHint->setObjectName(QStringLiteral("hint"));
+    m_duelHint->setWordWrap(true);
+    duelLayout->addWidget(m_duelHint, 1);
+    root->addWidget(duelBox);
+    connect(m_duels, &QComboBox::activated, this, [this] {
+        const auto mode = static_cast<DuelMode>(m_duels->currentData().toInt());
+        QSettings().setValue(QStringLiteral("duelMode"), static_cast<int>(mode));
+        MatchRules::setDefaultDuelMode(mode);
+        refresh();
     });
 
     auto *box = new QGroupBox(tr("Touches et souris"), this);
@@ -169,9 +194,37 @@ SettingsPage::SettingsPage(QWidget *parent)
     refresh();
 }
 
+void SettingsPage::loadPreferences()
+{
+    const int mode = QSettings().value(QStringLiteral("duelMode"), 0).toInt();
+    MatchRules::setDefaultDuelMode(static_cast<DuelMode>(std::clamp(mode, 0, 2)));
+}
+
+QString SettingsPage::duelDescription(DuelMode mode)
+{
+    const QString dash = Controls::instance().text(Action::Dash);
+    switch (mode) {
+    case DuelMode::Timing:
+        return tr("Appuyez sur %1 quand le curseur traverse la zone verte, de plus en plus étroite : "
+                  "un raté perd le duel.").arg(dash);
+    case DuelMode::Rush:
+        return tr("Tir à la corde : appuyez le plus vite possible sur %1 pour pousser le curseur vers "
+                  "l'adversaire. Au bout de 3,5 s, le plus avancé gagne ; pile au milieu, match nul.")
+            .arg(dash);
+    case DuelMode::None:
+        break;
+    }
+    return tr("Pas de duel : deux toupies qui se percutent en plein dash se repoussent comme lors "
+              "d'un choc ordinaire.");
+}
+
 void SettingsPage::refresh()
 {
     m_status->clear();
+    const MatchRules defaults;
+    m_duels->setCurrentIndex(m_duels->findData(static_cast<int>(defaults.duelMode)));
+    m_duelHint->setText(duelDescription(defaults.duelMode) + QLatin1Char(' ')
+                        + tr("En réseau, c'est le réglage de l'hôte qui compte."));
     const Controls &controls = Controls::instance();
     for (int a = 0; a < kActionCount; ++a) {
         for (int slot = 0; slot < Controls::kSlots; ++slot)

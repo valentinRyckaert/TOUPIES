@@ -67,6 +67,7 @@ private slots:
     void soloTournamentIsSavedAndResumed();
     void tournamentParticipantsFollowFormat();
     void controlsAreRebindableAndSaved();
+    void duelModeIsChosenInSettings();
     void reboundKeyIsUsedInBattle();
     void tutorialWalksThroughEveryAction();
     void englishTranslationKeepsGameName();
@@ -356,6 +357,27 @@ void TestGui::controlsAreRebindableAndSaved()
     QVERIFY(reloaded.helpHtml().contains(QStringLiteral("Clic droit")));
     controls.reset();
     QVERIFY(controls.triggers(Qt::Key_Space, Action::Dash));
+}
+
+void TestGui::duelModeIsChosenInSettings()
+{
+    SettingsPage page;
+    QComboBox *duels = nullptr;
+    for (QComboBox *combo : page.findChildren<QComboBox *>()) {
+        if (combo->findData(static_cast<int>(DuelMode::Rush)) >= 0 && combo->count() == 3)
+            duels = combo;
+    }
+    QVERIFY(duels);
+    duels->setCurrentIndex(duels->findData(static_cast<int>(DuelMode::Rush)));
+    emit duels->activated(duels->currentIndex());
+    QVERIFY(MatchRules{}.duelMode == DuelMode::Rush); // Nouvelles parties : duels en rafale.
+    MatchRules::setDefaultDuelMode(DuelMode::Timing);
+    SettingsPage::loadPreferences(); // Relu des réglages au démarrage.
+    QVERIFY(MatchRules{}.duelMode == DuelMode::Rush);
+
+    duels->setCurrentIndex(duels->findData(static_cast<int>(DuelMode::Timing)));
+    emit duels->activated(duels->currentIndex());
+    QVERIFY(MatchRules{}.duelMode == DuelMode::Timing);
 }
 
 void TestGui::reboundKeyIsUsedInBattle()

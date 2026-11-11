@@ -242,6 +242,14 @@
         <translation>Game paused</translation>
     </message>
     <message>
+        <source>Rafale ! Martelez %1</source>
+        <translation>Rush! Hammer %1</translation>
+    </message>
+    <message>
+        <source>Rafale</source>
+        <translation>Rush</translation>
+    </message>
+    <message>
         <source>DUEL ! %1 quand le curseur est dans le vert</source>
         <translation>DUEL! %1 when the cursor is in the green</translation>
     </message>
@@ -631,6 +639,14 @@
     <message>
         <source>%1 quand le curseur est dans la zone verte</source>
         <translation>%1 when the cursor is in the green zone</translation>
+    </message>
+    <message>
+        <source>Duel (rafale)</source>
+        <translation>Duel (rush)</translation>
+    </message>
+    <message>
+        <source>%1 le plus vite possible pendant 3,5 s</source>
+        <translation>%1 as fast as you can for 3.5 s</translation>
     </message>
     <message>
         <source>Fin de combat et menus</source>
@@ -1175,6 +1191,18 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Standard rules</translation>
     </message>
     <message>
+        <source>Timing</source>
+        <translation>Timing</translation>
+    </message>
+    <message>
+        <source>Rafale</source>
+        <translation>Rush</translation>
+    </message>
+    <message>
+        <source>Sans duel</source>
+        <translation>No duel</translation>
+    </message>
+    <message>
         <source>%1 %2 %</source>
         <translation>%1 %2%</translation>
     </message>
@@ -1710,6 +1738,10 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Restart the game now to switch to %1?</translation>
     </message>
     <message>
+        <source>Duels</source>
+        <translation>Duels</translation>
+    </message>
+    <message>
         <source>Touches et souris</source>
         <translation>Keys and mouse</translation>
     </message>
@@ -1740,6 +1772,22 @@ Download and install it? The game will restart on the new version.</translation>
     <message>
         <source>Rétablir les touches par défaut</source>
         <translation>Restore default keys</translation>
+    </message>
+    <message>
+        <source>Appuyez sur %1 quand le curseur traverse la zone verte, de plus en plus étroite : un raté perd le duel.</source>
+        <translation>Press %1 when the cursor crosses the green zone, which keeps narrowing: a miss loses the duel.</translation>
+    </message>
+    <message>
+        <source>Tir à la corde : appuyez le plus vite possible sur %1 pour pousser le curseur vers l&apos;adversaire. Au bout de 3,5 s, le plus avancé gagne ; pile au milieu, match nul.</source>
+        <translation>Tug of war: press %1 as fast as you can to push the marker towards your opponent. After 3.5 s, whoever is ahead wins; dead centre is a draw.</translation>
+    </message>
+    <message>
+        <source>Pas de duel : deux toupies qui se percutent en plein dash se repoussent comme lors d&apos;un choc ordinaire.</source>
+        <translation>No duel: two tops that collide mid-dash bounce off like in an ordinary hit.</translation>
+    </message>
+    <message>
+        <source>En réseau, c&apos;est le réglage de l&apos;hôte qui compte.</source>
+        <translation>On a LAN, the host&apos;s setting applies.</translation>
     </message>
 </context>
 <context>

@@ -1,5 +1,7 @@
 #include "ui/Controls.h"
 
+#include "game/MatchRules.h"
+
 #include <QCoreApplication>
 #include <QKeySequence>
 #include <QSettings>
@@ -201,7 +203,16 @@ QString Controls::helpHtml() const
     html += row(tr("Coup spécial"),
                 tr("%1 — une fois par partie, coûte un quart de l'endurance du moment")
                     .arg(key(Action::Special)));
-    html += row(tr("Duel"), tr("%1 quand le curseur est dans la zone verte").arg(key(Action::Dash)));
+    switch (MatchRules{}.duelMode) { // Type de duel choisi dans les paramètres.
+    case DuelMode::Timing:
+        html += row(tr("Duel"), tr("%1 quand le curseur est dans la zone verte").arg(key(Action::Dash)));
+        break;
+    case DuelMode::Rush:
+        html += row(tr("Duel (rafale)"), tr("%1 le plus vite possible pendant 3,5 s").arg(key(Action::Dash)));
+        break;
+    case DuelMode::None:
+        break;
+    }
     html += section(tr("Fin de combat et menus"));
     html += row(tr("Revanche (solo) / retour au lobby (hôte)"), key(Action::Rematch));
     html += row(tr("Retour au menu / quitter le lobby / abandonner"), tr("<b>Échap</b>"));

@@ -1,5 +1,6 @@
 #include "ui/Language.h"
 #include "ui/MainWindow.h"
+#include "ui/SettingsPage.h"
 #include "ui/Theme.h"
 
 #include <QApplication>
@@ -18,6 +19,7 @@ int main(int argc, char *argv[])
     // Avant toute page : catalogue, stadiums et coups sont traduits à leur création.
     toupie::Language::install(app);
     toupie::Theme::apply(app);
+    toupie::SettingsPage::loadPreferences(); // Type de duel par défaut.
 
     toupie::MainWindow window;
     window.showFullScreen(); // F11 : fenêtré / plein écran.
