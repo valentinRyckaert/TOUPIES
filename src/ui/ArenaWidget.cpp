@@ -929,7 +929,7 @@ void ArenaWidget::paintHud(QPainter &p)
                                                  ? tr("Limite %1 s").arg(qRound(state.config.maxDuration))
                                                  : tr("Sans limite de temps").toLower()));
 
-    // Onglet central : manche et score (ou chrono), puis la légende de la page.
+    // Onglet central : manche et score (ou chrono).
     const QRectF tab(width() / 2.0 - 160, 2, 320, kTopBar - 6);
     p.fillPath(Theme::chamfer(tab, 0, 0, 16, 16), withAlpha(Theme::kPanel, 0.92));
     p.setPen(QPen(Theme::kBorderBright, 1.2));
@@ -962,10 +962,10 @@ void ArenaWidget::paintHud(QPainter &p)
         p.drawText(line, Qt::AlignCenter,
                    QStringLiteral("%1:%2").arg(seconds / 60).arg(seconds % 60, 2, 10, QLatin1Char('0')));
     }
-    if (!m_caption.isEmpty()) {
+    if (!m_caption.isEmpty()) { // En haut à droite, sous le stadium : hors de l'arène.
         p.setFont(Theme::bodyFont(15, QFont::DemiBold));
         p.setPen(Theme::kMuted);
-        p.drawText(QRectF(0, tab.bottom() + 2, width(), 20), Qt::AlignCenter, m_caption);
+        p.drawText(QRectF(width() - margin - 420, 54, 420, 20), Qt::AlignRight | Qt::AlignVCenter, m_caption);
     }
 
     // Fiches des toupies en bas.
