@@ -476,7 +476,7 @@ void Battle::resolveCollision(int i, int j)
         return; // Contact prolongé : un seul choc comptabilisé.
 
     const double approach = std::max(0.0, closing);
-    if (a.isDashing() && b.isDashing() && !m_duel.active) {
+    if (a.isDashing() && b.isDashing() && !m_duel.active && m_config.duelMode != DuelMode::None) {
         startDuel(i, j, n, approach);
         return;
     }
@@ -698,6 +698,17 @@ void Battle::updateDuel(double h)
 {
     if (!m_duel.active)
         return;
+    m_duel.elapsed += h;
+    if (m_config.duelMode == DuelMode::Rush) {
+        for (int index : {m_duel.first, m_duel.second}) { // Tournent sur place sans s'user.
+            Spinner &s = m_spinners[index];
+            s.angle = std::fmod(s.angle + s.spinSign * (6.0 + 30.0 * s.spinRatio()) * h, 2.0 * kPi);
+        }
+        const int rope = m_duel.rope();
+        if (std::abs(rope) >= m_config.rushLimit || m_duel.elapsed >= m_config.rushDuration)
+            resolveDuel(rope == 0 ? -1 : rope > 0 ? 1 : 0); // Pile au milieu : nul.
+        return;
+    }
     bool timedOut[2] = {false, false};
     for (int k = 0; k < 2; ++k) {
         DuelSide &side = m_duel.sides[k];
@@ -723,6 +734,10 @@ bool Battle::duelPress(int index, double cursor)
         return false;
     DuelSide &side = m_duel.sides[k];
     side.idle = 0.0;
+    if (m_config.duelMode == DuelMode::Rush) {
+        ++side.presses; // La fin est décidée par updateDuel (durée ou avance décisive).
+        return true;
+    }
     if (std::abs(std::clamp(cursor, -1.0, 1.0)) > side.zone) {
         resolveDuel(k);
         return true;

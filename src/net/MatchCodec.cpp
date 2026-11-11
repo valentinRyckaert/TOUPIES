@@ -99,7 +99,8 @@ QJsonObject encodeState(const MatchState &state, const QList<ImpactEvent> &impac
                 r(d.approach)};
         for (const DuelSide &side : d.sides)
             duel.append(QJsonArray{r(side.cursor), side.direction, r(side.speed), r(side.zone),
-                                   side.streak, side.done ? 1 : 0, r(side.idle)});
+                                   side.streak, side.done ? 1 : 0, r(side.idle), side.presses});
+        duel.append(r(d.elapsed));
     }
 
     return {
@@ -201,7 +202,9 @@ bool decodeState(const QJsonObject &message, MatchState &state, QList<ImpactEven
             side.streak = a.at(4).toInt();
             side.done = a.at(5).toInt() != 0;
             side.idle = a.at(6).toDouble();
+            side.presses = a.at(7).toInt();
         }
+        d.elapsed = duel.at(9).toDouble();
     }
 
     if (impacts) {

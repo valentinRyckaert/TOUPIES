@@ -2,6 +2,13 @@
 
 namespace toupie {
 
+/// Duel entre deux toupies qui se percutent en plein dash.
+enum class DuelMode {
+    Timing, ///< Appuyer quand le curseur traverse la zone verte (zone de plus en plus étroite).
+    Rush,   ///< Rafale : tir à la corde, chaque appui pousse le curseur vers l'adversaire.
+    None,   ///< Pas de duel : choc ordinaire.
+};
+
 /// Ensemble des constantes de gameplay.
 ///
 /// Les distances sont exprimées en « rayons de stadium » (le stadium a un
@@ -108,6 +115,11 @@ struct BattleConfig
     bool specialsEnabled = true;
 
     // --- Duel (deux toupies qui se percutent en plein dash) --------------------
+    DuelMode duelMode = DuelMode::Timing;
+    /// Rafale : durée du duel, et avance (en appuis) qui le gagne aussitôt.
+    double rushDuration = 3.5;
+    int rushLimit = 12;
+    /// Timing :
     /// Chaque duelliste a une barre de -1 à 1 parcourue par un curseur ; il faut
     /// appuyer quand le curseur est dans la zone verte centrée sur 0, dont la
     /// demi-largeur rétrécit à chaque réussite jusqu'à duelZoneMin.

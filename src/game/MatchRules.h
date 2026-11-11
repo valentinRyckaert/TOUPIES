@@ -22,6 +22,11 @@ struct MatchRules
     double steering = 1.0;       ///< Pilotage aux flèches ; 0 = désactivé.
     bool specials = true;        ///< Coups spéciaux autorisés.
     double dashPower = 1.0;      ///< Bonus d'attaque des dashs.
+    /// Type de duel. Par défaut, celui de la page Paramètres (voir setDefaultDuelMode) ;
+    /// en réseau, les règles de l'hôte s'imposent aux clients.
+    DuelMode duelMode = s_defaultDuelMode;
+
+    static void setDefaultDuelMode(DuelMode mode) { s_defaultDuelMode = mode; }
 
     static constexpr double kMinMultiplier = 0.0;
     static constexpr double kMaxMultiplier = 3.0;
@@ -36,6 +41,11 @@ struct MatchRules
 
     bool operator==(const MatchRules &other) const;
     bool operator!=(const MatchRules &other) const { return !(*this == other); }
+
+private:
+    static inline DuelMode s_defaultDuelMode = DuelMode::Timing;
 };
+
+QString toString(DuelMode mode);
 
 } // namespace toupie

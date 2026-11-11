@@ -71,6 +71,10 @@ private slots:
     void duelDrawAfterFinalStreak();
     void idleDuellistLoses();
     void harderBotsWinDuels();
+    void noDuelModeJustCollides();
+    void rushDuelGoesToMostPresses();
+    void rushDuelDrawWhenLevel();
+    void harderBotsWinRushDuels();
     void finalEliminationKeepsWinnerEndurance();
 };
 
@@ -432,6 +436,15 @@ void TestBattle::rulesModifyConstants()
     QVERIFY(!c.specialsEnabled);
     QVERIFY(MatchRules::fromJson(rules.toJson()) == rules);
 
+    // Type de duel : réglage global par défaut, transmis tel quel avec les règles de l'hôte.
+    MatchRules::setDefaultDuelMode(DuelMode::Rush);
+    MatchRules rush;
+    MatchRules::setDefaultDuelMode(DuelMode::Timing);
+    QVERIFY(rush.duelMode == DuelMode::Rush);
+    QVERIFY(rush.apply(base).duelMode == DuelMode::Rush);
+    QVERIFY(MatchRules::fromJson(rush.toJson()).duelMode == DuelMode::Rush);
+    QVERIFY(MatchRules::fromJson(QJsonObject{}).duelMode == DuelMode::Timing); // Ancien hôte.
+
     Battle battle({attackTop(), defenseTop()}, Stadium::classic(), c, 1);
     QCOMPARE(battle.spinner(0).spin, 200.0);
 }
@@ -583,9 +596,10 @@ void TestBattle::disarmBlocksDash()
 
 namespace {
 /// Deux toupies immobiles proches qui dashent l'une vers l'autre au même moment.
-Battle duelBattle(std::uint32_t seed = 1)
+Battle duelBattle(std::uint32_t seed = 1, DuelMode mode = DuelMode::Timing)
 {
     BattleConfig config = staticConfig();
+    config.duelMode = mode;
     config.startOffset = 0.3;
     Battle battle(attackTop(), defenseTop(), config, seed);
     battle.launch(0.0, M_PI);
@@ -679,6 +693,79 @@ void TestBattle::harderBotsWinDuels()
     }
     qInfo("Duels gagnés par le bot difficile contre le facile : %d/%d", hardWins, kDuels);
     QVERIFY(hardWins > kDuels * 0.7);
+}
+
+void TestBattle::noDuelModeJustCollides()
+{
+    Battle battle = duelBattle(1, DuelMode::None);
+    QVERIFY(!battle.duel().active);
+    QVERIFY(battle.spinner(0).spin < battle.spinner(0).maxSpin); // Choc ordinaire : dégâts.
+}
+
+void TestBattle::rushDuelGoesToMostPresses()
+{
+    Battle battle = duelBattle(1, DuelMode::Rush);
+    QVERIFY(battle.duel().active);
+    const double spins[2] = {battle.spinner(0).spin, battle.spinner(1).spin};
+    for (int i = 0; i < 5; ++i)
+        QVERIFY(battle.duelPress(0, 0.0));
+    QVERIFY(battle.duelPress(1, 0.0));
+    QCOMPARE(battle.duel().rope(), 4);
+    auto wait = [](Battle &b, double seconds) { // advance() avance au plus de 0,1 s par appel.
+        for (double t = 0.0; t < seconds; t += 1.0 / 60.0)
+            b.advance(1.0 / 60.0);
+    };
+    wait(battle, battle.config().rushDuration * 0.5);
+    QVERIFY(battle.duel().active); // Ni avance décisive, ni fin du temps.
+    wait(battle, battle.config().rushDuration * 0.6);
+    QVERIFY(!battle.duel().active);
+    // Le second, distancé, perd (l'usure naturelle reprend ensuite pour les deux).
+    QVERIFY(spins[1] - battle.spinner(1).spin > 3.0);
+    QVERIFY(spins[0] - battle.spinner(0).spin < 1.0);
+
+    // Une avance décisive termine le duel aussitôt.
+    Battle quick = duelBattle(2, DuelMode::Rush);
+    for (int i = 0; i < quick.config().rushLimit; ++i)
+        quick.duelPress(1, 0.0);
+    quick.advance(1.0 / 60.0);
+    QVERIFY(!quick.duel().active);
+    QVERIFY(quick.elapsed() < quick.config().rushDuration);
+}
+
+void TestBattle::rushDuelDrawWhenLevel()
+{
+    Battle battle = duelBattle(1, DuelMode::Rush);
+    const double spins[2] = {battle.spinner(0).spin, battle.spinner(1).spin};
+    for (int i = 0; i < 7; ++i) {
+        battle.duelPress(0, 0.0);
+        battle.duelPress(1, 0.0);
+    }
+    for (double t = 0.0; t < battle.config().rushDuration + 0.1; t += 1.0 / 60.0)
+        battle.advance(1.0 / 60.0);
+    QVERIFY(!battle.duel().active);
+    QVERIFY(spins[0] - battle.spinner(0).spin < 1.0); // Pile au milieu : nul, sans dégâts.
+    QVERIFY(spins[1] - battle.spinner(1).spin < 1.0);
+}
+
+void TestBattle::harderBotsWinRushDuels()
+{
+    int hardWins = 0;
+    constexpr int kDuels = 100;
+    for (int k = 0; k < kDuels; ++k) {
+        Battle battle = duelBattle(static_cast<std::uint32_t>(k), DuelMode::Rush);
+        const int hardSeat = k % 2;
+        BotController bots[2] = {{0, hardSeat == 0 ? Difficulty::Hard : Difficulty::Easy, 5u * k},
+                                 {1, hardSeat == 1 ? Difficulty::Hard : Difficulty::Easy, 5u * k + 1}};
+        const double spins[2] = {battle.spinner(0).spin, battle.spinner(1).spin};
+        while (battle.duel().active) {
+            for (BotController &bot : bots)
+                bot.update(battle, 1.0 / 60.0);
+            battle.advance(1.0 / 60.0);
+        }
+        hardWins += battle.spinner(1 - hardSeat).spin < spins[1 - hardSeat];
+    }
+    qInfo("Rafales gagnées par le bot difficile contre le facile : %d/%d", hardWins, kDuels);
+    QVERIFY(hardWins > kDuels * 0.8);
 }
 
 void TestBattle::finalEliminationKeepsWinnerEndurance()

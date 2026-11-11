@@ -96,6 +96,7 @@ struct DuelSide
     int streak = 0;          ///< Réussites consécutives à la taille minimale.
     double idle = 0.0;       ///< Secondes depuis le dernier appui.
     bool done = false;       ///< Série finale réussie : attend l'adversaire.
+    int presses = 0;         ///< Rafale : appuis depuis le début du duel.
 
     /// Fait avancer le curseur (aller-retour sur la barre).
     void advance(double h);
@@ -112,7 +113,11 @@ struct Duel
     Vec2 point;              ///< Point de friction.
     Vec2 normal;             ///< De `first` vers `second`.
     double approach = 0.0;   ///< Vitesse de rapprochement au contact.
+    double elapsed = 0.0;    ///< Secondes depuis le début du duel.
     DuelSide sides[2];
+
+    /// Rafale : avance de `first` en appuis (> 0 : le curseur est chez `second`).
+    int rope() const { return sides[0].presses - sides[1].presses; }
 
     /// 0 ou 1 pour un duelliste, -1 sinon.
     int sideOf(int spinner) const

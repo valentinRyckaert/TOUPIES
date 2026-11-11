@@ -27,13 +27,14 @@ BotController::Skill BotController::skillFor(Difficulty difficulty)
 {
     switch (difficulty) {
     case Difficulty::Easy:
-        return {0.45, 0.5, 0.2, 1.3, 0.15, false, false, false, 0.075};
+        return {0.45, 0.5, 0.2, 1.3, 0.15, false, false, false, 0.075, 5.5};
     case Difficulty::Normal:
-        return {0.25, 0.2, 0.6, 0.9, 0.0, false, false, false, 0.045};
+        return {0.25, 0.2, 0.6, 0.9, 0.0, false, false, false, 0.045, 7.0};
     case Difficulty::Hard:
         break;
     }
-    return {0.12, 0.07, 0.8, 0.9, 0.0, true, true, true, 0.025};
+    // Rafale : un humain appuie 6 à 9 fois par seconde ; le bot difficile est dans le haut.
+    return {0.12, 0.07, 0.8, 0.9, 0.0, true, true, true, 0.025, 8.5};
 }
 
 BotController::BotController(int index, Difficulty difficulty, std::uint32_t seed)
@@ -208,6 +209,16 @@ void BotController::update(Battle &battle, double dt)
     // une erreur de timing qui dépend du niveau.
     const Duel &duel = battle.duel();
     if (const int side = duel.sideOf(m_index); side >= 0) {
+        if (battle.config().duelMode == DuelMode::Rush) {
+            // Rafale : appuis à la cadence du niveau, un peu irréguliers.
+            m_rushTimer -= dt;
+            if (m_rushTimer <= 0.0) {
+                std::uniform_real_distribution<double> jitter(0.75, 1.25);
+                m_rushTimer += jitter(m_rng) / m_skill.rushRate;
+                battle.duelPress(m_index, 0.0);
+            }
+            return;
+        }
         const DuelSide &bar = duel.sides[side];
         const double next = bar.cursor + bar.direction * bar.speed * dt;
         if (!bar.done && (bar.cursor < 0.0) != (next < 0.0)) {
@@ -228,8 +239,11 @@ void BotController::update(Battle &battle, double dt)
         battle.setSteering(m_index, chooseSteering(battle, target));
     }
 
+    m_rushTimer = 0.0; // Premier appui dès le début du prochain duel.
+
     // Contre-dash (réflexe, hors cadence de décision) : répondre à un dash
-    // adverse par un dash provoque un duel, où un bon timing fait la différence.
+    // adverse par un dash provoque un duel (où un bon timing ou une bonne cadence
+    // font la différence) ; sans duel, il évite d'encaisser un dash sans répondre.
     if (m_skill.tactics && battle.canDash(m_index)) {
         const Spinner &self = battle.spinner(m_index);
         for (int j = 0; j < battle.playerCount(); ++j) {

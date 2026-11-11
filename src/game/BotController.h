@@ -72,6 +72,7 @@ private:
         bool combos;        ///< Enchaînements coup spécial + dash.
         bool anticipate;    ///< Prévision des déplacements adverses.
         double duelTiming;  ///< Écart-type du timing en duel (secondes).
+        double rushRate;    ///< Duel en rafale : appuis par seconde.
     };
     static Skill skillFor(Difficulty difficulty);
 
@@ -96,6 +97,7 @@ private:
     bool m_specialsAllowed = true;
     double m_decisionTimer = 0.0;
     double m_steerTimer = 0.0;
+    double m_rushTimer = 0.0;
     QList<int> m_ignoredThreats; ///< Vagues que le bot n'a pas vues venir.
     QList<int> m_seenThreats;
 };

@@ -45,6 +45,7 @@ BattleConfig MatchRules::apply(const BattleConfig &base) const
     c.maxDuration = std::max(0.0, timeLimit);
 
     c.specialsEnabled = base.specialsEnabled && specials;
+    c.duelMode = duelMode;
     return c;
 }
 
@@ -85,7 +86,7 @@ QJsonObject MatchRules::toJson() const
         {"wear", wear},             {"damage", damage},
         {"maxEndurance", maxEndurance}, {"timeLimit", timeLimit},
         {"steering", steering},     {"specials", specials},
-        {"dashPower", dashPower},
+        {"dashPower", dashPower},   {"duels", static_cast<int>(duelMode)},
     };
 }
 
@@ -101,6 +102,8 @@ MatchRules MatchRules::fromJson(const QJsonObject &json)
     r.steering = clampMultiplier(json.value("steering").toDouble(1.0));
     r.specials = json.value("specials").toBool(true);
     r.dashPower = clampMultiplier(json.value("dashPower").toDouble(1.0));
+    // Pas le réglage local : un hôte qui n'envoie rien joue en timing.
+    r.duelMode = static_cast<DuelMode>(std::clamp(json.value("duels").toInt(0), 0, 2));
     return r;
 }
 
@@ -109,7 +112,20 @@ bool MatchRules::operator==(const MatchRules &o) const
     return same(speed, o.speed) && same(knockback, o.knockback) && same(wear, o.wear)
         && same(damage, o.damage) && same(maxEndurance, o.maxEndurance)
         && same(timeLimit, o.timeLimit) && same(steering, o.steering)
-        && specials == o.specials && same(dashPower, o.dashPower);
+        && specials == o.specials && same(dashPower, o.dashPower) && duelMode == o.duelMode;
+}
+
+QString toString(DuelMode mode)
+{
+    switch (mode) {
+    case DuelMode::Timing:
+        return QCoreApplication::translate("toupie::MatchRules", "Timing");
+    case DuelMode::Rush:
+        return QCoreApplication::translate("toupie::MatchRules", "Rafale");
+    case DuelMode::None:
+        return QCoreApplication::translate("toupie::MatchRules", "Sans duel");
+    }
+    return {};
 }
 
 } // namespace toupie
