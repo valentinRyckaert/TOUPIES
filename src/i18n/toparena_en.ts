@@ -1187,6 +1187,10 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>No special moves</translation>
     </message>
     <message>
+        <source>Duels : %1</source>
+        <translation>Duels: %1</translation>
+    </message>
+    <message>
         <source>Règles normales</source>
         <translation>Standard rules</translation>
     </message>
@@ -1707,6 +1711,14 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Time limit</translation>
     </message>
     <message>
+        <source>Timing : appuyer dans la zone verte. Rafale : tir à la corde, appuyer le plus vite possible. Sans duel : choc ordinaire. Par défaut, celui des paramètres.</source>
+        <translation>Timing: press in the green zone. Rush: tug of war, press as fast as you can. No duel: ordinary hit. By default, the one from the settings.</translation>
+    </message>
+    <message>
+        <source>Duels</source>
+        <translation>Duels</translation>
+    </message>
+    <message>
         <source>Réinitialiser</source>
         <translation>Reset</translation>
     </message>
@@ -1786,8 +1798,8 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>No duel: two tops that collide mid-dash bounce off like in an ordinary hit.</translation>
     </message>
     <message>
-        <source>En réseau, c&apos;est le réglage de l&apos;hôte qui compte.</source>
-        <translation>On a LAN, the host&apos;s setting applies.</translation>
+        <source>C&apos;est le duel par défaut des combats, des parties en réseau et des tournois ; la personnalisation des règles permet d&apos;en choisir un autre.</source>
+        <translation>This is the default duel for battles, LAN games and tournaments; the rules customisation lets you pick another one.</translation>
     </message>
 </context>
 <context>

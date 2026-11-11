@@ -224,7 +224,8 @@ void SettingsPage::refresh()
     const MatchRules defaults;
     m_duels->setCurrentIndex(m_duels->findData(static_cast<int>(defaults.duelMode)));
     m_duelHint->setText(duelDescription(defaults.duelMode) + QLatin1Char(' ')
-                        + tr("En réseau, c'est le réglage de l'hôte qui compte."));
+                        + tr("C'est le duel par défaut des combats, des parties en réseau et des tournois ; la "
+                           "personnalisation des règles permet d'en choisir un autre."));
     const Controls &controls = Controls::instance();
     for (int a = 0; a < kActionCount; ++a) {
         for (int slot = 0; slot < Controls::kSlots; ++slot)

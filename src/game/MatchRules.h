@@ -27,6 +27,7 @@ struct MatchRules
     DuelMode duelMode = s_defaultDuelMode;
 
     static void setDefaultDuelMode(DuelMode mode) { s_defaultDuelMode = mode; }
+    static DuelMode defaultDuelMode() { return s_defaultDuelMode; }
 
     static constexpr double kMinMultiplier = 0.0;
     static constexpr double kMaxMultiplier = 3.0;

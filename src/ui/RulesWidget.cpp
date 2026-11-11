@@ -95,6 +95,20 @@ RulesWidget::RulesWidget(QWidget *parent)
     grid->addWidget(new QLabel(tr("Temps maximal"), this), 3, 3);
     grid->addWidget(m_timeLimit, 3, 4, 1, 2);
 
+    // Type de duel : par défaut celui des paramètres, modifiable pour cette partie.
+    m_duels = new QComboBox(this);
+    for (DuelMode mode : {DuelMode::Timing, DuelMode::Rush, DuelMode::None})
+        m_duels->addItem(toString(mode), static_cast<int>(mode));
+    m_duels->setToolTip(tr("Timing : appuyer dans la zone verte. Rafale : tir à la corde, appuyer le "
+                           "plus vite possible. Sans duel : choc ordinaire. Par défaut, celui des "
+                           "paramètres."));
+    grid->addWidget(new QLabel(tr("Duels"), this), 4, 3);
+    grid->addWidget(m_duels, 4, 4, 1, 2);
+    connect(m_duels, &QComboBox::activated, this, [this] {
+        m_duelFromSettings = false; // Choisi pour cette partie.
+        emitChanged();
+    });
+
     auto *bottom = new QHBoxLayout;
     m_summary = new QLabel(this);
     m_summary->setWordWrap(true);
@@ -148,6 +162,9 @@ MatchRules RulesWidget::rules() const
     r.specials = m_specials->isChecked();
     r.maxEndurance = m_endurance->value();
     r.timeLimit = m_timeLimit->currentData().toInt();
+    // Jamais choisi ici : le réglage actuel des paramètres, même fenêtre fermée.
+    r.duelMode = m_duelFromSettings && !m_readOnly ? MatchRules::defaultDuelMode()
+                                                   : static_cast<DuelMode>(m_duels->currentData().toInt());
     return r;
 }
 
@@ -162,6 +179,9 @@ void RulesWidget::setRules(const MatchRules &r)
     m_steering.slider->setValue(toPercent(r.steering));
     m_specials->setChecked(r.specials);
     m_endurance->setValue(qRound(r.maxEndurance));
+    m_duels->setCurrentIndex(m_duels->findData(static_cast<int>(r.duelMode)));
+    // Des règles au duel des paramètres continuent de le suivre ; un autre duel est un choix.
+    m_duelFromSettings = r.duelMode == MatchRules::defaultDuelMode();
     const int index = m_timeLimit->findData(qRound(r.timeLimit));
     if (index >= 0) {
         m_timeLimit->setCurrentIndex(index);
@@ -179,10 +199,21 @@ void RulesWidget::setReadOnly(bool readOnly)
                        static_cast<QWidget *>(m_wear.slider), static_cast<QWidget *>(m_damage.slider),
                        static_cast<QWidget *>(m_dash.slider), static_cast<QWidget *>(m_steering.slider),
                        static_cast<QWidget *>(m_specials), static_cast<QWidget *>(m_endurance),
-                       static_cast<QWidget *>(m_timeLimit)})
+                       static_cast<QWidget *>(m_timeLimit), static_cast<QWidget *>(m_duels)})
         w->setEnabled(!readOnly);
+    m_readOnly = readOnly;
     m_reset->setVisible(!readOnly);
     setTitle(readOnly ? tr("Personnalisation (choisie par l'hôte)") : tr("Personnalisation"));
+}
+
+void RulesWidget::showEvent(QShowEvent *event)
+{
+    QGroupBox::showEvent(event);
+    const int index = m_duels->findData(static_cast<int>(MatchRules::defaultDuelMode()));
+    if (m_duelFromSettings && !m_readOnly && index != m_duels->currentIndex()) {
+        m_duels->setCurrentIndex(index);
+        emitChanged();
+    }
 }
 
 void RulesWidget::emitChanged()

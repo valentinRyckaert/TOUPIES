@@ -27,6 +27,10 @@ public:
     void setRules(const MatchRules &rules);
     void setReadOnly(bool readOnly);
 
+protected:
+    /// Duel jamais choisi ici : on reprend celui des paramètres (il a pu changer).
+    void showEvent(QShowEvent *event) override;
+
 signals:
     void rulesChanged(const toupie::MatchRules &rules);
 
@@ -51,6 +55,9 @@ private:
     QCheckBox *m_specials = nullptr;
     QSpinBox *m_endurance = nullptr;
     QComboBox *m_timeLimit = nullptr;
+    QComboBox *m_duels = nullptr;
+    bool m_duelFromSettings = true; ///< Le type de duel suit celui des paramètres.
+    bool m_readOnly = false;
     QPushButton *m_reset = nullptr;
     QLabel *m_summary = nullptr;
     bool m_updating = false;

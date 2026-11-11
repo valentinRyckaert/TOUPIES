@@ -76,6 +76,8 @@ QString MatchRules::summary() const
         percent(QCoreApplication::translate("toupie::MatchRules", "Pilotage"), steering);
     if (!specials)
         parts << QCoreApplication::translate("toupie::MatchRules", "Sans coups spéciaux");
+    if (duelMode != s_defaultDuelMode) // Autre que celui des paramètres.
+        parts << QCoreApplication::translate("toupie::MatchRules", "Duels : %1").arg(toString(duelMode));
     return parts.isEmpty() ? QCoreApplication::translate("toupie::MatchRules", "Règles normales") : parts.join(QStringLiteral(" · "));
 }
 

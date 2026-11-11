@@ -68,6 +68,7 @@ private slots:
     void tournamentParticipantsFollowFormat();
     void controlsAreRebindableAndSaved();
     void duelModeIsChosenInSettings();
+    void rulesOverrideTheDefaultDuelMode();
     void reboundKeyIsUsedInBattle();
     void tutorialWalksThroughEveryAction();
     void englishTranslationKeepsGameName();
@@ -378,6 +379,35 @@ void TestGui::duelModeIsChosenInSettings()
     duels->setCurrentIndex(duels->findData(static_cast<int>(DuelMode::Timing)));
     emit duels->activated(duels->currentIndex());
     QVERIFY(MatchRules{}.duelMode == DuelMode::Timing);
+}
+
+void TestGui::rulesOverrideTheDefaultDuelMode()
+{
+    RulesWidget widget;
+    QComboBox *duels = nullptr;
+    for (QComboBox *combo : widget.findChildren<QComboBox *>()) {
+        if (combo->findData(static_cast<int>(DuelMode::Rush)) >= 0)
+            duels = combo;
+    }
+    QVERIFY(duels);
+    QVERIFY(widget.rules().duelMode == DuelMode::Timing);
+
+    // Tant qu'il n'est pas choisi ici, le duel suit les paramètres.
+    MatchRules::setDefaultDuelMode(DuelMode::None);
+    QVERIFY(widget.rules().duelMode == DuelMode::None);
+    QVERIFY(widget.rules().isDefault());
+
+    // Choisi pour cette partie : il ne bouge plus, et le résumé le signale.
+    duels->setCurrentIndex(duels->findData(static_cast<int>(DuelMode::Rush)));
+    emit duels->activated(duels->currentIndex());
+    MatchRules::setDefaultDuelMode(DuelMode::Timing);
+    QVERIFY(widget.rules().duelMode == DuelMode::Rush);
+    QVERIFY(widget.rules().summary().contains(toString(DuelMode::Rush)));
+
+    buttonStartingWith(&widget, QStringLiteral("Réinitialiser"))->click();
+    MatchRules::setDefaultDuelMode(DuelMode::None);
+    QVERIFY(widget.rules().duelMode == DuelMode::None); // De nouveau celui des paramètres.
+    MatchRules::setDefaultDuelMode(DuelMode::Timing);
 }
 
 void TestGui::reboundKeyIsUsedInBattle()
