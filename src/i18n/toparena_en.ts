@@ -1222,10 +1222,6 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Frozen for 3 s: slowed, no steering, worn ×3</translation>
     </message>
     <message>
-        <source>Dégâts moyens</source>
-        <translation>Average damage</translation>
-    </message>
-    <message>
         <source>Aspire violemment tout le monde vers le centre</source>
         <translation>Violently pulls everyone towards the centre</translation>
     </message>
@@ -1829,8 +1825,8 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Frost Breath</translation>
     </message>
     <message>
-        <source>Vague glacée : pendant 3 secondes, la cible est fortement ralentie, ne peut plus piloter et le froid use sa rotation trois fois plus vite. Dégâts moyens.</source>
-        <translation>An icy wave: for 3 seconds, the target is heavily slowed, can&apos;t steer, and the cold wears down its spin three times faster. Medium damage.</translation>
+        <source>Vague glacée : pendant 3 secondes, la cible est fortement ralentie, ne peut plus piloter et le froid use sa rotation trois fois plus vite. Dégâts modérés.</source>
+        <translation>An icy wave: for 3 seconds, the target is heavily slowed, can&apos;t steer, and the cold wears down its spin three times faster. Moderate damage.</translation>
     </message>
     <message>
         <source>Vortex</source>

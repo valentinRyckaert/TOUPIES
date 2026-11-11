@@ -53,7 +53,7 @@ QList<SpecialMove> &SpecialMove::registry()
         frost.description = QCoreApplication::translate(
             "toupie::SpecialMove",
             "Vague glacée : pendant 3 secondes, la cible est fortement ralentie, ne peut plus "
-            "piloter et le froid use sa rotation trois fois plus vite. Dégâts moyens.");
+            "piloter et le froid use sa rotation trois fois plus vite. Dégâts modérés.");
         frost.damage = 18.5;
         frost.knockback = 0.1;
         frost.speed = 1.0;

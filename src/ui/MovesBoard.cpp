@@ -38,7 +38,7 @@ const MoveSheet kSheets[] = {
     {"lance", QT_TRANSLATE_NOOP("toupie::MovesBoard", "Les plus lourds dégâts (24)"),
      QT_TRANSLATE_NOOP("toupie::MovesBoard", "Aucun effet, presque aucun recul, esquivable de loin"), 24, 1, 4},
     {"givre", QT_TRANSLATE_NOOP("toupie::MovesBoard", "3 s gelée : ralentie, sans pilotage, usée ×3"),
-     QT_TRANSLATE_NOOP("toupie::MovesBoard", "Dégâts moyens"), 12, 2, 4},
+     QT_TRANSLATE_NOOP("toupie::MovesBoard", "Dégâts modérés"), 12, 2, 4},
     {"vortex", QT_TRANSLATE_NOOP("toupie::MovesBoard", "Aspire violemment tout le monde vers le centre"),
      QT_TRANSLATE_NOOP("toupie::MovesBoard", "Dégâts modérés"), 10, 4, 4},
     {"distorsion", QT_TRANSLATE_NOOP("toupie::MovesBoard", "Téléporte la cible près du bord, lancée vers l’extérieur"),
