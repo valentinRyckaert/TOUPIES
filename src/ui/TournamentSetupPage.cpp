@@ -1,7 +1,9 @@
 #include "ui/TournamentSetupPage.h"
 #include "ui/Theme.h"
 
+#include "core/PartCatalog.h"
 #include "core/TopRepository.h"
+#include "game/Tournament.h"
 #include "game/Stadium.h"
 #include "ui/RulesWidget.h"
 #include "ui/TournamentSettingsWidget.h"
@@ -50,6 +52,10 @@ TournamentSetupPage::TournamentSetupPage(TopRepository &repository, QWidget *par
                                  choice);
     solo->setProperty("glyph", QStringLiteral("trophy"));
     lan->setProperty("glyph", QStringLiteral("lan"));
+    // Visible quand un tournoi solo a été sauvegardé (texte mis à jour par refresh()).
+    m_resume = createChoiceCard(tr("Reprendre le tournoi solo"), QString(), choice);
+    m_resume->setProperty("glyph", QStringLiteral("play"));
+    choiceLayout->addWidget(m_resume);
     choiceLayout->addWidget(solo);
     choiceLayout->addWidget(lan);
     choiceLayout->addStretch();
@@ -109,6 +115,7 @@ TournamentSetupPage::TournamentSetupPage(TopRepository &repository, QWidget *par
     connect(back, &QPushButton::clicked, this, &TournamentSetupPage::backRequested);
     connect(solo, &QPushButton::clicked, this, [this] { m_steps->setCurrentIndex(1); });
     connect(lan, &QPushButton::clicked, this, &TournamentSetupPage::lanRequested);
+    connect(m_resume, &QPushButton::clicked, this, &TournamentSetupPage::resumeRequested);
     connect(previous, &QPushButton::clicked, this, [this] { m_steps->setCurrentIndex(0); });
     connect(rulesButton, &QPushButton::clicked, rulesPopup, &QDialog::open);
     connect(m_rules, &RulesWidget::rulesChanged, this,
@@ -138,6 +145,16 @@ TournamentSettings TournamentSetupPage::settings() const
 void TournamentSetupPage::refresh()
 {
     m_steps->setCurrentIndex(0);
+    const auto saved = SavedTournament::load(PartCatalog::instance());
+    m_resume->setVisible(saved.has_value());
+    if (saved) {
+        m_resume->setText(tr("Reprendre le tournoi solo") + QLatin1Char('\n')
+                          + tr("%1 · match %2 · %3 participants — %4, là où vous l'avez laissé.")
+                                .arg(toString(saved->settings().format),
+                                     toString(saved->settings().matchFormat).toLower())
+                                .arg(saved->participants().size())
+                                .arg(saved->roundName(saved->currentRound())));
+    }
     m_tops = m_repository.allTops();
     for (int i = 0; i < m_topCombos.size(); ++i) {
         QComboBox *combo = m_topCombos.at(i);

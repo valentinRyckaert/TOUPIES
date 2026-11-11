@@ -152,6 +152,16 @@ private:
     int m_current = 0;
 };
 
+/// Tournoi solo sauvegardé : un seul emplacement, à côté des toupies du joueur.
+namespace SavedTournament {
+QString filePath();
+bool exists();
+bool save(const Tournament &tournament);
+/// Tournoi sauvegardé (nullopt s'il n'y en a pas ou s'il est illisible).
+std::optional<Tournament> load(const PartCatalog &catalog);
+void remove();
+} // namespace SavedTournament
+
 /// Joue entièrement (sans affichage) un match de tournoi entre deux bots.
 MatchSeries playBotMatch(const Participant &a, const Participant &b, MatchFormat format,
                          const Stadium &stadium, const MatchRules &rules, std::uint32_t seed);

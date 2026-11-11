@@ -1,6 +1,7 @@
 #include "ui/MainWindow.h"
 
 #include "core/PartCatalog.h"
+#include "game/Tournament.h"
 #include "net/TournamentSession.h"
 #include "net/Updater.h"
 #include "session/LocalSession.h"
@@ -27,6 +28,7 @@
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QRandomGenerator>
+#include <QPushButton>
 #include <QShortcut>
 #include <QStackedWidget>
 #include <QTimer>
@@ -166,6 +168,9 @@ MainWindow::~MainWindow()
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     m_battle->stop();
+    // Tournoi solo en cours : sauvegardé d'office, on le reprend au prochain lancement.
+    if (m_soloTournament && !m_soloTournament->tournament().isFinished())
+        SavedTournament::save(m_soloTournament->tournament());
     m_soloTournament.reset();
     m_lobby->leave();
     QMainWindow::closeEvent(event);
@@ -240,6 +245,21 @@ void MainWindow::setupTournaments()
                     nullptr, std::move(tournament), rng->generate());
                 attachTournament(m_soloTournament.get(), false);
             });
+    connect(m_tournamentSetup, &TournamentSetupPage::resumeRequested, this, [this] {
+        auto saved = SavedTournament::load(PartCatalog::instance());
+        if (!saved) {
+            QMessageBox::warning(this, tr("Tournoi illisible"),
+                                 tr("Le tournoi sauvegardé est illisible ; il a été supprimé."));
+            SavedTournament::remove();
+            m_tournamentSetup->refresh();
+            return;
+        }
+        // Le tournoi repris est en cours : la sauvegarde sera refaite en le quittant.
+        SavedTournament::remove();
+        m_soloTournament = std::make_unique<net::TournamentDirector>(
+            nullptr, std::move(*saved), QRandomGenerator::global()->generate());
+        attachTournament(m_soloTournament.get(), false);
+    });
     connect(m_tournamentSetup, &TournamentSetupPage::lanRequested, this, [this] {
         m_lanMenu->setTournament(m_tournamentSetup->settings());
         showLanMenu();
@@ -248,10 +268,29 @@ void MainWindow::setupTournaments()
             [this] { attachTournament(m_lobby->tournament(), m_lobby->isHost()); });
     connect(m_tournamentPage, &TournamentPage::leaveRequested, this, [this] {
         if (m_tournament && m_tournament == m_soloTournament.get()) {
-            if (QMessageBox::question(this, tr("Quitter le tournoi"),
-                                      tr("Quitter le tournoi ? Il sera perdu."))
-                != QMessageBox::Yes)
-                return;
+            if (!m_soloTournament->tournament().isFinished()) {
+                QMessageBox box(QMessageBox::Question, tr("Quitter le tournoi"),
+                                tr("Sauvegarder le tournoi pour le reprendre plus tard ? Un match "
+                                   "en cours sera rejoué depuis le début."),
+                                QMessageBox::NoButton, this);
+                QPushButton *save = box.addButton(tr("Sauvegarder et quitter"), QMessageBox::AcceptRole);
+                QPushButton *drop = box.addButton(tr("Quitter sans sauvegarder"), QMessageBox::DestructiveRole);
+                box.addButton(tr("Annuler"), QMessageBox::RejectRole);
+                save->setProperty("variant", QStringLiteral("primary"));
+                drop->setProperty("variant", QStringLiteral("danger"));
+                box.setDefaultButton(save);
+                box.exec();
+                if (box.clickedButton() == save) {
+                    if (!SavedTournament::save(m_soloTournament->tournament())) {
+                        QMessageBox::warning(this, tr("Sauvegarde impossible"),
+                                             tr("Impossible d'écrire le fichier :\n%1")
+                                                 .arg(SavedTournament::filePath()));
+                        return;
+                    }
+                } else if (box.clickedButton() != drop) {
+                    return;
+                }
+            }
             m_battle->stop();
             m_soloTournament.reset();
             showMenu();

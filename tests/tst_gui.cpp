@@ -3,6 +3,7 @@
 
 #include "core/PartCatalog.h"
 #include "core/TopRepository.h"
+#include "game/Tournament.h"
 #include "ui/ArenaWidget.h"
 #include "ui/BattlePage.h"
 #include "ui/BuilderPage.h"
@@ -63,6 +64,7 @@ private slots:
     void builderSavesTopWithBolt();
     void lanLobbyStartsMatchWithHostRules();
     void soloTournamentOpensMatch();
+    void soloTournamentIsSavedAndResumed();
     void tournamentParticipantsFollowFormat();
     void controlsAreRebindableAndSaved();
     void reboundKeyIsUsedInBattle();
@@ -288,6 +290,33 @@ void TestGui::soloTournamentOpensMatch()
     QCOMPARE(battle->mode(), BattlePage::Mode::Tournament);
     QVERIFY(battle->session() && battle->session()->state().series.has_value());
     QVERIFY(buttonStartingWith(battle, QStringLiteral("Abandonner")));
+}
+
+void TestGui::soloTournamentIsSavedAndResumed()
+{
+    SavedTournament::remove();
+    {
+        MainWindow window;
+        window.show();
+        emit window.findChild<MenuPage *>()->tournamentRequested();
+        auto *setup = qobject_cast<TournamentSetupPage *>(currentPage(window));
+        QVERIFY(!buttonStartingWith(setup, QStringLiteral("Reprendre"))->isVisible());
+        buttonStartingWith(setup, QStringLiteral("Tournoi solo"))->click();
+        buttonStartingWith(setup, QStringLiteral("Lancer le tournoi"))->click();
+        QVERIFY(qobject_cast<TournamentPage *>(currentPage(window)));
+        window.close(); // Fermer le jeu en plein tournoi le sauvegarde.
+    }
+    QVERIFY(SavedTournament::exists());
+
+    MainWindow window;
+    window.show();
+    emit window.findChild<MenuPage *>()->tournamentRequested();
+    auto *setup = qobject_cast<TournamentSetupPage *>(currentPage(window));
+    QPushButton *resume = buttonStartingWith(setup, QStringLiteral("Reprendre"));
+    QVERIFY(resume && resume->isVisible());
+    resume->click();
+    QVERIFY(qobject_cast<TournamentPage *>(currentPage(window)));
+    QVERIFY(!SavedTournament::exists()); // Repris : la sauvegarde sera refaite en le quittant.
 }
 
 void TestGui::tournamentParticipantsFollowFormat()

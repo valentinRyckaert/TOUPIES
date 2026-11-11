@@ -2,6 +2,7 @@
 #include "game/Tournament.h"
 
 #include <QSet>
+#include <QStandardPaths>
 #include <QTest>
 
 using namespace toupie;
@@ -65,6 +66,7 @@ private slots:
     void leagueStandingsAddBothScores();
     void knockoutBracketWithByes();
     void jsonRoundTrip();
+    void savedTournamentRoundTrip();
     void botMatchHasWinner();
 };
 
@@ -209,6 +211,24 @@ void TestTournament::jsonRoundTrip()
     QCOMPARE(copy->toJson(), t.toJson());
     QCOMPARE(copy->participants().at(3).tops.size(), 3);
     QCOMPARE(copy->currentRound(), 1);
+}
+
+void TestTournament::savedTournamentRoundTrip()
+{
+    QStandardPaths::setTestModeEnabled(true); // Jamais le tournoi du joueur.
+    SavedTournament::remove();
+    QVERIFY(!SavedTournament::exists());
+    QVERIFY(!SavedTournament::load(PartCatalog::instance()));
+    Tournament t(settings(TournamentFormat::League, MatchFormat::Express, 6), makeParticipants(6), 9);
+    playRound(t);
+    t.nextRound();
+    QVERIFY(SavedTournament::save(t));
+    QVERIFY(SavedTournament::exists());
+    const auto loaded = SavedTournament::load(PartCatalog::instance());
+    QVERIFY(loaded.has_value());
+    QCOMPARE(loaded->toJson(), t.toJson());
+    SavedTournament::remove();
+    QVERIFY(!SavedTournament::exists());
 }
 
 void TestTournament::botMatchHasWinner()

@@ -2,6 +2,12 @@
 
 #include "core/PartCatalog.h"
 
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QSaveFile>
+#include <QStandardPaths>
 #include <QCoreApplication>
 #include <QJsonArray>
 
@@ -451,6 +457,47 @@ QList<Participant> addBots(QList<Participant> humans, const TournamentSettings &
     }
     return humans;
 }
+
+namespace SavedTournament {
+
+QString filePath()
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return QDir(dir).filePath(QStringLiteral("solo-tournament.json"));
+}
+
+bool exists()
+{
+    return QFile::exists(filePath());
+}
+
+bool save(const Tournament &tournament)
+{
+    QDir().mkpath(QFileInfo(filePath()).absolutePath());
+    QSaveFile file(filePath()); // Écrit à part puis remplace : jamais de fichier à moitié écrit.
+    if (!file.open(QIODevice::WriteOnly))
+        return false;
+    file.write(QJsonDocument(tournament.toJson()).toJson(QJsonDocument::Compact));
+    return file.commit();
+}
+
+std::optional<Tournament> load(const PartCatalog &catalog)
+{
+    QFile file(filePath());
+    if (!file.open(QIODevice::ReadOnly))
+        return std::nullopt;
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject())
+        return std::nullopt;
+    return Tournament::fromJson(doc.object(), catalog);
+}
+
+void remove()
+{
+    QFile::remove(filePath());
+}
+
+} // namespace SavedTournament
 
 MatchSeries playBotMatch(const Participant &a, const Participant &b, MatchFormat format,
                          const Stadium &stadium, const MatchRules &rules, std::uint32_t seed)

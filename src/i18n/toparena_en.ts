@@ -1020,12 +1020,16 @@
         <translation>Forfeit this match? Your opponent will win it.</translation>
     </message>
     <message>
-        <source>Quitter le tournoi</source>
-        <translation>Leave tournament</translation>
+        <source>Tournoi illisible</source>
+        <translation>Unreadable tournament</translation>
     </message>
     <message>
-        <source>Quitter le tournoi ? Il sera perdu.</source>
-        <translation>Leave the tournament? It will be lost.</translation>
+        <source>Le tournoi sauvegardé est illisible ; il a été supprimé.</source>
+        <translation>The saved tournament can&apos;t be read; it has been deleted.</translation>
+    </message>
+    <message>
+        <source>Quitter le tournoi</source>
+        <translation>Leave tournament</translation>
     </message>
     <message>
         <source>Quitter le tournoi en réseau ?</source>
@@ -1060,6 +1064,28 @@
     <message>
         <source>Annuler</source>
         <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>Sauvegarder le tournoi pour le reprendre plus tard ? Un match en cours sera rejoué depuis le début.</source>
+        <translation>Save the tournament to resume it later? A match in progress will be replayed from the start.</translation>
+    </message>
+    <message>
+        <source>Sauvegarder et quitter</source>
+        <translation>Save and quit</translation>
+    </message>
+    <message>
+        <source>Quitter sans sauvegarder</source>
+        <translation>Quit without saving</translation>
+    </message>
+    <message>
+        <source>Sauvegarde impossible</source>
+        <translation>Can&apos;t save</translation>
+    </message>
+    <message>
+        <source>Impossible d&apos;écrire le fichier :
+%1</source>
+        <translation>Can&apos;t write the file:
+%1</translation>
     </message>
     <message>
         <source>Mises à jour</source>
@@ -2420,6 +2446,10 @@ Knockout: the loser of each match is eliminated.</translation>
         <translation>2 to 4 human players, each on their own computer, filled out with bots.</translation>
     </message>
     <message>
+        <source>Reprendre le tournoi solo</source>
+        <translation>Resume the solo tournament</translation>
+    </message>
+    <message>
         <source>Retour au menu</source>
         <translation>Back to menu</translation>
     </message>
@@ -2450,6 +2480,10 @@ Knockout: the loser of each match is eliminated.</translation>
     <message>
         <source>Lancer le tournoi</source>
         <translation>Start tournament</translation>
+    </message>
+    <message>
+        <source>%1 · match %2 · %3 participants — %4, là où vous l&apos;avez laissé.</source>
+        <translation>%1 · %2 matches · %3 players — %4, right where you left it.</translation>
     </message>
 </context>
 <context>

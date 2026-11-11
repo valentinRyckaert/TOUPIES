@@ -6,6 +6,7 @@
 #include <QWidget>
 
 class QComboBox;
+class QPushButton;
 class QFormLayout;
 class QLabel;
 class QStackedWidget;
@@ -35,6 +36,8 @@ signals:
     void soloRequested(const toupie::TournamentSettings &settings, const QList<toupie::Top> &tops);
     /// Tournoi en réseau : créer ou rejoindre un lobby de tournoi.
     void lanRequested();
+    /// Reprendre le tournoi solo sauvegardé.
+    void resumeRequested();
 
 private:
     void updateTops();
@@ -48,6 +51,7 @@ private:
     RulesWidget *m_rules = nullptr;
     QLabel *m_rulesSummary = nullptr;
     QList<QComboBox *> m_topCombos;
+    QPushButton *m_resume = nullptr;
 };
 
 } // namespace toupie
