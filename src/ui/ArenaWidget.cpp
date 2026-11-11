@@ -1260,9 +1260,9 @@ void ArenaWidget::paintOverlay(QPainter &p)
         double y = c.y() - 150;
         if (state.playerCount() > 2)
             y -= 40;
+        // Texte net, sans reflets magenta / cyan (illisibles sur un titre de cette taille).
         chromaText(p, QRectF(0, y, width(), 110), Qt::AlignCenter, title.toUpper(),
-                   Theme::displayFont(std::min(96.0, width() / 9.0), true),
-                   winner == local ? QColor(Qt::white) : color, winner >= 0 && winner != local ? 0 : 6);
+                   Theme::displayFont(std::min(96.0, width() / 9.0), true), color, 0);
         y += 112;
         const QString reason = endReasonText(state.endReason, state.playerCount());
         if (!reason.isEmpty()) {
