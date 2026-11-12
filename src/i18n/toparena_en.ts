@@ -1356,10 +1356,6 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Special moves</translation>
     </message>
     <message>
-        <source>Sept signatures visuelles</source>
-        <translation>Seven visual signatures</translation>
-    </message>
-    <message>
         <source>Vague = projectile qui file vers l’adversaire le plus proche (esquivable). Anneau = onde qui s’élargit autour du lanceur.</source>
         <translation>Wave = projectile that flies towards the nearest opponent (dodgeable). Ring = wave that widens around the caster.</translation>
     </message>

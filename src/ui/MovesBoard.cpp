@@ -454,7 +454,7 @@ MovesPage::MovesPage(QWidget *parent)
     back->setProperty("variant", QStringLiteral("ghost"));
     back->setProperty("glyph", QStringLiteral("back"));
     back->setProperty("key", tr("Échap"));
-    root->addWidget(new TopBar(back, MovesBoard::tr("Coups spéciaux"), MovesBoard::tr("Sept signatures visuelles"), this));
+    root->addWidget(new TopBar(back, MovesBoard::tr("Coups spéciaux"), QString(), this));
     auto *legend = new QLabel(MovesBoard::tr("Vague = projectile qui file vers l’adversaire le plus proche (esquivable). "
                                              "Anneau = onde qui s’élargit autour du lanceur."),
                               this);
