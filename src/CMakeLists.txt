@@ -80,6 +80,8 @@ add_library(toupie_ui STATIC
     ui/StadiumPainter.cpp
     ui/StatsWidget.h
     ui/StatsWidget.cpp
+    ui/BattleEffects.h
+    ui/BattleEffects.cpp
     ui/ArenaWidget.h
     ui/ArenaWidget.cpp
     ui/MenuPage.h

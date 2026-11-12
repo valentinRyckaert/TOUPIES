@@ -6,6 +6,7 @@
 #include "game/MatchRules.h"
 #include "game/Stadium.h"
 #include "ui/ArenaWidget.h"
+#include "ui/BattleEffects.h"
 #include "ui/StadiumPainter.h"
 #include "ui/Theme.h"
 #include "ui/TopPainter.h"
@@ -98,7 +99,8 @@ protected:
 /// Démonstration en fond de menu : un vrai combat entre deux bots normaux (toupies et
 /// stadium tirés au hasard) ; dès qu'il se termine, un autre commence.
 /// La simulation ne tourne que menu affiché, et le stadium est mis en cache :
-/// chaque image ne redessine que deux toupies et leurs coups spéciaux.
+/// chaque image ne redessine que les toupies et les effets du combat (BattleEffects,
+/// les mêmes qu'en jeu : coups spéciaux, étincelles des chocs et des duels).
 class BotDemo : public QWidget
 {
 public:
@@ -133,6 +135,7 @@ protected:
             return;
         const double dt = std::min(0.05, m_clock.restart() / 1000.0);
         if (m_battle->isFinished()) {
+            m_effects.update(dt, {}, m_battle->spinners(), m_battle->duel(), false); // Fin des étincelles.
             m_pause -= dt;
             if (m_pause <= 0.0)
                 restart();
@@ -140,6 +143,7 @@ protected:
             for (BotController &bot : m_bots)
                 bot.update(*m_battle, dt);
             m_battle->advance(dt);
+            m_effects.update(dt, m_battle->takeImpacts(), m_battle->spinners(), m_battle->duel(), true);
             if (m_battle->isFinished())
                 m_pause = 1.5; // Le temps de voir qui a gagné.
             else if (m_battle->elapsed() > 60.0)
@@ -166,33 +170,27 @@ protected:
         p.drawPixmap(0, 0, m_cache);
         auto toScreen = [&](Vec2 v) { return c + QPointF(v.x, v.y) * k; };
 
-        for (const Projectile &shot : m_battle->projectiles()) {
-            QColor color = QColor::fromRgb(shot.color);
-            if (shot.ring) {
-                const double r = shot.radius * k;
-                color.setAlphaF(0.85 * (1.0 - shot.traveled / std::max(0.01, shot.range)));
-                p.setPen(QPen(color, std::max(2.0, shot.width * k)));
-                p.setBrush(Qt::NoBrush);
-                p.drawEllipse(toScreen(shot.origin), r, r);
-            } else {
-                const QPointF at = toScreen(shot.position);
-                QRadialGradient glow(at, shot.width * k * 3);
-                glow.setColorAt(0.0, color);
-                color.setAlpha(0);
-                glow.setColorAt(1.0, color);
-                p.setPen(Qt::NoPen);
-                p.setBrush(glow);
-                p.drawEllipse(at, shot.width * k * 3, shot.width * k * 3);
-            }
-        }
-        const double radius = m_battle->config().topRadius * k;
-        for (const Spinner &s : m_battle->spinners()) {
+        const BattleConfig &config = m_battle->config();
+        const double radius = config.topRadius * k;
+        m_effects.paintTrails(p, m_battle->spinners(), toScreen, radius);
+        BattleEffects::paintProjectiles(p, m_battle->projectiles(), toScreen, k, config.topRadius,
+                                        m_battle->geometry().radius, m_battle->elapsed());
+        const auto &spinners = m_battle->spinners();
+        for (int i = 0; i < int(spinners.size()); ++i) {
+            const Spinner &s = spinners[i];
             if (s.status == Spinner::Status::RingOut && m_battle->isFinished())
                 continue; // Éjectée : sortie du stadium.
+            QPointF pos = toScreen(s.position);
+            if (m_battle->duel().sideOf(i) >= 0) { // Duel : les toupies tremblent.
+                const double t = m_battle->elapsed() * 60.0 + i * 1.7;
+                pos += QPointF(std::sin(t * 1.3), std::cos(t * 1.7)) * (radius * 0.06);
+            }
             p.setOpacity(s.isActive() ? 1.0 : 0.5);
-            TopPainter::paint(p, s.top, toScreen(s.position), radius, s.angle, s.isDashing() || s.isBoosted() ? 1.0 : 0.0);
+            TopPainter::paint(p, s.top, pos, radius, s.angle, s.isDashing() || s.isBoosted() ? 1.0 : 0.0);
+            BattleEffects::paintStatus(p, s, pos, radius, m_battle->elapsed());
         }
         p.setOpacity(1.0);
+        m_effects.paintSparks(p, toScreen, radius, k);
     }
 
 private:
@@ -226,11 +224,13 @@ private:
         m_battle->launch({m_bots[0].chooseLaunchAngle(*m_battle), m_bots[1].chooseLaunchAngle(*m_battle)},
                          {m_bots[0].chooseLaunchPower(*m_battle), m_bots[1].chooseLaunchPower(*m_battle)});
         m_cache = QPixmap();
+        m_effects.reset();
     }
 
     std::mt19937 m_rng;
     std::unique_ptr<Battle> m_battle;
     std::vector<BotController> m_bots;
+    BattleEffects m_effects;
     QPixmap m_cache;
     double m_cacheScale = 0.0;
     QElapsedTimer m_clock;

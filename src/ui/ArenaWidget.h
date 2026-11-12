@@ -1,6 +1,7 @@
 #pragma once
 
 #include "session/MatchSession.h"
+#include "ui/BattleEffects.h"
 
 #include <QElapsedTimer>
 #include <QList>
@@ -59,21 +60,6 @@ protected:
     void focusOutEvent(QFocusEvent *event) override;
 
 private:
-    struct Spark
-    {
-        QPointF position; // Coordonnées du monde.
-        double age = 0.0;
-        double intensity = 0.0;
-        QColor color;          ///< Invalide : étincelle de choc classique.
-    };
-    /// Étincelle projetée par le frottement d'un duel.
-    struct Ember
-    {
-        QPointF position; // Coordonnées du monde.
-        QPointF velocity;
-        double age = 0.0;
-    };
-
     void tick();
     void resetVisuals();
     void confirmLaunch();
@@ -89,7 +75,6 @@ private:
     /// Force de lancer correspondant à une longueur de flèche (unités du monde).
     double powerForLength(double length) const;
     double lengthForPower(double power) const;
-    void paintProjectiles(QPainter &p);
 
     double scale() const;
     QPointF center() const;
@@ -118,9 +103,7 @@ private:
     QSet<int> m_steerKeys;
     double m_flash = 0.0;
 
-    std::vector<QList<QPointF>> m_trails;
-    QList<Spark> m_sparks;
-    QList<Ember> m_embers;
+    BattleEffects m_effects; ///< Étincelles, traînées et coups spéciaux.
     QString m_duelResult;      ///< Bandeau de fin de duel.
     QColor m_duelResultColor;
     double m_duelResultTimer = 0.0;
