@@ -79,16 +79,17 @@ void radialFill(QPainter &p, const QPainterPath &path, QPointF c, double R,
     p.fillPath(path, g);
 }
 
-/// Projette un point d'un motif plat (dalles, rides) sur la cuvette vue de dessus : le
-/// motif suit la pente et se resserre vers le bord, au lieu de paraître posé à plat.
+/// Projette un point d'un motif plat (dalles, rides) sur la cuvette vue de dessus, en
+/// perspective : le fond, plus loin, rapetisse et le bord, plus proche, s'élargit ; les
+/// lignes se courbent vers le centre, ce qui creuse le stadium.
 QPointF onBowl(QPointF c, double R, QPointF flat)
 {
     const QPointF d = flat - c;
     const double r = std::hypot(d.x(), d.y()) / R;
     if (r < 1e-9)
         return flat;
-    constexpr double kReach = 1.25; // Rayon plat ramené sur le bord du stadium.
-    const double curved = std::sin(std::min(r, kReach) / kReach * M_PI / 2.0) * 1.04;
+    constexpr double kReach = 1.1; // Rayon plat ramené sur le bord du stadium.
+    const double curved = std::pow(std::min(r, kReach) / kReach, 1.35) * 1.04;
     return c + d * (curved / r);
 }
 
