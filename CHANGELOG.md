@@ -22,6 +22,23 @@ Toutes les évolutions notables de Top Arena (anciennement Toupie Arena). Le for
   et nom de code propres) et effet visuel propre à chaque coup spécial ; toupies gelées ou
   sonnées signalées sur l'arène.
 
+### Modifications
+
+- **Vortex** : l'anneau balaie tout le stadium (portée 2,2, plus rapide) et aspire vraiment ses
+  cibles pendant 0,9 s, jusqu'au centre sans le dépasser ; elles ne peuvent pas dasher pendant
+  l'aspiration. 20 dégâts (au lieu de 17).
+- **Rebord** : le percuter fait perdre un peu d'endurance (selon la vitesse, amorti par la
+  défense), en jetant des étincelles ; le longer ne coûte rien.
+- Le combat de bots du menu affiche les mêmes effets qu'en jeu (coups spéciaux, étincelles des
+  chocs et des duels).
+- Les stadiums Béton et Sable laissent voir la courbure de leur cuvette.
+- Écran du tournoi : « Quitter » au lieu d'« Abandonner » (le bouton propose de sauvegarder).
+
+### Corrections
+
+- Le Vortex projetait ses cibles de l'autre côté du stadium, parfois dehors, au lieu de les
+  ramener au centre.
+
 ## [1.2.1] — 2026-11-05
 
 ### Corrections

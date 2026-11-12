@@ -70,15 +70,17 @@ QList<SpecialMove> &SpecialMove::registry()
         vortex.name = QCoreApplication::translate("toupie::SpecialMove", "Vortex");
         vortex.description = QCoreApplication::translate(
             "toupie::SpecialMove",
-            "Anneau à longue portée qui aspire violemment toutes les toupies vers le centre "
-            "du stadium : provoque la mêlée, empêche de fuir. Dégâts modérés.");
+            "Anneau qui balaie tout le stadium et aspire violemment toutes les toupies vers "
+            "le centre : provoque la mêlée et empêche de fuir (pas de dash pendant "
+            "l'aspiration). Dégâts modérés, mais les cibles s'éloignent du bord.");
         vortex.shape = Shape::Ring;
-        vortex.damage = 17.0;
-        vortex.speed = 1.0;
-        vortex.range = 1.4;
+        vortex.damage = 20.0;
+        vortex.speed = 1.8;
+        vortex.range = 2.2; // Tout le stadium, d'où que parte l'anneau.
         vortex.width = 0.07;
         vortex.effect = Effect::PullToCenter;
-        vortex.effectStrength = 0.9; // Part du chemin vers le centre (1 = jusqu'au centre).
+        vortex.effectStrength = 2.5; // Taux d'aspiration (1/s) : 90 % du chemin en 0,9 s.
+        vortex.effectDuration = 0.9;
         vortex.color = 0x8f5bff;
         list.append(vortex);
 

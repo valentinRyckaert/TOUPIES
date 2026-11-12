@@ -93,7 +93,7 @@ bool Battle::canDash(int index) const
         return false;
     const Spinner &self = m_spinners[index];
     return m_phase == Phase::Running && self.isActive() && !self.isDashing()
-        && !self.isDisarmed() && !inDuel(index) && self.dashCooldown <= 0.0
+        && !self.isDisarmed() && !self.isPulled() && !inDuel(index) && self.dashCooldown <= 0.0
         && self.spin > m_config.dashCost && nearestOpponent(index) >= 0;
 }
 
@@ -386,6 +386,11 @@ void Battle::integrate(Spinner &s, double h)
             s.dashTimer = 0.0;
             s.velocity = s.dashDirection * m_config.postDashSpeed;
         }
+    } else if (s.isPulled()) {
+        // Aspirée (vortex) : sa vitesse converge vers celle qui la ramène au centre,
+        // rapide de loin, nulle au centre ; ni propulsion ni pilotage ne s'y opposent.
+        const Vec2 target = s.position * -s.pullRate;
+        s.velocity += (target - s.velocity) * (1.0 - std::exp(-m_config.pullGrip * h));
     } else {
         // Ralentie (givre) : moins de propulsion, plus de frottement, pas de pilotage.
         const double control = s.isSlowed() ? 1.0 - s.slowStrength : 1.0;
@@ -433,6 +438,11 @@ void Battle::integrate(Spinner &s, double h)
     s.boostTimer = std::max(0.0, s.boostTimer - h);
     s.slowTimer = std::max(0.0, s.slowTimer - h);
     s.disarmTimer = std::max(0.0, s.disarmTimer - h);
+    if (s.isPulled()) {
+        s.pullTimer = std::max(0.0, s.pullTimer - h);
+        if (!s.isPulled()) // Fin de l'aspiration : juste de quoi glisser jusqu'au centre.
+            s.velocity = -s.position * m_config.friction;
+    }
 }
 
 void Battle::resolveCollision(int i, int j)
@@ -618,14 +628,14 @@ void Battle::applySpecialHit(const Projectile &projectile, const SpecialMove &mo
     switch (move.effect) {
     case SpecialMove::Effect::None:
         break;
-    case SpecialMove::Effect::PullToCenter: {
-        // Juste la vitesse qui ramène la toupie au centre en roue libre (frottement
-        // visqueux : distance parcourue = vitesse / frottement), sans la projeter au-delà.
-        const double friction = std::max(0.1, m_config.friction);
-        t.velocity = -t.position * (friction * move.effectStrength);
+    case SpecialMove::Effect::PullToCenter:
+        // Aspiration pendant effectDuration : la distance au centre décroît
+        // exponentiellement (taux effectStrength), sans jamais le dépasser.
+        t.pullTimer = move.effectDuration;
+        t.pullRate = move.effectStrength;
+        t.velocity = -t.position * move.effectStrength;
         t.dashTimer = 0.0;
         break;
-    }
     case SpecialMove::Effect::Slow:
         t.slowTimer = move.effectDuration;
         t.slowStrength = move.effectStrength;

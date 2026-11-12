@@ -114,6 +114,9 @@ struct BattleConfig
     double specialCost = 0.25;
     double specialDamageScale = 1.0; ///< Multiplicateur des dégâts des coups spéciaux.
     double specialKnockbackScale = 1.0;
+    /// Toupie aspirée (vortex) : rapidité (1/s) avec laquelle sa vitesse rejoint
+    /// celle de l'aspiration.
+    double pullGrip = 12.0;
     /// Toupie gelée (souffle de givre) : sa perte passive est multipliée par
     /// 1 + slowWear × intensité du gel (le froid ronge la rotation).
     double slowWear = 2.0;

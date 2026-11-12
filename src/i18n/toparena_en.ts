@@ -1288,10 +1288,6 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Frozen for 3 s: slowed, no steering, worn ×3</translation>
     </message>
     <message>
-        <source>Aspire violemment tout le monde vers le centre</source>
-        <translation>Violently pulls everyone towards the centre</translation>
-    </message>
-    <message>
         <source>Dégâts modérés</source>
         <translation>Moderate damage</translation>
     </message>
@@ -1358,6 +1354,14 @@ Download and install it? The game will restart on the new version.</translation>
     <message>
         <source>Vague = projectile qui file vers l’adversaire le plus proche (esquivable). Anneau = onde qui s’élargit autour du lanceur.</source>
         <translation>Wave = projectile that flies towards the nearest opponent (dodgeable). Ring = wave that widens around the caster.</translation>
+    </message>
+    <message>
+        <source>Aspire tout le stadium vers le centre, sans dash possible</source>
+        <translation>Pulls the whole stadium to the centre, no dash allowed</translation>
+    </message>
+    <message>
+        <source>Dégâts modérés, éloigne les cibles du bord</source>
+        <translation>Moderate damage, moves targets away from the rim</translation>
     </message>
 </context>
 <context>
@@ -1923,10 +1927,6 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Vortex</translation>
     </message>
     <message>
-        <source>Anneau à longue portée qui aspire violemment toutes les toupies vers le centre du stadium : provoque la mêlée, empêche de fuir. Dégâts modérés.</source>
-        <translation>A long-range ring that violently pulls all tops toward the center of the stadium: forces a melee, prevents escape. Moderate damage.</translation>
-    </message>
-    <message>
         <source>Distorsion</source>
         <translation>Distortion</translation>
     </message>
@@ -1949,6 +1949,10 @@ Download and install it? The game will restart on the new version.</translation>
     <message>
         <source>Secousse qui blesse toutes les toupies très proches et les empêche de dasher ou de lancer leur coup spécial pendant 6 secondes. Portée très courte.</source>
         <translation>A tremor that hurts all very close tops and stops them from dashing or using their special move for 6 seconds. Very short range.</translation>
+    </message>
+    <message>
+        <source>Anneau qui balaie tout le stadium et aspire violemment toutes les toupies vers le centre : provoque la mêlée et empêche de fuir (pas de dash pendant l&apos;aspiration). Dégâts modérés, mais les cibles s&apos;éloignent du bord.</source>
+        <translation>A ring that sweeps the whole stadium and violently pulls every top to the centre: it starts a brawl and stops anyone from fleeing (no dash while pulled). Moderate damage, but targets end up away from the rim.</translation>
     </message>
 </context>
 <context>

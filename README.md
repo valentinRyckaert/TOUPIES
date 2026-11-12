@@ -173,7 +173,7 @@ adversaires jusqu'à sa portée. La défense de la cible réduit dégâts et rec
 | Tempête   | Onde de choc     | anneau | gros recul : éjecte une cible déjà au bord | portée courte |
 | Perçant   | Lance d'acier    | vague  | les plus lourds dégâts (24) | aucun effet, presque aucun recul, esquivable de loin |
 | Polaire   | Souffle de givre | vague  | 3 s gelée : ralentie, sans pilotage, et usée trois fois plus vite | dégâts moyens |
-| Abysse    | Vortex           | anneau | aspire violemment tout le monde vers le centre | dégâts modérés |
+| Abysse    | Vortex           | anneau | balaie tout le stadium et aspire tout le monde vers le centre (pas de dash pendant l'aspiration) | dégâts modérés, éloigne les cibles du bord |
 | Spectral  | Distorsion       | vague  | téléporte la cible près du bord, lancée vers l'extérieur (risque d'éjection) | lente, facile à esquiver |
 | Vampire   | Siphon           | vague  | rend 60 % de l'endurance volée | dégâts modérés, peu de recul |
 | Tellurique| Séisme           | anneau | blesse et bloque dash + coup spécial 6 s | portée très courte |

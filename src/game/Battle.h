@@ -42,6 +42,8 @@ struct Spinner
     double slowTimer = 0.0;    ///< > 0 : ralentie (coup spécial « givre »).
     double slowStrength = 0.0;
     double disarmTimer = 0.0;  ///< > 0 : ni dash ni coup spécial.
+    double pullTimer = 0.0;    ///< > 0 : aspirée vers le centre (coup spécial « vortex »).
+    double pullRate = 0.0;     ///< Vitesse d'aspiration = pullRate × distance au centre.
 
     Status status = Status::Waiting;
 
@@ -51,6 +53,7 @@ struct Spinner
     bool isBoosted() const { return boostTimer > 0.0; }
     bool isSlowed() const { return slowTimer > 0.0; }
     bool isDisarmed() const { return disarmTimer > 0.0; }
+    bool isPulled() const { return pullTimer > 0.0; }
 };
 
 /// Vague d'un coup spécial en cours de propagation.
