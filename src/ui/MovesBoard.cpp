@@ -161,31 +161,51 @@ void paintEffect(QPainter &p, const QString &key, const QColor &col, const QRect
             glowLine(p, line({x + w * 0.8, cy - 20}, {x + w * 0.95, cy - 32}), col, 2);
             glowLine(p, line({x + w * 0.8, cy - 10}, {x + w * 0.97, cy - 14}), col, 2);
         } else if (key == QLatin1String("vortex")) {
+            // Tourbillon au centre du stadium : les toupies touchées y sont ramenées.
+            const QPointF hub(x + w * 0.55, cy);
             for (int k = 0; k < 4; ++k) {
                 QPainterPath arm;
                 for (int i = 0; i <= 40; ++i) {
-                    const double a = k * kTau / 4 + i * 0.13, r = u * 0.46 * (1 - i / 44.0);
-                    const QPointF pt(cx + std::cos(a) * r, cy + std::sin(a) * r * 0.9);
+                    const double a = k * kTau / 4 + i * 0.13, r = u * 0.42 * (1 - i / 44.0);
+                    const QPointF pt(hub.x() + std::cos(a) * r, hub.y() + std::sin(a) * r * 0.9);
                     i ? arm.lineTo(pt) : arm.moveTo(pt);
                 }
-                glowLine(p, arm, col, 3.2, 0.9);
+                glowLine(p, arm, col, 3.0, 0.8);
             }
-            softDisc(p, QPointF(cx, cy), u * 0.14, Theme::kViolet, 0.5);
+            softDisc(p, hub, u * 0.14, Theme::kViolet, 0.5);
             p.setPen(QPen(Theme::kViolet, 2));
             p.setBrush(Qt::black);
-            p.drawEllipse(QPointF(cx, cy), u * 0.1, u * 0.1);
-            const QPointF pulled[2] = {{x + w * 0.85, cy - 40}, {x + w * 0.1, cy + 50}};
-            QPen dash(Theme::kViolet, 3);
-            dash.setDashPattern({2, 2});
-            p.setPen(dash);
-            for (const QPointF &t : pulled) {
-                const double a = std::atan2(cy - t.y(), cx - t.x());
-                const QPointF d(std::cos(a), std::sin(a));
-                p.drawLine(t + d * 34, t + d * 70);
+            p.drawEllipse(hub, u * 0.08, u * 0.08);
+            // Le lanceur, à l'écart, émet l'anneau qui a touché les deux toupies.
+            const QPointF casterAt(x + w * 0.14, cy + u * 0.22);
+            p.setPen(QPen(alpha(col, 0.55), 1.5));
+            p.setBrush(Qt::NoBrush);
+            p.drawEllipse(casterAt, u * 0.2, u * 0.2);
+            // Trajet de chaque toupie : fantôme à son point de départ, traînée et flèche
+            // vers le centre.
+            struct Pull { QPointF from; double progress; const Top *top; };
+            const Pull pulls[2] = {{{x + w * 0.93, cy - u * 0.34}, 0.55, &target},
+                                   {{x + w * 0.8, cy + u * 0.4}, 0.5, &presets.at(2)}};
+            for (const Pull &pull : pulls) {
+                const QPointF now = pull.from + (hub - pull.from) * pull.progress;
+                const QPointF d = (hub - pull.from) / std::hypot(hub.x() - pull.from.x(), hub.y() - pull.from.y());
+                const QPointF n(-d.y(), d.x());
+                p.save();
+                p.setOpacity(0.3);
+                TopPainter::paint(p, *pull.top, pull.from, 18, 0.3);
+                p.restore();
+                QPen trail(alpha(Theme::kViolet, 0.8), 2);
+                trail.setDashPattern({2, 3});
+                p.setPen(trail);
+                p.drawLine(pull.from + d * 20, now - d * 24);
+                const QPointF tip = now + d * 56;
+                glowLine(p, line(now + d * 28, tip), col, 2.5);
+                p.setPen(Qt::NoPen);
+                p.setBrush(col);
+                p.drawPolygon(QPolygonF{tip + d * 10, tip + n * 7, tip - n * 7});
+                TopPainter::paint(p, *pull.top, now, 22, 0.3);
             }
-            TopPainter::paint(p, caster, QPointF(cx, cy), 30, 2);
-            TopPainter::paint(p, target, pulled[0], 22, 0.3);
-            TopPainter::paint(p, presets.at(2), pulled[1], 22, 1.4);
+            TopPainter::paint(p, caster, casterAt, 26, 2);
         } else { // Séisme
             for (int k = 0; k < 10; ++k) {
                 double a = k * kTau / 10, r = 30;

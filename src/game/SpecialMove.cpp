@@ -78,7 +78,7 @@ QList<SpecialMove> &SpecialMove::registry()
         vortex.range = 1.4;
         vortex.width = 0.07;
         vortex.effect = Effect::PullToCenter;
-        vortex.effectStrength = 2.0;
+        vortex.effectStrength = 0.9; // Part du chemin vers le centre (1 = jusqu'au centre).
         vortex.color = 0x8f5bff;
         list.append(vortex);
 

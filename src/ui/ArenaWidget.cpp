@@ -623,19 +623,35 @@ void ArenaWidget::paintProjectiles(QPainter &p)
             p.setBrush(Qt::NoBrush);
             p.drawEllipse(c, proj.range * s, proj.range * s);
             if (proj.move == QLatin1String("vortex")) {
-                // Bras de spirale aspirés vers le centre.
+                // Le front de l'anneau part du lanceur et touche au passage…
+                p.setBrush(Qt::NoBrush);
+                p.setPen(QPen(withAlpha(color, 0.25 * alpha), proj.width * s * 3.0));
+                p.drawEllipse(c, r, r);
+                p.setPen(QPen(withAlpha(color, alpha), 2.0));
+                p.drawEllipse(c, r, r);
+                // … et le tourbillon, au centre du stadium, y aspire les toupies touchées.
+                const QPointF hub = toScreen({0.0, 0.0});
+                const double reach = state.geometry.radius * s * 0.5;
                 for (int k = 0; k < 4; ++k) {
                     QPainterPath arm;
                     for (int i = 0; i <= 36; ++i) {
-                        const double a = k * M_PI / 2 + i * 0.14 - time * 4.0;
-                        const QPointF q = c + QPointF(std::cos(a), std::sin(a)) * r * (1.0 - i / 40.0);
+                        const double a = k * M_PI / 2 + i * 0.14 + time * 3.0;
+                        const QPointF q = hub + QPointF(std::cos(a), std::sin(a)) * reach * (1.0 - i / 40.0);
                         i == 0 ? arm.moveTo(q) : arm.lineTo(q);
                     }
-                    Theme::strokeGlow(p, arm, withAlpha(color, alpha), 2.5);
+                    Theme::strokeGlow(p, arm, withAlpha(color, 0.8 * alpha), 2.2);
+                }
+                p.setPen(Qt::NoPen);
+                for (int k = 0; k < 18; ++k) {
+                    const double f = std::fmod(time * 0.9 + k / 18.0, 1.0); // 0 dehors, 1 au centre
+                    const double a = k * 2.4 + f * 3.0 + time * 3.0;
+                    p.setBrush(withAlpha(Qt::white, alpha * (0.3 + 0.7 * f)));
+                    p.drawEllipse(hub + QPointF(std::cos(a), std::sin(a)) * reach * 1.1 * (1.0 - f),
+                                  1.5 + 1.5 * f, 1.5 + 1.5 * f);
                 }
                 p.setBrush(QColor(0, 0, 0, 200));
                 p.setPen(QPen(color, 2.0));
-                p.drawEllipse(c, r * 0.16, r * 0.16);
+                p.drawEllipse(hub, reach * 0.14, reach * 0.14);
             } else if (proj.move == QLatin1String("seisme")) {
                 // Failles qui courent jusqu'au front de l'onde.
                 for (int k = 0; k < 10; ++k) {

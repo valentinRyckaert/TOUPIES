@@ -607,8 +607,10 @@ void Battle::applySpecialHit(const Projectile &projectile, const SpecialMove &mo
     case SpecialMove::Effect::None:
         break;
     case SpecialMove::Effect::PullToCenter: {
-        const Vec2 toCenter = (-t.position).normalized();
-        t.velocity = toCenter * move.effectStrength;
+        // Juste la vitesse qui ramène la toupie au centre en roue libre (frottement
+        // visqueux : distance parcourue = vitesse / frottement), sans la projeter au-delà.
+        const double friction = std::max(0.1, m_config.friction);
+        t.velocity = -t.position * (friction * move.effectStrength);
         t.dashTimer = 0.0;
         break;
     }

@@ -65,6 +65,7 @@ private slots:
     void waveHitsTargetAndAppliesEffect_data();
     void waveHitsTargetAndAppliesEffect();
     void ringHitsEveryOpponentInRange();
+    void vortexPullsTargetToCenter();
     void disarmBlocksDash();
     void simultaneousDashesStartDuel();
     void duelMissCostsOneAndHalfDashDamage();
@@ -577,6 +578,25 @@ void TestBattle::ringHitsEveryOpponentInRange()
     QVERIFY(battle.spinner(1).isDisarmed());
     QVERIFY(battle.spinner(3).isDisarmed());
     QVERIFY(!battle.spinner(2).isDisarmed());
+}
+
+void TestBattle::vortexPullsTargetToCenter()
+{
+    // La cible, à mi-chemin du bord, est ramenée au centre sans être projetée au-delà.
+    const Top vortex = withBolt(defenseTop(), "B4");
+    BattleConfig config = staticConfig();
+    config.startOffset = 0.55;
+    Battle battle({vortex, attackTop()}, Stadium::classic(), config, 1);
+    battle.launch({0.0, 0.0});
+    battle.advance(0.01);
+    const Vec2 start = battle.spinner(1).position;
+    QVERIFY(battle.requestSpecial(0));
+    runUntil(battle, 2.0, [&] { return battle.projectiles().empty(); });
+    run(battle, 3.0);
+    const Spinner &target = battle.spinner(1);
+    QVERIFY(target.isActive());
+    QVERIFY(target.position.length() < 0.15 * start.length() + config.topRadius);
+    QVERIFY(target.position.dot(start) > 0.0); // Pas passée de l'autre côté du centre.
 }
 
 void TestBattle::disarmBlocksDash()

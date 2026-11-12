@@ -21,7 +21,7 @@ struct SpecialMove
     enum class Shape { Wave, Ring };
     enum class Effect {
         None,
-        PullToCenter, ///< Projette la cible vers le centre du stadium.
+        PullToCenter, ///< Ramène la cible vers le centre du stadium (sans le dépasser).
         Slow,         ///< Ralentit la cible et l'empêche de piloter.
         Teleport,     ///< Téléporte la cible près du bord.
         Drain,        ///< La toupie lanceuse récupère l'endurance infligée.
