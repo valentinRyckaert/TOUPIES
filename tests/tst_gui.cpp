@@ -284,6 +284,7 @@ void TestGui::soloTournamentOpensMatch()
     buttonStartingWith(setup, QStringLiteral("Lancer le tournoi"))->click();
     auto *hub = qobject_cast<TournamentPage *>(currentPage(window));
     QVERIFY(hub);
+    QVERIFY(buttonStartingWith(hub, QStringLiteral("Quitter"))); // Quitte (et sauvegarde), n'abandonne pas.
 
     // Prêt : la première manche du match du joueur s'ouvre dans l'arène.
     buttonStartingWith(hub, QStringLiteral("Prêt"))->click();

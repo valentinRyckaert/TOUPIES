@@ -2261,10 +2261,6 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>To play</translation>
     </message>
     <message>
-        <source>Abandonner</source>
-        <translation>Forfeit</translation>
-    </message>
-    <message>
         <source>Échap</source>
         <translation>Esc</translation>
     </message>
@@ -2399,6 +2395,10 @@ Download and install it? The game will restart on the new version.</translation>
     <message>
         <source>Rien à jouer pour vous dans ce tour : en attente des autres matchs…</source>
         <translation>Nothing for you to play this round: waiting for the other matches…</translation>
+    </message>
+    <message>
+        <source>Quitter</source>
+        <translation>Quit</translation>
     </message>
 </context>
 <context>

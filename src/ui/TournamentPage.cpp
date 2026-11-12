@@ -560,7 +560,7 @@ TournamentPage::TournamentPage(QWidget *parent)
     auto *root = new QVBoxLayout(this);
     root->setSpacing(22);
 
-    auto *leave = new QPushButton(tr("Abandonner"), this);
+    auto *leave = new QPushButton(tr("Quitter"), this);
     leave->setProperty("variant", QStringLiteral("ghost"));
     leave->setProperty("glyph", QStringLiteral("back"));
     leave->setProperty("key", tr("Échap"));
