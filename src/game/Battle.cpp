@@ -359,6 +359,18 @@ void Battle::applyRim(Spinner &s)
     }
     if (outward > 0.0)
         s.velocity -= normal * (outward * (1.0 + m_config.rimRestitution));
+    if (outward > m_config.rimDamageThreshold) {
+        // Percuter le rebord use un peu la rotation (la défense amortit le choc).
+        const double mitigation = std::max(
+            m_config.minReduction, 1.0 - m_config.damagePerDefense * s.stats.defense);
+        const double loss = m_config.rimDamage * outward * mitigation * stability(s);
+        s.spin -= loss;
+        ImpactEvent event;
+        event.point = s.position + normal * m_config.topRadius;
+        event.intensity = std::min(1.0, loss / 2.0);
+        event.first = event.second = -1; // Choc contre le rebord, sans adversaire.
+        m_impacts.append(event);
+    }
     s.position = m_geometry.projectInside(s.position, m_config.topRadius);
 }
 

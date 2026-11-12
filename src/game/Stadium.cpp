@@ -143,6 +143,7 @@ BattleConfig Stadium::apply(const BattleConfig &base) const
     c.orbitPerAttack *= speed;
     c.passiveBase *= enduranceDrain;
     c.damageBase *= damage;
+    c.rimDamage *= damage;
     c.knockbackBase *= knockback;
     c.knockbackPerAttack *= knockback;
     c.knockbackPerAttackerDefense *= knockback;

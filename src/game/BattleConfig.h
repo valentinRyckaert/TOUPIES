@@ -28,6 +28,11 @@ struct BattleConfig
     /// dessous, la toupie rebondit avec ce coefficient de restitution.
     double rimEscapeSpeed = 0.4223;
     double rimRestitution = 0.4;
+    /// Rebond contre le rebord : perte d'endurance = rimDamage × vitesse vers le
+    /// rebord, réduite par la défense comme un choc. En dessous de
+    /// rimDamageThreshold (toupie qui longe le bord), rien n'est perdu.
+    double rimDamage = 4.0;
+    double rimDamageThreshold = 0.08;
 
     // --- Mouvement -----------------------------------------------------------
     /// Le stadium est une cuvette : accélération vers le centre = k * distance.

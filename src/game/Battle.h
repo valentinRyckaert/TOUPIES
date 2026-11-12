@@ -79,7 +79,7 @@ struct ImpactEvent
 
     Vec2 point;
     double intensity = 0.0;
-    int first = 0;
+    int first = 0;         ///< -1 : choc contre le rebord.
     int second = 1;
     bool special = false;  ///< Touché par un coup spécial.
     unsigned color = 0;    ///< Couleur du coup spécial.

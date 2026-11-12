@@ -5,6 +5,7 @@
 
 #include <QSet>
 
+#include <memory>
 #include <random>
 #include <QTest>
 
@@ -44,6 +45,7 @@ private slots:
     void cannotDashDuringCooldown();
     void topsMoveOppositeToTheirSpin();
     void slowTopBouncesOnRim();
+    void hittingTheRimCostsEndurance();
     void fastTopIsRingedOut();
     void topWithoutEnduranceLoses();
     void simulationIsDeterministic();
@@ -165,6 +167,31 @@ void TestBattle::slowTopBouncesOnRim()
     run(battle, 1.5);
     QVERIFY(!battle.isFinished());
     QVERIFY(battle.spinner(0).position.length() <= config.stadiumRadius);
+}
+
+void TestBattle::hittingTheRimCostsEndurance()
+{
+    auto rimBattle = [](double speed) {
+        BattleConfig config;
+        config.launchSpeed = speed;
+        config.slopeStrength = config.centerPull = 0.0;
+        config.friction = 0.0;
+        config.passiveBase = 0.0; // Seul le rebord use la rotation.
+        config.orbitBase = config.orbitPerAttack = 0.0;
+        config.startOffset = config.stadiumRadius - config.topRadius - 0.01;
+        auto battle = std::make_unique<Battle>(defenseTop(), defenseTop(), config, 1);
+        battle->launch(M_PI, 0.0); // La toupie 0 fonce sur le rebord.
+        run(*battle, 1.0);
+        return battle;
+    };
+    const auto hard = rimBattle(BattleConfig{}.rimEscapeSpeed * 0.8);
+    const Spinner &hit = hard->spinner(0);
+    QVERIFY(hit.isActive());
+    QVERIFY(hit.spin < hit.maxSpin - 0.3); // Un peu d'endurance perdue…
+    QVERIFY(hit.spin > hit.maxSpin - 3.0); // … mais seulement un peu.
+    // Une toupie qui effleure le bord ne perd rien.
+    const auto soft = rimBattle(BattleConfig{}.rimDamageThreshold * 0.5);
+    QCOMPARE(soft->spinner(0).spin, soft->spinner(0).maxSpin);
 }
 
 void TestBattle::fastTopIsRingedOut()

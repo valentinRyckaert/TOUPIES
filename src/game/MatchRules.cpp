@@ -38,6 +38,7 @@ BattleConfig MatchRules::apply(const BattleConfig &base) const
 
     c.passiveBase *= wear;
     c.damageBase *= damage;
+    c.rimDamage *= damage;
     c.specialDamageScale *= damage;
     c.dashAttackMultiplier = 1.0 + (base.dashAttackMultiplier - 1.0) * dashPower;
 
