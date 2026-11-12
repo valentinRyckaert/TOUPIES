@@ -81,26 +81,17 @@ void radialFill(QPainter &p, const QPainterPath &path, QPointF c, double R,
 
 /// Projette un point d'un motif plat (dalles, rides) sur la cuvette vue de dessus, en
 /// perspective : le fond, plus loin, rapetisse et le bord, plus proche, s'élargit ; les
-/// lignes se courbent vers le centre, ce qui creuse le stadium.
-QPointF onBowl(QPointF c, double R, QPointF flat)
+/// lignes se courbent vers le centre, ce qui creuse le stadium. `depth` > 1 règle l'effet
+/// (1 : motif à plat).
+QPointF onBowl(QPointF c, double R, QPointF flat, double depth)
 {
     const QPointF d = flat - c;
     const double r = std::hypot(d.x(), d.y()) / R;
     if (r < 1e-9)
         return flat;
     constexpr double kReach = 1.1; // Rayon plat ramené sur le bord du stadium.
-    const double curved = std::pow(std::min(r, kReach) / kReach, 1.35) * 1.04;
+    const double curved = std::pow(std::min(r, kReach) / kReach, depth) * 1.04;
     return c + d * (curved / r);
-}
-
-/// Ligne plate de a à b, échantillonnée puis projetée sur la cuvette.
-void addBowlLine(QPainterPath &path, QPointF c, double R, QPointF a, QPointF b)
-{
-    constexpr int kSamples = 48;
-    for (int i = 0; i <= kSamples; ++i) {
-        const QPointF q = onBowl(c, R, a + (b - a) * (double(i) / kSamples));
-        i == 0 ? path.moveTo(q) : path.lineTo(q);
-    }
 }
 
 /// Ombrage d'une cuvette éclairée d'en haut à gauche : le versant opposé (bas-droit)
@@ -195,10 +186,11 @@ void paintConcrete(QPainter &p, const QPainterPath &floor, const StadiumGeometry
                    double scale, double R, QRandomGenerator &rng)
 {
     const QPainterPath wall = outlinePath(g, c, scale, R * 0.16);
+    // Mur du même béton que le sol, éclairé d'en haut à gauche.
     QLinearGradient wallFill(c - QPointF(R, R), c + QPointF(R, R));
-    wallFill.setColorAt(0, rgb(0x4a4e66));
-    wallFill.setColorAt(0.5, rgb(0x22253a));
-    wallFill.setColorAt(1, rgb(0x14162a));
+    wallFill.setColorAt(0, rgb(0xa9aeb6));
+    wallFill.setColorAt(0.5, rgb(0x777c86));
+    wallFill.setColorAt(1, rgb(0x464a55));
     p.fillPath(wall, wallFill);
     p.setPen(QPen(rgb(0x05040f), 2.0));
     p.drawPath(wall);
@@ -208,29 +200,46 @@ void paintConcrete(QPainter &p, const QPainterPath &floor, const StadiumGeometry
     p.setPen(stripes);
     p.drawPath(outlinePath(g, c, scale, R * 0.085));
     Theme::strokeGlow(p, outlinePath(g, c, scale, R * 0.02), rgb(0x3dff8b, 110), 1.5);
-    radialFill(p, floor, c, R, {{0.0, 0x5d6280}, {0.6, 0x2c3048}, {1.0, 0x121426}});
+    // Béton frais : gris clair, plus sombre au pied du mur.
+    radialFill(p, floor, c, R, {{0.0, 0xb4b8bf}, {0.55, 0x90959e}, {1.0, 0x4c505b}});
     p.save();
     p.setClipPath(floor);
-    // Dalles de béton qui épousent la cuvette, et poussière.
-    QPainterPath seams;
-    for (int i = -5; i <= 5; ++i) {
-        const double at = i * R * 0.25;
-        addBowlLine(seams, c, R, c + QPointF(at, -R * 1.3), c + QPointF(at, R * 1.3));
-        addBowlLine(seams, c, R, c + QPointF(-R * 1.3, at), c + QPointF(R * 1.3, at));
-    }
-    p.strokePath(seams, QPen(QColor(11, 12, 24, 150), 2.0));
-    bowlShading(p, floor, c, R);
+    // Grain : granulats clairs et sombres, à peine visibles.
     p.setPen(Qt::NoPen);
-    p.setBrush(QColor(154, 160, 192, 60));
-    for (int i = 0; i < 30; ++i) {
-        const QPointF d((rng.generateDouble() - 0.5) * 1.6, (rng.generateDouble() - 0.5) * 1.6);
-        const double s = 1.0 + rng.bounded(2.0);
-        p.drawEllipse(c + d * R, s, s);
+    for (int i = 0; i < 260; ++i) {
+        const double a = rng.bounded(kTau), r = std::sqrt(rng.bounded(1.0)) * R * 1.02;
+        p.setBrush(i % 2 ? QColor(40, 42, 50, 40 + int(rng.bounded(40)))
+                         : QColor(235, 238, 242, 30 + int(rng.bounded(40))));
+        const double size = 0.6 + rng.bounded(1.6);
+        p.drawEllipse(c + QPointF(std::cos(a), std::sin(a)) * r, size, size);
     }
+    // Quelques fissures fines, brisées, parfois ramifiées : six au hasard, puis
+    // quatre sur la moitié gauche.
+    QPainterPath cracks;
+    for (int k = 0; k < 10; ++k) {
+        const bool left = k >= 6;
+        const double a0 = left ? M_PI + (rng.generateDouble() - 0.5) * 1.4 : rng.bounded(kTau);
+        const double reach = left ? 0.4 + rng.bounded(0.45) : 0.2 + rng.bounded(0.65);
+        QPointF at = c + QPointF(std::cos(a0), std::sin(a0)) * R * reach;
+        double heading = rng.bounded(kTau);
+        cracks.moveTo(at);
+        const int segments = 4 + int(rng.bounded(4));
+        for (int i = 0; i < segments; ++i) {
+            heading += (rng.generateDouble() - 0.5) * 1.1;
+            at += QPointF(std::cos(heading), std::sin(heading)) * R * (0.04 + rng.bounded(0.05));
+            cracks.lineTo(at);
+            if (i == segments / 2 && k % 2 == 0) { // Ramification.
+                const double branch = heading + (rng.generateDouble() < 0.5 ? -0.9 : 0.9);
+                cracks.lineTo(at + QPointF(std::cos(branch), std::sin(branch)) * R * 0.06);
+                cracks.moveTo(at);
+            }
+        }
+    }
+    p.strokePath(cracks.translated(0.8, 0.8), QPen(QColor(255, 255, 255, 30), 1.0)); // Arête éclatée.
+    p.strokePath(cracks, QPen(QColor(30, 32, 40, 110), 1.0, Qt::SolidLine, Qt::RoundCap, Qt::BevelJoin));
+    bowlShading(p, floor, c, R);
     p.restore();
     p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(rgb(0x3dff8b), 2.0));
-    p.drawPolygon(regular(c, R * 0.18, 8, M_PI / 8));
     p.setPen(QPen(rgb(0x05040f), 3.0));
     p.drawPath(floor);
 }
@@ -350,7 +359,7 @@ void paintSand(QPainter &p, const QPainterPath &floor, const StadiumGeometry &g,
         for (int k = 0; k <= kSamples; ++k) {
             const double x = -R * 1.3 + k * R * 2.6 / kSamples;
             const double y = y0 + std::sin(x / R * 4.0 * M_PI + i) * R * 0.035;
-            const QPointF q = onBowl(c, R, c + QPointF(x, y));
+            const QPointF q = onBowl(c, R, c + QPointF(x, y), 1.2);
             k == 0 ? dunes.moveTo(q) : dunes.lineTo(q);
         }
     }
