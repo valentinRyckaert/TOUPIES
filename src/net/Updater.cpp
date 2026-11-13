@@ -17,7 +17,7 @@ namespace toupie::net {
 
 namespace {
 const QUrl kLatestRelease(
-    QStringLiteral("https://api.github.com/repos/valentinRyckaert/TOUPIES/releases/latest"));
+    QStringLiteral("https://api.github.com/repos/valentinRyckaert/Top-Arena/releases/latest"));
 
 QVersionNumber parseVersion(QString text)
 {

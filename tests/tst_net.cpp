@@ -559,7 +559,7 @@ void TestNet::updateIsFoundInLatestRelease()
 
     const QJsonObject release{
         {"tag_name", "v1.2.0"},
-        {"html_url", "https://github.com/valentinRyckaert/TOUPIES/releases/tag/v1.2.0"},
+        {"html_url", "https://github.com/valentinRyckaert/Top-Arena/releases/tag/v1.2.0"},
         {"assets",
          QJsonArray{QJsonObject{{"name", "ToupieArena-v1.2.0-windows-x64.zip"},
                                 {"browser_download_url", "https://example.org/win.zip"}},

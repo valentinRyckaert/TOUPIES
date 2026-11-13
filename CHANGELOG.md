@@ -10,6 +10,8 @@ Toutes les évolutions notables de Top Arena (anciennement Toupie Arena). Le for
 
 - **Le jeu s'appelle désormais Top Arena.** Les toupies sauvegardées, les paramètres et les
   mises à jour automatiques ne changent pas (identifiants et exécutable conservés).
+- **Dépôt renommé « Top-Arena »** : les mises à jour sont cherchées à la nouvelle adresse
+  (l'ancienne redirige, les versions déjà installées les trouvent aussi).
 - **Solo contre 1 à 3 bots** : avec 2 ou 3 bots, le combat est une mêlée à 3 ou 4 toupies.
   Chaque bot a sa toupie (choisie ou au hasard) ; ils partagent la difficulté.
 - **Traduction anglaise** : langue au choix dans les Paramètres (par défaut celle du système),
@@ -130,7 +132,7 @@ Première version publique.
 - **Atelier** pour assembler et enregistrer ses toupies.
 - **Paquets** Linux (AppImage), Windows (zip) et macOS (dmg) publiés par la CI.
 
-[1.2.1]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.2.0...v1.2.1
-[1.2.0]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/valentinRyckaert/TOUPIES/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/valentinRyckaert/TOUPIES/releases/tag/v1.0.0
+[1.2.1]: https://github.com/valentinRyckaert/Top-Arena/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/valentinRyckaert/Top-Arena/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/valentinRyckaert/Top-Arena/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/valentinRyckaert/Top-Arena/releases/tag/v1.0.0

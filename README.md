@@ -1,7 +1,7 @@
 # Top Arena
 
-[![CI](https://github.com/valentinRyckaert/TOUPIES/actions/workflows/ci.yml/badge.svg)](https://github.com/valentinRyckaert/TOUPIES/actions/workflows/ci.yml)
-[![Release](https://github.com/valentinRyckaert/TOUPIES/actions/workflows/release.yml/badge.svg)](https://github.com/valentinRyckaert/TOUPIES/actions/workflows/release.yml)
+[![CI](https://github.com/valentinRyckaert/Top-Arena/actions/workflows/ci.yml/badge.svg)](https://github.com/valentinRyckaert/Top-Arena/actions/workflows/ci.yml)
+[![Release](https://github.com/valentinRyckaert/Top-Arena/actions/workflows/release.yml/badge.svg)](https://github.com/valentinRyckaert/Top-Arena/actions/workflows/release.yml)
 
 Jeu de combat de toupies en 2D, vu du dessus, écrit en C++17 avec Qt 6 (Widgets).
 
