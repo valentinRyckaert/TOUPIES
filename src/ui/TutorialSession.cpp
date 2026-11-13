@@ -270,7 +270,9 @@ void TutorialSession::update(double dt)
             pause();
         break;
     case Step::Duel:
-        if (m_battle->canDash(0) && m_battle->canDash(1) && distance() < 0.7)
+        // Coup spécial retombé d'abord : il stopperait le dash qui doit provoquer le duel.
+        if (m_battle->canDash(0) && m_battle->canDash(1) && distance() < 0.7
+            && m_battle->projectiles().empty())
             pause();
         break;
     case Step::AfterDuel:

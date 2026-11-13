@@ -24,10 +24,10 @@ QList<SpecialMove> &SpecialMove::registry()
             "Anneau qui repousse violemment toutes les toupies proches : idéal pour éjecter "
             "une cible déjà au bord. Dégâts faibles, portée courte.");
         wave.shape = Shape::Ring;
-        wave.damage = 12.5;
-        wave.knockback = 1.25;
+        wave.damage = 6.0;     // Le recul fait tout : plus fort, dégâts et portée réduits.
+        wave.knockback = 1.4;
         wave.speed = 1.2;
-        wave.range = 0.75;
+        wave.range = 0.65;
         wave.width = 0.06;
         wave.color = 0x34d6ff;
         list.append(wave);
