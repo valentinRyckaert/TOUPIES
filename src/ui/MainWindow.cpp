@@ -74,7 +74,7 @@ MainWindow::MainWindow(QWidget *parent)
     backdropLayout->setContentsMargins(16, 12, 16, 12);
     m_stack = new QStackedWidget(backdrop);
     backdropLayout->addWidget(m_stack);
-    m_menu = new MenuPage(m_stack);
+    m_menu = new MenuPage(m_repository, m_stack);
     m_builder = new BuilderPage(PartCatalog::instance(), m_repository, m_stack);
     m_setup = new SetupPage(m_repository, m_stack);
     m_battle = new BattlePage(m_stack);

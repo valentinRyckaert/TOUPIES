@@ -1,6 +1,6 @@
 #include "ui/MenuPage.h"
 
-#include "core/PartCatalog.h"
+#include "core/TopRepository.h"
 #include "game/Battle.h"
 #include "game/BotController.h"
 #include "game/MatchRules.h"
@@ -96,16 +96,18 @@ protected:
     }
 };
 
-/// Démonstration en fond de menu : un vrai combat entre deux bots normaux (toupies et
-/// stadium tirés au hasard) ; dès qu'il se termine, un autre commence.
+/// Démonstration en fond de menu : un vrai combat entre deux bots normaux (deux toupies
+/// distinctes, pré-assemblées ou perso, et un stadium, tirés au hasard) ; dès qu'il se
+/// termine, un autre commence.
 /// La simulation ne tourne que menu affiché, et le stadium est mis en cache :
 /// chaque image ne redessine que les toupies et les effets du combat (BattleEffects,
 /// les mêmes qu'en jeu : coups spéciaux, étincelles des chocs et des duels).
 class BotDemo : public QWidget
 {
 public:
-    explicit BotDemo(QWidget *parent)
+    BotDemo(const TopRepository &repository, QWidget *parent)
         : QWidget(parent)
+        , m_repository(repository)
         , m_rng(std::random_device{}())
     {
         setMinimumSize(360, 360);
@@ -207,13 +209,18 @@ private:
 
     void restart()
     {
-        const QList<Top> tops = PartCatalog::instance().presets();
+        // Toutes les toupies (pré-assemblées et perso), relues à chaque combat pour
+        // inclure celles enregistrées entre-temps.
+        const QList<Top> tops = m_repository.allTops();
         const QList<Stadium> &stadiums = Stadium::all();
-        std::uniform_int_distribution<qsizetype> pickTop(0, tops.size() - 1), pickStadium(0, stadiums.size() - 1);
-        const qsizetype a = pickTop(m_rng);
-        qsizetype b = pickTop(m_rng);
-        if (b == a)
-            b = (a + 1) % tops.size();
+        // Deux toupies distinctes, toutes les paires également probables (la seconde est
+        // tirée parmi les n - 1 autres).
+        std::uniform_int_distribution<qsizetype> pickFirst(0, tops.size() - 1),
+            pickSecond(0, tops.size() - 2), pickStadium(0, stadiums.size() - 1);
+        const qsizetype a = pickFirst(m_rng);
+        qsizetype b = pickSecond(m_rng);
+        if (b >= a)
+            ++b;
         const Stadium &stadium = stadiums.at(pickStadium(m_rng));
         BattleConfig config = stadium.apply(BattleConfig{});
         config.duelMode = MatchRules{}.duelMode; // Les duels choisis dans les paramètres.
@@ -227,6 +234,7 @@ private:
         m_effects.reset();
     }
 
+    const TopRepository &m_repository;
     std::mt19937 m_rng;
     std::unique_ptr<Battle> m_battle;
     std::vector<BotController> m_bots;
@@ -240,7 +248,7 @@ private:
 
 } // namespace
 
-MenuPage::MenuPage(QWidget *parent)
+MenuPage::MenuPage(const TopRepository &repository, QWidget *parent)
     : QWidget(parent)
 {
     auto *root = new QHBoxLayout(this);
@@ -248,7 +256,7 @@ MenuPage::MenuPage(QWidget *parent)
     auto *column = new QVBoxLayout;
     column->setSpacing(12);
     root->addLayout(column, 0);
-    root->addWidget(new BotDemo(this), 1);
+    root->addWidget(new BotDemo(repository, this), 1);
 
     column->addStretch(1);
     column->addWidget(new LogoWidget(this));
