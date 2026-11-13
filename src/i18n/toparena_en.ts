@@ -416,14 +416,6 @@
         <translation>Highest stat: %1 %2</translation>
     </message>
     <message>
-        <source>Budget</source>
-        <translation>Budget</translation>
-    </message>
-    <message>
-        <source>%1 / %2 PTS</source>
-        <translation>%1 / %2 PTS</translation>
-    </message>
-    <message>
         <source>Menu</source>
         <translation>Menu</translation>
     </message>

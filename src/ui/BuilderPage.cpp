@@ -518,7 +518,7 @@ private:
     int m_timer = 0;
 };
 
-// --- Statistiques : radar, type obtenu, barres et budget --------------------------
+// --- Statistiques : radar, type obtenu et barres ---------------------------------
 
 class BuildStats : public QWidget
 {
@@ -548,7 +548,7 @@ protected:
                                   TopPainter::typeColor(TopType::Endurance)};
         const QColor type = TopPainter::typeColor(m_top.type());
         const double w = width();
-        constexpr double kBottom = 310; // Type, trois barres et budget.
+        constexpr double kBottom = 256; // Type et trois barres.
 
         // Le radar occupe 1,5 R plus ses étiquettes (≈ 92 px) au-dessus du bloc du bas.
         const double R = std::min({175.0, (height() - kBottom - 92) / 1.5, (w - 120) / 1.75});
@@ -608,16 +608,6 @@ protected:
             Theme::paintStatBar(p, QRectF(0, y, w, 36), labels[i], values[i], maxStat(), colors[i]);
             y += 48;
         }
-        const int budget = PartCatalog::budget(PartKind::Wheel) + PartCatalog::budget(PartKind::Middle)
-                         + PartCatalog::budget(PartKind::Tip);
-        p.setFont(smallCaps());
-        p.setPen(Theme::kMuted);
-        p.drawText(QRectF(0, y, w, 20), Qt::AlignLeft | Qt::AlignVCenter, BuilderPage::tr("Budget"));
-        p.setFont(Theme::displayFont(16));
-        p.setPen(Theme::kAccent);
-        p.drawText(QRectF(0, y, w, 20), Qt::AlignRight | Qt::AlignVCenter,
-                   BuilderPage::tr("%1 / %2 PTS").arg(st.total()).arg(budget));
-        Theme::paintStatBar(p, QRectF(0, y + 26, w, 8), QString(), st.total(), budget, Theme::kAccent);
     }
 
 private:
