@@ -3,9 +3,11 @@
 #include "game/MatchRules.h"
 #include "ui/Theme.h"
 
+#include "ui/Audio.h"
 #include "ui/Controls.h"
 #include "ui/Language.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QMessageBox>
 
@@ -16,6 +18,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QSettings>
+#include <QSlider>
 #include <QVBoxLayout>
 
 #include <functional>
@@ -115,6 +118,41 @@ SettingsPage::SettingsPage(QWidget *parent)
         Language::setCurrent(code);
         emit restartRequested();
     });
+
+    // --- Son : chaque musique et les effets s'activent et se règlent séparément -------
+    auto *soundBox = new QGroupBox(tr("Son"), this);
+    auto *soundGrid = new QGridLayout(soundBox);
+    const std::pair<Audio::Channel, QString> channels[] = {
+        {Audio::MenuMusic, tr("Musique des menus")},
+        {Audio::BattleMusic, tr("Musique des combats")},
+        {Audio::Effects, tr("Effets sonores")},
+    };
+    for (int row = 0; row < Audio::kChannels; ++row) {
+        const Audio::Channel channel = channels[row].first;
+        auto *enabled = new QCheckBox(channels[row].second, soundBox);
+        enabled->setChecked(Audio::instance().isEnabled(channel));
+        auto *slider = new QSlider(Qt::Horizontal, soundBox);
+        slider->setRange(0, 100);
+        slider->setValue(Audio::instance().volume(channel));
+        slider->setEnabled(enabled->isChecked());
+        auto *value = new QLabel(tr("%1 %").arg(slider->value()), soundBox);
+        value->setMinimumWidth(50);
+        soundGrid->addWidget(enabled, row, 0);
+        soundGrid->addWidget(slider, row, 1);
+        soundGrid->addWidget(value, row, 2);
+        connect(enabled, &QCheckBox::toggled, this, [channel, slider](bool on) {
+            Audio::instance().setEnabled(channel, on);
+            slider->setEnabled(on);
+        });
+        connect(slider, &QSlider::valueChanged, this, [channel, value](int percent) {
+            Audio::instance().setVolume(channel, percent);
+            value->setText(tr("%1 %").arg(percent));
+        });
+        if (channel == Audio::Effects) // Aperçu du volume des effets.
+            connect(slider, &QSlider::sliderReleased, this, [] { Audio::instance().play({Sfx::Hit}); });
+    }
+    soundGrid->setColumnStretch(1, 1);
+    root->addWidget(soundBox);
 
     // --- Duels : préférence globale, valeur par défaut des règles de partie ------------
     auto *duelBox = new QGroupBox(tr("Duels"), this);

@@ -60,6 +60,8 @@ target_link_libraries(toupie_net PUBLIC toupie_core Qt6::Network)
 add_library(toupie_ui STATIC
     ui/Theme.h
     ui/Theme.cpp
+    ui/Audio.h
+    ui/Audio.cpp
     ui/Language.h
     ui/Language.cpp
     ui/Widgets.h
@@ -107,7 +109,7 @@ add_library(toupie_ui STATIC
     ui/MainWindow.h
     ui/MainWindow.cpp
 )
-target_link_libraries(toupie_ui PUBLIC toupie_net Qt6::Widgets)
+target_link_libraries(toupie_ui PUBLIC toupie_net Qt6::Widgets Qt6::Multimedia)
 # Traductions (le français est la langue source). Après un changement de textes :
 #   lupdate src -ts src/i18n/toparena_en.ts -locations none
 find_package(Qt6 REQUIRED COMPONENTS LinguistTools)
@@ -126,6 +128,36 @@ qt_add_resources(toupie_ui "fonts"
         ui/fonts/Rajdhani-Medium.ttf
         ui/fonts/Rajdhani-SemiBold.ttf
         ui/fonts/Rajdhani-Bold.ttf
+)
+
+# Musiques (16 bits) et effets sonores (générés par tools/make_sounds.py)
+qt_add_resources(toupie_ui "audio"
+    PREFIX "/audio"
+    BASE audio
+    BIG_RESOURCES
+    FILES
+        audio/menu.wav
+        audio/battle.wav
+        audio/click.wav
+        audio/countdown.wav
+        audio/go.wav
+        audio/hit.wav
+        audio/wall.wav
+        audio/dash.wav
+        audio/duel_start.wav
+        audio/duel_press.wav
+        audio/duel_win.wav
+        audio/duel_lose.wav
+        audio/ejection.wav
+        audio/victory.wav
+        audio/defeat.wav
+        audio/special_onde.wav
+        audio/special_lance.wav
+        audio/special_givre.wav
+        audio/special_vortex.wav
+        audio/special_distorsion.wav
+        audio/special_siphon.wav
+        audio/special_seisme.wav
 )
 
 # Application. Exécutable, identifiants et dossier de données gardent leur nom

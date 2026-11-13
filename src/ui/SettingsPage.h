@@ -12,7 +12,7 @@ class QPushButton;
 
 namespace toupie {
 
-/// Paramètres : langue du jeu, touches du clavier et boutons de la souris
+/// Paramètres : langue du jeu, son (musiques, effets), touches du clavier et boutons de la souris
 /// associés à chaque action (cliquer sur une case puis appuyer sur la touche voulue).
 class SettingsPage : public QWidget
 {

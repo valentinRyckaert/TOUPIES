@@ -10,6 +10,12 @@ Toutes les évolutions notables de Top Arena (anciennement Toupie Arena). Le for
 
 - **Le jeu s'appelle désormais Top Arena.** Les toupies sauvegardées, les paramètres et les
   mises à jour automatiques ne changent pas (identifiants et exécutable conservés).
+- **Musique et effets sonores** : une boucle musicale sur les menus et une autre pendant les
+  combats (coupée à la fin de la partie, écran de résultat sans musique). Effets pour les
+  boutons, le compte à rebours, les chocs (selon leur violence) et le rebord, le dash, les
+  duels (début, appui réussi, gagné, perdu), les éjections, la victoire et la défaite, et un
+  son par coup spécial. Dans les Paramètres, la musique des menus, celle des combats et les
+  effets s'activent et se règlent séparément.
 - **Dépôt renommé « Top-Arena »** : les mises à jour sont cherchées à la nouvelle adresse
   (l'ancienne redirige, les versions déjà installées les trouvent aussi).
 - **Solo contre 1 à 3 bots** : avec 2 ou 3 bots, le combat est une mêlée à 3 ou 4 toupies.

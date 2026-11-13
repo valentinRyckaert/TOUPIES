@@ -1,6 +1,7 @@
 #pragma once
 
 #include "session/MatchSession.h"
+#include "ui/Audio.h"
 #include "ui/BattleEffects.h"
 
 #include <QElapsedTimer>
@@ -104,6 +105,7 @@ private:
     double m_flash = 0.0;
 
     BattleEffects m_effects; ///< Étincelles, traînées et coups spéciaux.
+    BattleSounds m_sounds;
     QString m_duelResult;      ///< Bandeau de fin de duel.
     QColor m_duelResultColor;
     double m_duelResultTimer = 0.0;

@@ -20,8 +20,12 @@ Fonctionnalités :
 - **Duels** : deux toupies qui dashent l'une vers l'autre au même moment s'affrontent dans un
   duel de timing.
 - **Tutoriel** : un combat scénarisé qui présente chaque action pas à pas.
-- **Paramètres et aide** : langue du jeu (français ou anglais), touches du clavier et boutons
-  de la souris configurables, et page d'aide qui récapitule les commandes.
+- **Paramètres et aide** : langue du jeu (français ou anglais), son (musique des menus,
+  musique des combats et effets sonores, activables et réglables séparément), touches du
+  clavier et boutons de la souris configurables, et page d'aide qui récapitule les commandes.
+- **Musique et effets sonores** : une boucle pour les menus, une autre pendant les combats
+  (coupée à la fin de la partie) ; sons des boutons, du compte à rebours, des chocs, du dash,
+  des duels, des éjections, de la victoire et de la défaite, et un son par coup spécial.
 - **Charte « Holo Combat »** : reflets holographiques bleu / violet, vert fluo pour les actions
   et coins coupés ; chaque roue a sa silhouette, chaque stadium sa matière et chaque coup
   spécial son effet visuel. Maquettes de référence dans [`design/`](design/README.md).
@@ -35,8 +39,8 @@ Fonctionnalités :
 ## Compilation
 
 Prérequis : CMake ≥ 3.21, un compilateur C++17, Qt ≥ 6.4 (modules Core, Gui, Network,
-Widgets, Test et les outils Linguist ; sous Ubuntu : `qt6-base-dev`, `qt6-tools-dev`,
-`qt6-tools-dev-tools`, `qt6-l10n-tools`).
+Widgets, Multimedia, Test et les outils Linguist ; sous Ubuntu : `qt6-base-dev`,
+`qt6-multimedia-dev`, `qt6-tools-dev`, `qt6-tools-dev-tools`, `qt6-l10n-tools`).
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -66,6 +70,17 @@ Les toupies assemblées sont enregistrées en JSON dans le dossier de données d
 (`~/.local/share/ToupieArena/ToupieArena/tops.json` sous Linux). Ce dossier, l'exécutable
 (`toupie_arena`) et les identifiants internes gardent l'ancien nom du jeu, pour conserver les
 toupies et les paramètres et pour que les mises à jour automatiques continuent de fonctionner.
+
+### Sons
+
+Les musiques (`src/audio/menu.wav`, `src/audio/battle.wav`, WAV 16 bits) et les effets
+sonores sont compilés dans l'exécutable. Les effets sont synthétisés par
+`tools/make_sounds.py` (Python, bibliothèque standard seule : sons originaux, sans licence) ;
+après avoir modifié un réglage du script :
+
+```sh
+python3 tools/make_sounds.py   # réécrit les effets dans src/audio/
+```
 
 ## Commandes
 
@@ -412,12 +427,13 @@ src/
             (directeur du tournoi en solo ou chez l'hôte, suivi chez les clients)
   ui/       interface (bibliothèque toupie_ui) : MainWindow et pages, ArenaWidget,
             RulesWidget, TournamentSettingsWidget, Controls (touches), StadiumPainter, StatsWidget,
-            TopPainter, Theme
+            TopPainter, Theme, Audio (musiques, effets et réglages ; BattleSounds : sons d'un combat)
+  audio/    musiques et effets sonores (WAV)
   main.cpp  exécutable toupie_arena
 tests/      Qt Test : modèle, moteur, réseau, interface
-tools/      simulateur d'équilibrage
+tools/      simulateur d'équilibrage, générateur des effets sonores (make_sounds.py)
 packaging/  fichier .desktop et icône
 ```
 
 `toupie_core` (modèle, moteur, sessions) ne dépend que de Qt Core, `toupie_net` ajoute
-Qt Network et `toupie_ui` Qt Widgets.
+Qt Network et `toupie_ui` Qt Widgets et Qt Multimedia.

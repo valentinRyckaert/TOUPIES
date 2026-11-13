@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Network Widgets)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Network Widgets Multimedia)
 qt_standard_project_setup()
 
 # shortcut: Qt 6.8.3 lie encore le framework AGL, absent des SDK macOS récents

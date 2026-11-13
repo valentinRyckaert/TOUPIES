@@ -105,6 +105,7 @@ void ArenaWidget::setSession(MatchSession *session)
 void ArenaWidget::resetVisuals()
 {
     m_effects.reset();
+    m_sounds.reset();
     m_duelResultTimer = 0.0;
     m_flash = 0.0;
     m_lastPhase = MatchPhase::Aiming;
@@ -143,6 +144,11 @@ void ArenaWidget::tick()
     const QList<ImpactEvent> impacts = m_session->takeImpacts();
     m_effects.update(dt, impacts, state.spinners, state.duel, state.phase == MatchPhase::Fighting);
     const int local = m_session->localPlayer();
+    // Musique de combat jusqu'à la fin de la partie ; écran de fin sans musique.
+    Audio &audio = Audio::instance();
+    audio.setMusic(state.phase == MatchPhase::Finished ? Audio::Music::None : Audio::Music::Battle);
+    for (const SoundCue &cue : m_sounds.update(state, impacts, local))
+        audio.play(cue);
     for (const ImpactEvent &impact : impacts) {
         if (impact.duelLoser == ImpactEvent::kNoDuel)
             continue;

@@ -5,6 +5,7 @@
 #include "net/TournamentSession.h"
 #include "net/Updater.h"
 #include "session/LocalSession.h"
+#include "ui/Audio.h"
 #include "ui/BattlePage.h"
 #include "ui/BuilderPage.h"
 #include "ui/LanMenuPage.h"
@@ -371,8 +372,10 @@ void MainWindow::showPage(QWidget *page)
 {
     if (page != m_lanMenu)
         m_lanMenu->deactivate();
-    if (page != m_battle)
+    if (page != m_battle) {
         m_battle->stop();
+        Audio::instance().setMusic(Audio::Music::Menu); // Combat : l'arène choisit la musique.
+    }
     m_stack->setCurrentWidget(page);
 }
 

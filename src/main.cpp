@@ -1,3 +1,4 @@
+#include "ui/Audio.h"
 #include "ui/Language.h"
 #include "ui/MainWindow.h"
 #include "ui/SettingsPage.h"
@@ -20,6 +21,9 @@ int main(int argc, char *argv[])
     toupie::Language::install(app);
     toupie::Theme::apply(app);
     toupie::SettingsPage::loadPreferences(); // Type de duel par défaut.
+
+    app.installEventFilter(&toupie::Audio::instance()); // Clic des boutons.
+    toupie::Audio::instance().setMusic(toupie::Audio::Music::Menu);
 
     toupie::MainWindow window;
     window.showFullScreen(); // F11 : fenêtré / plein écran.

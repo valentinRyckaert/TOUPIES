@@ -1742,6 +1742,26 @@ Download and install it? The game will restart on the new version.</translation>
         <translation>Restart the game now to switch to %1?</translation>
     </message>
     <message>
+        <source>Son</source>
+        <translation>Sound</translation>
+    </message>
+    <message>
+        <source>Musique des menus</source>
+        <translation>Menu music</translation>
+    </message>
+    <message>
+        <source>Musique des combats</source>
+        <translation>Battle music</translation>
+    </message>
+    <message>
+        <source>Effets sonores</source>
+        <translation>Sound effects</translation>
+    </message>
+    <message>
+        <source>%1 %</source>
+        <translation>%1%</translation>
+    </message>
+    <message>
         <source>Duels</source>
         <translation>Duels</translation>
     </message>

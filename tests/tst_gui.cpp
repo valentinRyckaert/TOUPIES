@@ -5,6 +5,7 @@
 #include "core/TopRepository.h"
 #include "game/Tournament.h"
 #include "ui/ArenaWidget.h"
+#include "ui/Audio.h"
 #include "ui/BattlePage.h"
 #include "ui/BuilderPage.h"
 #include "ui/Controls.h"
@@ -24,9 +25,13 @@
 #include "ui/TournamentSetupPage.h"
 #include "ui/TutorialSession.h"
 
+#include <QSlider>
 #include <QSpinBox>
 
 #include <QApplication>
+#include <QCheckBox>
+#include <QFile>
+#include <QSettings>
 #include <QComboBox>
 #include <QLineEdit>
 #include <QPushButton>
@@ -72,6 +77,8 @@ private slots:
     void reboundKeyIsUsedInBattle();
     void tutorialWalksThroughEveryAction();
     void englishTranslationKeepsGameName();
+    void soundsExistAndFollowTheBattle();
+    void soundSettingsAreSaved();
 };
 
 void TestGui::initTestCase()
@@ -82,6 +89,8 @@ void TestGui::initTestCase()
     QCoreApplication::setApplicationName(QStringLiteral("ToupieArenaTests"));
     QFile::remove(TopRepository::defaultFilePath());
     Controls::instance().reset(); // Touches par défaut, quoi qu'ait laissé un essai précédent.
+    for (int c = 0; c < Audio::kChannels; ++c) // Tests silencieux.
+        Audio::instance().setEnabled(static_cast<Audio::Channel>(c), false);
     Theme::apply(*qApp);
 }
 
@@ -532,6 +541,87 @@ void TestGui::englishTranslationKeepsGameName()
     Language::setCurrent(QStringLiteral("fr"));
     Language::install(*qApp);
     QCOMPARE(toString(TopType::Endurance), QStringLiteral("Endurance"));
+}
+
+void TestGui::soundsExistAndFollowTheBattle()
+{
+    const auto exists = [](const SoundCue &cue) { // Présent et au format du mélangeur des effets.
+        return !Audio::loadPcm(QStringLiteral(":/audio/%1.wav").arg(Audio::fileName(cue))).isEmpty();
+    };
+    for (int s = 0; s < static_cast<int>(Sfx::Special); ++s)
+        QVERIFY2(exists(static_cast<Sfx>(s)), qPrintable(Audio::fileName(static_cast<Sfx>(s))));
+    for (const SpecialMove &move : SpecialMove::all())
+        QVERIFY2(exists({Sfx::Special, 1.0, move.id}), qPrintable(move.id));
+    QVERIFY(QFile::exists(QStringLiteral(":/audio/menu.wav")));
+    QVERIFY(QFile::exists(QStringLiteral(":/audio/battle.wav")));
+    QVERIFY(Audio::loadPcm(QStringLiteral(":/audio/menu.wav")).isEmpty()); // Stéréo : refusée.
+
+    MatchState state;
+    state.spinners.resize(2);
+    BattleSounds sounds;
+    const auto play = [&](const QList<ImpactEvent> &impacts = {}) {
+        QList<Sfx> out;
+        for (const SoundCue &cue : sounds.update(state, impacts, 0))
+            out.append(cue.sfx);
+        return out;
+    };
+    QVERIFY(play().isEmpty()); // Point de départ : aucun son.
+    state.phase = MatchPhase::Countdown;
+    state.countdown = 2.7;
+    QVERIFY(play() == QList<Sfx>{Sfx::Countdown});
+    state.countdown = 2.2;
+    QVERIFY(play().isEmpty());
+    state.countdown = 1.9;
+    QVERIFY(play() == QList<Sfx>{Sfx::Countdown});
+    state.phase = MatchPhase::Fighting;
+    QVERIFY(play() == QList<Sfx>{Sfx::Go});
+
+    ImpactEvent hit;
+    hit.intensity = 0.5;
+    ImpactEvent graze; // Frôlement du rebord : silencieux.
+    graze.first = -1;
+    graze.intensity = 0.01;
+    state.spinners[1].dashTimer = 0.3;
+    state.spinners[1].specialUsed = true;
+    const QList<SoundCue> cues = sounds.update(state, {hit, graze}, 0);
+    QCOMPARE(cues.size(), 3);
+    QVERIFY(cues[0].sfx == Sfx::Hit && cues[1].sfx == Sfx::Dash && cues[2].sfx == Sfx::Special);
+    QCOMPARE(cues[2].special, state.spinners[1].top.special());
+    QVERIFY(play().isEmpty()); // Rien ne se répète tant que l'état ne change pas.
+
+    state.duel.active = true;
+    state.duel.first = 0;
+    state.duel.second = 1;
+    state.duel.sides[0].zone = 0.5;
+    QVERIFY(play() == QList<Sfx>{Sfx::DuelStart});
+    state.duel.sides[0].zone = 0.4; // Appui réussi : la zone rétrécit.
+    QVERIFY(play() == QList<Sfx>{Sfx::DuelPress});
+    ImpactEvent duelEnd;
+    duelEnd.duelLoser = 1;
+    state.duel.active = false;
+    QVERIFY(play({duelEnd}) == QList<Sfx>{Sfx::DuelWin});
+
+    state.spinners[1].status = Spinner::Status::RingOut;
+    state.phase = MatchPhase::Finished;
+    state.winner = 0;
+    QVERIFY(play() == (QList<Sfx>{Sfx::Victory, Sfx::Ejection}));
+}
+
+void TestGui::soundSettingsAreSaved()
+{
+    SettingsPage page;
+    auto *effects = page.findChildren<QSlider *>().value(Audio::Effects);
+    QVERIFY(effects && !effects->isEnabled()); // Coupés par initTestCase.
+    const QList<QCheckBox *> boxes = page.findChildren<QCheckBox *>();
+    QCOMPARE(boxes.size(), Audio::kChannels);
+    boxes[Audio::Effects]->setChecked(true);
+    QVERIFY(effects->isEnabled());
+    effects->setValue(35);
+    QVERIFY(Audio::instance().isEnabled(Audio::Effects));
+    QCOMPARE(Audio::instance().volume(Audio::Effects), 35);
+    QCOMPARE(QSettings().value(QStringLiteral("audio/effects/volume")).toInt(), 35);
+    QVERIFY(!Audio::instance().isEnabled(Audio::MenuMusic));
+    boxes[Audio::Effects]->setChecked(false);
 }
 
 QTEST_MAIN(TestGui)
