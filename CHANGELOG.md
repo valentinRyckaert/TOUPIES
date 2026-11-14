@@ -35,6 +35,8 @@ Toutes les évolutions notables de Top Arena (anciennement Toupie Arena). Le for
 - **Vortex** : l'anneau balaie tout le stadium (portée 2,2, plus rapide) et aspire vraiment ses
   cibles pendant 0,9 s, jusqu'au centre sans le dépasser ; elles ne peuvent pas dasher pendant
   l'aspiration. 20 dégâts (au lieu de 17).
+- **Onde de choc** : recul plus fort (1,4 au lieu de 1,25), dégâts réduits (6 au lieu de 12,5)
+  et portée un peu plus courte (0,65 au lieu de 0,75) : c'est un coup qui éjecte, pas qui use.
 - **Rebord** : le percuter fait perdre un peu d'endurance (selon la vitesse, amorti par la
   défense), en jetant des étincelles ; le longer ne coûte rien.
 - Le combat de bots du menu affiche les mêmes effets qu'en jeu (coups spéciaux, étincelles des
@@ -46,6 +48,9 @@ Toutes les évolutions notables de Top Arena (anciennement Toupie Arena). Le for
 
 - Le Vortex projetait ses cibles de l'autre côté du stadium, parfois dehors, au lieu de les
   ramener au centre.
+- Les coups spéciaux ne repoussaient pas une toupie en plein dash (le dash effaçait le recul),
+  et une toupie qui fonçait sur le lanceur amortissait le recul de sa propre vitesse. Le choc
+  stoppe désormais son élan vers le lanceur avant de la repousser.
 
 ## [1.2.1] — 2026-11-05
 

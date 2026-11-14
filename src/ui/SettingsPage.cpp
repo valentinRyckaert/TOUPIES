@@ -99,6 +99,7 @@ SettingsPage::SettingsPage(QWidget *parent)
         m_language->addItem(Language::nativeName(code), code);
     m_language->setCurrentIndex(m_language->findData(Language::current()));
     m_language->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_language->setMinimumWidth(150); // Le style (gras, marges) élargit le texte : comme Duels.
     languageRow->addWidget(m_language);
     auto *languageHint = new QLabel(tr("Le jeu redémarre pour changer de langue."), languageBox);
     languageHint->setObjectName(QStringLiteral("hint"));

@@ -620,6 +620,12 @@ void Battle::applySpecialHit(const Projectile &projectile, const SpecialMove &mo
 
     const Vec2 direction = projectile.ring ? (t.position - projectile.origin).normalized()
                                            : projectile.direction;
+    // Le choc stoppe l'élan de la cible vers le lanceur, dash compris : un dash en cours
+    // réimposait sa vitesse à chaque pas et effaçait le recul.
+    t.dashTimer = 0.0;
+    const double approach = t.velocity.dot(direction);
+    if (approach < 0.0)
+        t.velocity -= direction * approach;
     const double resistance = std::max(
         m_config.minReduction, 1.0 - m_config.knockbackPerDefense * t.stats.defense);
     t.velocity += direction * (move.knockback * m_config.specialKnockbackScale * resistance
@@ -634,12 +640,10 @@ void Battle::applySpecialHit(const Projectile &projectile, const SpecialMove &mo
         t.pullTimer = move.effectDuration;
         t.pullRate = move.effectStrength;
         t.velocity = -t.position * move.effectStrength;
-        t.dashTimer = 0.0;
         break;
     case SpecialMove::Effect::Slow:
         t.slowTimer = move.effectDuration;
         t.slowStrength = move.effectStrength;
-        t.dashTimer = 0.0;
         break;
     case SpecialMove::Effect::Teleport: {
         // Point aléatoire au niveau voulu (toutes les formes sont homogènes).
@@ -648,7 +652,6 @@ void Battle::applySpecialHit(const Projectile &projectile, const SpecialMove &mo
         const double level = std::max(1e-6, m_geometry.level(dir));
         t.position = dir * (move.effectStrength / level);
         t.velocity = dir * (move.knockback * m_config.specialKnockbackScale);
-        t.dashTimer = 0.0;
         t.escaping = false;
         break;
     }
@@ -658,7 +661,6 @@ void Battle::applySpecialHit(const Projectile &projectile, const SpecialMove &mo
         break;
     case SpecialMove::Effect::Disarm:
         t.disarmTimer = move.effectDuration;
-        t.dashTimer = 0.0;
         break;
     }
 

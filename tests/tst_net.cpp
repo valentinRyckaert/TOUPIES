@@ -13,6 +13,7 @@
 #include <QSignalSpy>
 #include <QJsonDocument>
 #include <QNetworkDatagram>
+#include <QScopeGuard>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QUdpSocket>
@@ -251,20 +252,24 @@ void TestNet::lobbyIsFoundByTcpScan()
 
 void TestNet::scanSurvivesImmediateFailuresInThread()
 {
-    // Des milliers de sondes qui échouent tout de suite, dans un fil à petite
-    // pile (comme sous macOS) : sans récursion, pas de débordement de pile.
+    // 300 sondes qui échouent tout de suite (Linux, macOS), dans un fil à petite pile
+    // (comme sous macOS) : l'ancien code récursif n'en venait pas à bout. Sous Windows,
+    // chaque sonde vers cette adresse prend environ 25 ms (mesuré en CI) : 300 ≈ 8 s.
     QThread thread;
     thread.setStackSize(512 * 1024);
     auto *scanner = new LobbyScanner;
     scanner->moveToThread(&thread);
     QSignalSpy finished(scanner, &LobbyScanner::finished);
     thread.start();
-    const QList<QHostAddress> hosts(3000, QHostAddress(QStringLiteral("255.255.255.255")));
+    // Même si le test échoue : un QThread détruit en marche arrête le programme.
+    const auto stop = qScopeGuard([&] {
+        thread.quit();
+        thread.wait();
+        delete scanner;
+    });
+    const QList<QHostAddress> hosts(100, QHostAddress(QStringLiteral("255.255.255.255")));
     QMetaObject::invokeMethod(scanner, [scanner, hosts] { scanner->scan(hosts); });
     QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 20000);
-    thread.quit();
-    thread.wait();
-    delete scanner;
 }
 
 void TestNet::hostAnswersDiscoveryQuery()

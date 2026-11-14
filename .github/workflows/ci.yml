@@ -129,6 +129,24 @@ jobs:
             echo "::endgroup::"
           done
 
+      # Un test qui s'arrête sans rien afficher sous Windows : sa sortie, détaillée, va
+      # dans un fichier (pas la console), pour voir la dernière fonction commencée.
+      - name: Détail des tests en cas d'échec (Windows)
+        if: failure() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($t in Get-ChildItem build -Recurse -File -Filter "tst_*.exe") {
+            Write-Output "::group::$($t.Name)"
+            $log = "$($t.BaseName).log"
+            & $t.FullName -v2 -o "$log,txt"
+            Write-Output "code de sortie : $LASTEXITCODE"
+            if (Test-Path $log) {
+              Select-String -Path $log -Pattern 'FAIL!|QWARN|QFATAL' -Context 2,4 | ForEach-Object { $_.ToString() }
+              Get-Content $log | Select-Object -Last 15
+            }
+            Write-Output "::endgroup::"
+          }
+
       - name: Archive du binaire
         uses: actions/upload-artifact@v4
         with:

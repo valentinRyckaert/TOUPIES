@@ -69,6 +69,7 @@ private slots:
     void ringHitsEveryOpponentInRange();
     void vortexPullsTargetToCenter();
     void disarmBlocksDash();
+    void specialHitStopsADashingTarget();
     void simultaneousDashesStartDuel();
     void duelMissCostsOneAndHalfDashDamage();
     void duelDrawAfterFinalStreak();
@@ -643,6 +644,31 @@ void TestBattle::disarmBlocksDash()
     QVERIFY(battle.spinner(1).isDisarmed());
     QVERIFY(!battle.canDash(1));
     QVERIFY(!battle.canSpecial(1));
+}
+
+void TestBattle::specialHitStopsADashingTarget()
+{
+    // Cible qui fonce sur le lanceur : l'onde de choc la repousse quand même (le dash en
+    // cours effaçait le recul à chaque pas).
+    const Top wave = withBolt(attackTop(), "B1");
+    BattleConfig config = staticConfig();
+    config.startOffset = 0.2;
+    Battle battle({wave, enduranceTop()}, Stadium::classic(), config, 1);
+    battle.launch({0.0, 0.0});
+    battle.advance(0.01);
+    QVERIFY(battle.requestSpecial(0));
+    QVERIFY(battle.requestDash(1, 0));
+    bool hit = false;
+    runUntil(battle, 1.0, [&] {
+        for (const ImpactEvent &impact : battle.takeImpacts())
+            hit = hit || impact.special;
+        return hit;
+    });
+    QVERIFY(hit);
+    const Spinner &target = battle.spinner(1);
+    const Vec2 away = (target.position - battle.spinner(0).position).normalized();
+    QVERIFY(!target.isDashing());
+    QVERIFY(target.velocity.dot(away) > 0.5); // Repoussée, pas seulement freinée.
 }
 
 namespace {
