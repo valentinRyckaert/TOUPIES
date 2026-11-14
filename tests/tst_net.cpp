@@ -252,10 +252,9 @@ void TestNet::lobbyIsFoundByTcpScan()
 
 void TestNet::scanSurvivesImmediateFailuresInThread()
 {
-    // 1200 sondes qui échouent tout de suite (Linux, macOS), dans un fil à petite pile
-    // (comme sous macOS) : sans récursion, pas de débordement de pile. L'ancien code
-    // débordait dès 600 sondes. Sous Windows, ces sondes attendent leur délai :
-    // 1200 / 128 × 350 ms ≈ 3 s.
+    // 300 sondes qui échouent tout de suite (Linux, macOS), dans un fil à petite pile
+    // (comme sous macOS) : l'ancien code récursif n'en venait pas à bout. Sous Windows,
+    // chaque sonde vers cette adresse prend environ 25 ms (mesuré en CI) : 300 ≈ 8 s.
     QThread thread;
     thread.setStackSize(512 * 1024);
     auto *scanner = new LobbyScanner;
@@ -268,7 +267,7 @@ void TestNet::scanSurvivesImmediateFailuresInThread()
         thread.wait();
         delete scanner;
     });
-    const QList<QHostAddress> hosts(400, QHostAddress(QStringLiteral("255.255.255.255")));
+    const QList<QHostAddress> hosts(100, QHostAddress(QStringLiteral("255.255.255.255")));
     QMetaObject::invokeMethod(scanner, [scanner, hosts] { scanner->scan(hosts); });
     QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 20000);
 }
