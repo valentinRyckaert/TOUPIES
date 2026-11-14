@@ -139,7 +139,10 @@ jobs:
             $log = "$($t.BaseName).log"
             & $t.FullName -v2 -o "$log,txt"
             Write-Output "code de sortie : $LASTEXITCODE"
-            if (Test-Path $log) { Get-Content $log | Select-Object -Last 60 }
+            if (Test-Path $log) {
+              Select-String -Path $log -Pattern 'FAIL!|QWARN|QFATAL' -Context 2,4 | ForEach-Object { $_.ToString() }
+              Get-Content $log | Select-Object -Last 15
+            }
             Write-Output "::endgroup::"
           }
 
