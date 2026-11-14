@@ -6,45 +6,103 @@ Toutes les évolutions notables de Top Arena (anciennement Toupie Arena). Le for
 
 ## [Non publié]
 
+## [2.0.0] — 2026-11-14
+
+Toupie Arena devient **Top Arena** : refonte visuelle complète « Holo Combat », mêlées contre
+plusieurs bots, traduction anglaise, trois types de duel, tournois sauvegardés et coups
+spéciaux rééquilibrés. Les toupies enregistrées, les paramètres et les mises à jour
+automatiques des versions 1.x sont conservés.
+
 ### Nouveautés
 
-- **Le jeu s'appelle désormais Top Arena.** Les toupies sauvegardées, les paramètres et les
-  mises à jour automatiques ne changent pas (identifiants et exécutable conservés).
-- **Dépôt renommé « Top-Arena »** : les mises à jour sont cherchées à la nouvelle adresse
-  (l'ancienne redirige, les versions déjà installées les trouvent aussi).
-- **Solo contre 1 à 3 bots** : avec 2 ou 3 bots, le combat est une mêlée à 3 ou 4 toupies.
+- **Le jeu s'appelle désormais Top Arena** et son dépôt **Top-Arena**. Les identifiants internes,
+  l'exécutable (`toupie_arena`) et le dossier de données ne changent pas : les toupies
+  sauvegardées et les paramètres sont repris, et les versions déjà installées trouvent cette
+  mise à jour (l'ancienne adresse du dépôt redirige vers la nouvelle).
+- **Charte « Holo Combat »** sur tout le jeu, d'après les maquettes de `design/` :
+  - fond holographique, boutons, champs, listes et cadres à coins coupés, icônes vectorielles ;
+  - polices Chakra Petch et Rajdhani embarquées (licence SIL OFL) ;
+  - toupies redessinées : une silhouette par roue métallique (lames tournées dans le sens de
+    rotation), motifs des parties intermédiaires, emblème du coup spécial sur le boulon ;
+  - stadiums détaillés, chacun avec sa matière, son nom de code et sa couleur ;
+  - effet visuel propre à chaque coup spécial ; toupies gelées ou sonnées signalées sur
+    l'arène.
+- **Écrans refaits** :
+  - **Menu** : un vrai combat entre deux bots tourne en fond, sur un stadium au hasard, avec
+    les mêmes effets qu'en jeu ; les toupies sont tirées équitablement parmi les toupies
+    prédéfinies et les vôtres.
+  - **Préparation du combat** en cartes : camps, VS, choix du stadium.
+  - **Combat** : boutons Menu (Échap) et Changer de toupies sur l'arène, stadium et limite de
+    temps en haut à droite, manche et score (ou chrono) au centre, fiches des toupies en
+    miroir (endurance, état, « DASH ! » pendant un dash), carte du coup spécial cliquable,
+    rappel des touches en bas.
+  - **Atelier** en trois panneaux : vos toupies illustrées ; l'établi avec une carte par pièce
+    (flèches ‹ › ou liste illustrée de toutes les pièces), une vue éclatée et un aperçu qui
+    tourne ; les statistiques (radar, type obtenu, barres).
+  - **Coups spéciaux** : une page qui détaille les sept coups (illustration de l'effet,
+    emblème, point fort, faiblesse, jauges de dégâts, de recul et de portée), ouverte depuis
+    l'atelier.
+  - **Tournoi** : tableau d'élimination directe complet dès le premier tour (scores, chemin du
+    joueur en vert, coupe du champion), qui défile pour 16 ou 32 participants ; carte « Votre
+    match » ; classement de ligue avec podium, miniatures et différence de buts.
+- **Solo contre 1 à 3 bots** : avec 2 ou 3 bots, le combat devient une mêlée à 3 ou 4 toupies.
   Chaque bot a sa toupie (choisie ou au hasard) ; ils partagent la difficulté.
+- **Trois types de duel** quand deux dashs se croisent :
+  - **Timing** (comme avant) : appuyer quand le curseur traverse la zone verte ;
+  - **Rafale** : tir à la corde, chaque appui pousse le curseur vers l'adversaire ; au bout de
+    3,5 s le plus avancé gagne, 12 appuis d'avance gagnent aussitôt, pile au milieu c'est nul ;
+  - **Sans duel** : les toupies se repoussent comme lors d'un choc ordinaire.
+
+  Le type par défaut se choisit dans les Paramètres ; la personnalisation d'un combat, d'un
+  lobby ou d'un tournoi peut en imposer un autre. Les bots appuient plus ou moins vite en
+  rafale selon leur niveau ; le tutoriel garde le duel de timing qu'il enseigne.
+- **Tournois solo sauvegardés** : quitter propose « Sauvegarder et quitter », et fermer le jeu
+  en plein tournoi le sauvegarde. L'écran des tournois affiche alors une carte « Reprendre »
+  (format, joueurs, tour) ; un match en cours au moment de la sauvegarde est rejoué.
 - **Traduction anglaise** : langue au choix dans les Paramètres (par défaut celle du système),
-  le jeu redémarre pour l'appliquer. Noms des pièces, toupies, stadiums et coups traduits.
-- **Nouvelle charte « Holo Combat »** sur tout le jeu : fond holographique, coins coupés,
-  polices Chakra Petch et Rajdhani (licence OFL, embarquées), menu animé avec le logo,
-  préparation du combat en cartes (camps, VS, stadiums), interface de combat refaite (fiches
-  des toupies, chrono, manche), toupies redessinées (une silhouette par roue, motifs des
-  parties intermédiaires, emblème du coup spécial sur le boulon), stadiums détaillés (matière
-  et nom de code propres) et effet visuel propre à chaque coup spécial ; toupies gelées ou
-  sonnées signalées sur l'arène.
+  le jeu redémarre pour l'appliquer. Pièces, toupies, stadiums et coups sont traduits ; le nom
+  du jeu ne l'est jamais.
+- **Plein écran** au démarrage ; F11 bascule entre plein écran et fenêtre.
 
 ### Modifications
 
-- **Vortex** : l'anneau balaie tout le stadium (portée 2,2, plus rapide) et aspire vraiment ses
-  cibles pendant 0,9 s, jusqu'au centre sans le dépasser ; elles ne peuvent pas dasher pendant
-  l'aspiration. 20 dégâts (au lieu de 17).
+- **Stadiums** : tous ont désormais la surface du stadium Classique (l'octogone, l'hexagone et
+  l'ellipse étaient inscrits dans son cercle et le Volcan faisait 85 % de sa taille), et ils
+  apparaissent à la même échelle à l'écran.
+- **Rebord** : le percuter fait perdre un peu d'endurance (jusqu'à environ 1,7 point, selon la
+  vitesse, amorti par la défense), en jetant des étincelles ; le longer ne coûte rien.
+- **Vortex** : l'anneau balaie tout le stadium (portée 2,2, vitesse 1,8) et aspire vraiment ses
+  cibles pendant 0,9 s jusqu'au centre, sans le dépasser ; elles ne peuvent ni piloter ni
+  dasher pendant l'aspiration. 20 dégâts (au lieu de 17).
 - **Onde de choc** : recul plus fort (1,4 au lieu de 1,25), dégâts réduits (6 au lieu de 12,5)
   et portée un peu plus courte (0,65 au lieu de 0,75) : c'est un coup qui éjecte, pas qui use.
-- **Rebord** : le percuter fait perdre un peu d'endurance (selon la vitesse, amorti par la
-  défense), en jetant des étincelles ; le longer ne coûte rien.
-- Le combat de bots du menu affiche les mêmes effets qu'en jeu (coups spéciaux, étincelles des
-  chocs et des duels).
-- Les stadiums Béton et Sable laissent voir la courbure de leur cuvette.
-- Écran du tournoi : « Quitter » au lieu d'« Abandonner » (le bouton propose de sauvegarder).
+- **Duels** : maintenir la touche de dash ne répète plus les appuis.
+- **Atelier** : la jauge de budget disparaît (toutes les toupies totalisent 23 points).
+- **Tournoi** : « Quitter » au lieu d'« Abandonner » ; quitter un tournoi en réseau local
+  demande confirmation, puisque Échap le déclenche.
 
 ### Corrections
 
+- **Coups spéciaux** : une toupie en plein dash n'était pas repoussée (le dash effaçait le
+  recul), et une toupie qui fonçait sur le lanceur amortissait le recul de sa propre vitesse.
+  Le choc stoppe désormais son élan vers le lanceur avant de la repousser.
 - Le Vortex projetait ses cibles de l'autre côté du stadium, parfois dehors, au lieu de les
   ramener au centre.
-- Les coups spéciaux ne repoussaient pas une toupie en plein dash (le dash effaçait le recul),
-  et une toupie qui fonçait sur le lanceur amortissait le recul de sa propre vitesse. Le choc
-  stoppe désormais son élan vers le lanceur avant de la repousser.
+- L'emblème du boulon tourne avec la toupie ; les lames des roues sont orientées dans le sens
+  de rotation.
+- Titres de fin de combat lisibles (sans effet chromatique), fissures des stadiums Terre et
+  Volcan plus discrètes, courbure de la cuvette visible sur les stadiums Béton et Sable.
+- Le sélecteur de langue et celui du nombre de participants d'un tournoi affichent leur texte
+  en entier.
+- **Windows** : la 1.2.1 n'avait pas pu être publiée pour Windows (un test réseau dépassait son
+  délai sur cette plateforme). La 2.0.0 est de nouveau disponible pour Linux, Windows et macOS.
+
+### Compatibilité
+
+- Le multijoueur en réseau local garde le protocole 4 : une version 1.x peut encore rejoindre
+  un lobby 2.0.0 (et l'application mobile aussi). L'hôte simule le combat, donc ce sont ses
+  règles qui s'appliquent ; mieux vaut que tout le monde passe en 2.0.0, car une version 1.x
+  ne connaît pas les nouveaux types de duel.
 
 ## [1.2.1] — 2026-11-05
 
@@ -137,6 +195,8 @@ Première version publique.
 - **Atelier** pour assembler et enregistrer ses toupies.
 - **Paquets** Linux (AppImage), Windows (zip) et macOS (dmg) publiés par la CI.
 
+[Non publié]: https://github.com/valentinRyckaert/Top-Arena/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/valentinRyckaert/Top-Arena/compare/v1.2.1...v2.0.0
 [1.2.1]: https://github.com/valentinRyckaert/Top-Arena/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/valentinRyckaert/Top-Arena/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/valentinRyckaert/Top-Arena/compare/v1.0.0...v1.1.0
